@@ -1,0 +1,1 @@
+"""Calculator adapters (HIP, ASE)."""

@@ -1,0 +1,12 @@
+# Level 0: Pure GAD — raw Hessian, fixed dt, Euler steps
+method: pure_gad
+n_steps: 300
+dt: 0.005
+k_track: 0          # 0 = no mode tracking (always lowest eigenvector)
+beta: 1.0
+use_projection: false
+use_adaptive_dt: false
+max_atom_disp: 0.35
+min_interatomic_dist: 0.4
+force_threshold: 0.01
+purify_hessian: false

@@ -1,0 +1,12 @@
+defaults:
+  - search: pure_gad
+  - starting: noised_ts
+  - calculator: hip
+  - logging: default
+  - cluster: trillium
+  - _self_
+
+seed: 42
+max_samples: 300
+split: test
+output_dir: /scratch/memoozd/gadplus/runs/${now:%Y%m%d_%H%M%S}

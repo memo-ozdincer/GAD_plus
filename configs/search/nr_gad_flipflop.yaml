@@ -1,0 +1,11 @@
+# Level 4: NR+GAD flip-flop (state-based alternation)
+method: nr_gad_flipflop
+max_steps: 500
+gad_dt: 0.005
+k_track: 8
+use_projection: true
+max_atom_disp: 0.35
+min_interatomic_dist: 0.4
+nr_max_step_component: 0.3
+force_threshold: 0.01
+purify_hessian: false

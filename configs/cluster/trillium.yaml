@@ -1,0 +1,9 @@
+account: rrg-aspuru
+gpus_per_node: 1
+cpus_per_task: 12
+mem_gb: 64
+time_min: 360        # 6 hours
+modules:
+  - StdEnv/2023
+  - python/3.11.5
+  - cuda/12.6

@@ -1,0 +1,4 @@
+experiment_name: gadplus
+log_spectrum_k: 6
+save_coords: true
+mlflow_enabled: true

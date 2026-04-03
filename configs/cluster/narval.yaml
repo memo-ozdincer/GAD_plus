@@ -1,0 +1,17 @@
+# Narval (Calcul Québec) — A100 with MIG slicing
+# Use MIG slices for massive throughput on sequential MLIP inference.
+# A 2g.10gb slice gives ~1/4 A100 compute + 10GB VRAM — more than enough
+# for single-molecule Hessian evaluation.
+account: def-aspMDes   # UPDATE: replace with your Narval allocation
+gpus_per_node: 0        # MIG uses --gres instead of --gpus-per-node
+cpus_per_task: 2
+mem_gb: 8
+time_min: 360
+gres: "gpu:a100_2g.10gb:1"  # MIG slice: 10GB VRAM, 2/8 compute
+modules:
+  - StdEnv/2023
+  - python/3.11
+  - cuda/12.6
+# Paths (override in config.yaml or CLI)
+# project_dir: /lustre06/project/6033559/memoozd
+# scratch_dir: /lustre07/scratch/memoozd

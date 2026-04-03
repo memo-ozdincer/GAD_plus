@@ -1,0 +1,4 @@
+# Starting from geodesic/linear interpolation between reactant and product
+method: geodesic
+n_images: 10
+start_fraction: 0.5   # which interpolation point to start from (0.5 = midpoint)

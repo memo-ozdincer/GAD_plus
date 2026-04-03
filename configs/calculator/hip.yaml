@@ -1,0 +1,5 @@
+name: hip
+checkpoint: /project/rrg-aspuru/memoozd/models/hip_v2.ckpt
+hessian_method: predict
+device: cuda
+h5_path: /project/rrg-aspuru/memoozd/data/transition1x.h5

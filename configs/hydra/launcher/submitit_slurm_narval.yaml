@@ -1,0 +1,22 @@
+# @package _global_
+defaults:
+  - override /hydra/launcher: submitit_slurm
+
+hydra:
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+    timeout_min: ${cluster.time_min}
+    cpus_per_task: ${cluster.cpus_per_task}
+    gpus_per_node: 0    # MIG uses gres, not gpus_per_node
+    tasks_per_node: 1
+    mem_gb: ${cluster.mem_gb}
+    nodes: 1
+    name: gadplus_narval
+    array_parallelism: 200   # blast with MIG slices
+    additional_parameters:
+      gres: ${cluster.gres}
+    setup:
+      - module purge
+      - module load StdEnv/2023 python/3.11 cuda/12.6
+      - source /lustre06/project/6033559/memoozd/GADplus/.venv/bin/activate
+      - export MLFLOW_TRACKING_URI=file:///lustre07/scratch/memoozd/gadplus/mlruns

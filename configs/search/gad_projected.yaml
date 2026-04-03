@@ -1,0 +1,12 @@
+# Level 2: GAD + mode tracking + Eckart projection
+method: gad_projected
+n_steps: 300
+dt: 0.005
+k_track: 8
+beta: 1.0
+use_projection: true
+use_adaptive_dt: false
+max_atom_disp: 0.35
+min_interatomic_dist: 0.4
+force_threshold: 0.01
+purify_hessian: false

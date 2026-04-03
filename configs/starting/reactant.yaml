@@ -1,0 +1,4 @@
+# Starting from reactant geometry
+method: reactant
+noise_levels_pm: [0]
+seeds_per_level: 1
