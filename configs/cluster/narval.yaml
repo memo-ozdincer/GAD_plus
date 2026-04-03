@@ -1,27 +1,23 @@
 # Narval (Calcul Québec) — A100-40GB with MIG slicing
 #
-# HIP inference on small molecules uses <2GB VRAM. A 2g.10gb MIG slice
-# gives 10GB VRAM + 2/8 compute — plenty for sequential Hessian evaluation.
-# This lets you pack ~14 independent jobs per physical A100.
+# HIP inference on small molecules: sequential, <2GB VRAM, GPU-bound but
+# not compute-bound. Full A100 would sit 95% idle. MIG slices give same
+# per-job throughput with much faster queue dispatch.
 #
-# Narval policy: min 1h jobs, max 7 days, max 1000 jobs queued.
-# GPU nodes: 159 nodes × 4 A100-SXM4-40GB each, 48 cores/node, 498GB RAM.
+# Narval policy: min 1h jobs, max 7 days, max 1000 queued.
+# GPU nodes: 159 × 4 A100-SXM4-40GB, 48 cores/node, 498GB RAM.
+# MIG nodes are often idle — batch MIG jobs start within minutes.
 #
-# MIG slices available:
-#   1g.5gb  — 1/8 compute, 5GB  (cheapest, may be tight for Hessian autodiff)
-#   2g.10gb — 2/8 compute, 10GB (sweet spot for HIP inference)
-#   3g.20gb — 3/8 compute, 20GB (for larger molecules)
-#   4g.20gb — 4/8 compute, 20GB (fewer available)
+# Interactive salloc has ~3hr wait (small pool). Use sbatch instead.
 
-account: def-aspuru
-gpus: "a100_2g.10gb:1"   # MIG slice via --gpus= (Narval syntax)
-cpus_per_task: 2          # 2 CPU cores per MIG slice (more isn't useful)
-mem_gb: 8                 # 8GB RAM per job (HIP + dataset fits easily)
-time_min: 360             # 6 hours default
+account: rrg-aspuru
+gpus: "a100_2g.10gb:1"   # MIG slice: 10GB VRAM, 2/8 compute — plenty for HIP
+cpus_per_task: 4          # 4 cores: 1 for main loop, rest for torch/data
+mem_gb: 16                # Dataset + model + trajectory buffer
+time_min: 360             # 6 hours
 
-# Threading: pin to 2 threads to match cpus_per_task, avoid contention
-omp_num_threads: 1        # BLAS/LAPACK: single-threaded (torch handles parallelism)
-torch_num_threads: 2      # PyTorch intra-op threads
+omp_num_threads: 1        # BLAS single-threaded
+torch_num_threads: 2      # Intra-op: 2 is enough for MIG slice
 
 modules:
   - StdEnv/2023

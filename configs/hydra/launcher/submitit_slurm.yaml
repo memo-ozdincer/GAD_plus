@@ -19,7 +19,7 @@ hydra:
     mem_gb: ${cluster.mem_gb}
     nodes: 1
     name: gadplus
-    array_parallelism: 200  # Narval MIG: blast the queue with tiny jobs
+    array_parallelism: 500  # MIG nodes often idle — blast the queue
     additional_parameters:
       account: ${cluster.account}
       gpus: ${cluster.gpus}
