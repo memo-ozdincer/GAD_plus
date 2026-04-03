@@ -333,6 +333,76 @@ The typical pattern for running experiments:
 
 The Parquet-per-sample design means partial runs always produce usable data. No database locks, no corruption from interrupted jobs.
 
+## Experiments
+
+### Overview
+
+All experiments use HIP on Transition1x (train split, 9561 samples). No SCINE. No Sella/KinBot benchmark — just T1x. Bottom-up: benchmark pure GAD first, then add features one at a time.
+
+### Experiment 1: Noised TS (primary)
+
+Start from known TS geometry + Gaussian noise. Like noisyTS.tex Figure 3.
+
+- Noise levels: 0, 1, 3, 5, 7, 10, 12, 15 pm
+- 10 noise seeds per level
+- Compare: GAD levels 0-4 vs Sella-BFGS-Internal vs Sella-Hessian-Internal vs Sella-Hessian-Cartesian
+
+### Experiment 2: Geodesic interpolation reactant→product
+
+Start from interpolated geometry between reactant and product (not from noised TS). Tests whether GAD can find the TS from a path guess.
+
+### Experiment 3: Random starting point + NR+GAD
+
+Start from random geometry. Use NR+GAD flip-flop. Hardest starting condition.
+
+### Experiment 4 (secondary): Relaxation basin mapping
+
+Start from known TS, add increasing noise, check if we return to the SAME TS. Maps the basin of attraction around each saddle point. How far can we go before we land on a different TS?
+
+### Metrics for every experiment
+
+1. **Converged**: `n_neg == 1 AND force_norm < threshold` (use Sella's threshold for fair comparison)
+2. **Intended (IRC validation)**: From converged TS, run Sella IRC forward + backward. Compare endpoints to known reactant/product via RMSD. Both match → intended. One matches → half-intended. Neither → unintended.
+3. **Frequency analysis**: Eckart-projected vibrational eigenvalues confirm n_neg == 1.
+
+IRC pseudocode:
+```python
+from sella import IRC
+atoms.calc = HipASECalculator(predict_fn, atomic_nums)
+optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4, "keep_going": True}
+forward = IRC(atoms, **optimizer_kwargs).run(direction="forward")
+reverse = IRC(atoms, **optimizer_kwargs).run(direction="reverse")
+# Compare forward/reverse endpoints to known reactant/product via RMSD
+```
+
+### Baselines
+
+- **Sella TS-BFGS** (quasi-Newton, internal coordinates) — standard QN baseline
+- **Sella full Hessian** (internal coordinates) — gold standard, expensive
+- **Sella full Hessian** (Cartesian coordinates) — tests coordinate system effect
+- **Our GAD levels 0-4** — pure GAD through NR+GAD flip-flop
+
+### Visualizations and logging
+
+Every run produces:
+- **Per-step Parquet** with 40 fields (energy, forces, eigenvalues, mode tracking, displacements, etc.)
+- **Eigenvalue evolution plots**: eig0, eig1, eig_product vs step (key for seeing when n_neg hits 1)
+- **Force convergence plot**: force_norm vs step
+- **Energy trajectory**: energy vs step
+- **Mode overlap plot**: tracking quality across steps (detects mode crossings)
+- **Gradient-mode overlap**: |grad · v_i| / |grad| — bottleneck detector for stuck modes
+- **Displacement plots**: from start, from last step, to known TS
+- **Failure autopsy**: 6-class classification for every failed run
+
+Aggregate visualizations (like noisyTS.tex figures):
+- **Intended count vs noise level** (with 95% CI from seeds) — the main result figure
+- **TS failure count vs noise level** (with 95% CI)
+- **Wall time distribution** (violin/box plots per method)
+- **Convergence rate table**: method × noise level × starting geometry
+
+Paper page: like https://bestquark.github.io/springs-and-sticks/
+GIF: random geometry → TS via GAD dynamics
+
 ## Don't
 
 - Don't use anything other than n_neg==1 + force<threshold as TS convergence
