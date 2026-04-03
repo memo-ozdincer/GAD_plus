@@ -6,11 +6,11 @@
 # 3. Claude Code or cron-like loop checks progress, fixes bugs, resubmits
 #
 # Usage:
-#   salloc --account=rrg-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
+#   salloc --account=def-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
 #   bash scripts/run_narval_reserved.sh
 #
 # Or for the full 4-GPU node (run 4 experiments in parallel):
-#   salloc --account=rrg-aspuru --gpus=a100:4 --cpus-per-task=48 --mem=250G --time=12:00:00
+#   salloc --account=def-aspuru --gpus=a100:4 --cpus-per-task=48 --mem=250G --time=12:00:00
 
 set -euo pipefail
 

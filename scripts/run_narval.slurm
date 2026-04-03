@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=rrg-aspuru
+#SBATCH --account=def-aspuru
 #SBATCH --gpus=a100_2g.10gb:1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G

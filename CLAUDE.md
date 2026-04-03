@@ -97,7 +97,7 @@ HIP inference on small molecules is sequential and uses <2GB VRAM. A full A100 w
 ```
 Cluster:   Narval (Calcul Québec, Alliance Canada)
 Login:     narval.alliancecan.ca
-Account:   rrg-aspuru
+Account:   def-aspuru
 GPU:       a100_2g.10gb:1 (MIG slice: 10GB VRAM, 2/8 compute)
 CPU:       4 cores per job
 RAM:       16GB per job
@@ -113,7 +113,7 @@ Batch MIG jobs start within minutes. Interactive `salloc` has ~3hr wait (smaller
 Override with `cluster=trillium`. Useful for larger molecules or model training.
 
 ```
-Account:   rrg-aspuru
+Account:   def-aspuru
 GPU:       1× H100-SXM (full, 80GB)
 CPU:       12 cores per job
 RAM:       64GB per job
@@ -166,7 +166,7 @@ python -m gadplus.orchestration.run --multirun \
 Reserve a full A100 node, run experiments sequentially with `srun`. Claude Code checks every hour, fixes bugs, resubmits:
 
 ```bash
-salloc --account=rrg-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
+salloc --account=def-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
 bash scripts/run_narval_reserved.sh
 ```
 
