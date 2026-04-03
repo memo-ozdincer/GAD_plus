@@ -8,7 +8,7 @@
 #   bash scripts/run_narval_sweep.sh
 #
 # Or from a reserved node:
-#   salloc --account=def-aspuru --gpus=a100:1 --cpus-per-task=48 --mem=64G --time=12:00:00
+#   salloc --account=rrg-aspuru --gpus=a100:1 --cpus-per-task=48 --mem=64G --time=12:00:00
 #   # Then run individual experiments with srun:
 #   srun python -m gadplus.orchestration.run search=gad_projected max_samples=100
 

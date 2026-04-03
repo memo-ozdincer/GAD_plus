@@ -32,7 +32,7 @@ scripts/             # SLURM scripts, DuckDB analysis, env setup
 Narval's MIG lets you slice a single A100 into isolated mini-GPUs. HIP inference on small molecules uses <2GB VRAM, so a `2g.10gb` slice (10GB, 2/8 compute) is plenty. This packs ~14 independent jobs per physical A100.
 
 ```
-Account:   def-aspuru
+Account:   rrg-aspuru
 GPU:       a100_2g.10gb:1 (MIG slice)
 CPU:       2 cores per job
 RAM:       8GB per job
@@ -63,7 +63,7 @@ bash scripts/setup_env.sh
 source .venv/bin/activate
 
 # Single run on a reserved node
-salloc --account=def-aspuru --gpus=a100_2g.10gb:1 --cpus-per-task=2 --mem=8G --time=6:00:00
+salloc --account=rrg-aspuru --gpus=a100_2g.10gb:1 --cpus-per-task=2 --mem=8G --time=6:00:00
 srun python -m gadplus.orchestration.run search=gad_projected max_samples=50
 
 # Submit as SLURM job
@@ -73,7 +73,7 @@ sbatch scripts/run_narval.slurm
 bash scripts/run_narval_sweep.sh
 
 # Overnight reserved-node workflow
-salloc --account=def-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
+salloc --account=rrg-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
 bash scripts/run_narval_reserved.sh
 
 # Analysis
