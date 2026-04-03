@@ -1,4 +1,11 @@
 # @package _global_
+#
+# Default SLURM launcher — Narval with MIG slicing.
+# Override with cluster=trillium for H100 runs.
+#
+# Usage:
+#   python -m gadplus.orchestration.run --multirun hydra/launcher=submitit_slurm ...
+
 defaults:
   - override /hydra/launcher: submitit_slurm
 
@@ -7,14 +14,25 @@ hydra:
     submitit_folder: ${hydra.sweep.dir}/.submitit/%j
     timeout_min: ${cluster.time_min}
     cpus_per_task: ${cluster.cpus_per_task}
-    gpus_per_node: ${cluster.gpus_per_node}
+    gpus_per_node: 0        # Narval MIG uses --gpus, not --gpus-per-node
     tasks_per_node: 1
     mem_gb: ${cluster.mem_gb}
     nodes: 1
-    name: gadplus_sweep
-    array_parallelism: 50
+    name: gadplus
+    array_parallelism: 200  # Narval MIG: blast the queue with tiny jobs
+    additional_parameters:
+      account: ${cluster.account}
+      gpus: ${cluster.gpus}
     setup:
       - module purge
-      - module load StdEnv/2023 python/3.11.5 cuda/12.6
-      - source /project/rrg-aspuru/memoozd/GADplus/.venv/bin/activate
-      - export MLFLOW_TRACKING_URI=file:///scratch/memoozd/gadplus/mlruns
+      - module load StdEnv/2023 python/3.11 cuda/12.6
+      - source ${cluster.project_dir}/GAD_plus/.venv/bin/activate
+      - export OMP_NUM_THREADS=${cluster.omp_num_threads}
+      - export MKL_NUM_THREADS=${cluster.omp_num_threads}
+      - export OPENBLAS_NUM_THREADS=${cluster.omp_num_threads}
+      - export NUMEXPR_NUM_THREADS=${cluster.omp_num_threads}
+      - export TORCH_NUM_THREADS=${cluster.torch_num_threads}
+      - export MPLBACKEND=Agg
+      - export TMPDIR=${cluster.scratch_dir}/gadplus/tmp
+      - export MLFLOW_TRACKING_URI=file://${cluster.scratch_dir}/gadplus/mlruns
+      - mkdir -p $TMPDIR

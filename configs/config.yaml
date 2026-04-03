@@ -3,10 +3,10 @@ defaults:
   - starting: noised_ts
   - calculator: hip
   - logging: default
-  - cluster: trillium
+  - cluster: narval
   - _self_
 
 seed: 42
 max_samples: 300
 split: test
-output_dir: /scratch/memoozd/gadplus/runs/${now:%Y%m%d_%H%M%S}
+output_dir: /lustre07/scratch/memoozd/gadplus/runs/${now:%Y%m%d_%H%M%S}

@@ -70,6 +70,13 @@ def _build_nr_gad_config(cfg: DictConfig) -> NRGADConfig:
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
 
+    # Pin threading to avoid contention on shared MIG nodes
+    omp_threads = str(cfg.cluster.get("omp_num_threads", 1))
+    torch_threads = int(cfg.cluster.get("torch_num_threads", 2))
+    for var in ["OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"]:
+        os.environ[var] = omp_threads
+    torch.set_num_threads(torch_threads)
+
     # Seed
     torch.manual_seed(cfg.seed)
     if torch.cuda.is_available():

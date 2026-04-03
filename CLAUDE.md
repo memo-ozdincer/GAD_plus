@@ -1,92 +1,112 @@
-# GADplus
+# GAD_plus
 
-Clean, publishable implementation of GAD-based transition state search with HIP neural network potential. Bottom-up design: pure GAD is the base, each feature (mode tracking, Eckart projection, adaptive dt, NR flip-flop) is added and benchmarked independently.
+Clean, publishable GAD-based transition state search with HIP neural network potential. Bottom-up design: pure GAD is the base, each feature is added and benchmarked independently. Narval-first.
 
 ## Project structure
 
 ```
 src/gadplus/
   core/              # Pure algorithms, zero I/O
-    gad.py             # GAD vector computation, Euler step
-    mode_tracking.py   # Eigenvector continuity across steps
-    newton_raphson.py  # Spectral-partitioned NR for TS refinement
-    convergence.py     # n_neg==1 AND force<0.01, cascade analysis
-    adaptive_dt.py     # Eigenvalue-clamped timestep, displacement cap
-    types.py           # PredictFn protocol
-  projection/        # Eckart/mass-weighting
-    masses.py          # MASS_DICT, get_mass_weights_torch
-    eckart.py          # Eckart generators, projector, vibrational basis
-    hessian.py         # reduced_basis_hessian, vib_eig, purify_sum_rules
-    gad_projected.py   # GAD dynamics with Eckart projection
-  calculator/        # HIP interface
-    hip.py             # make_hip_predict_fn, load_hip_calculator
-    ase_adapter.py     # ASE Calculator wrapper for Sella IRC
-  geometry/          # Molecular geometry utilities
-    alignment.py       # Kabsch + Hungarian
-    noise.py           # Gaussian noise
-    interpolation.py   # Linear + geodesic interpolation
-    starting.py        # StartingGeometry factory
-  search/            # Search loops (all state-based, no path history)
-    gad_search.py      # Main GAD loop (levels 0-3)
-    nr_gad_flipflop.py # NR+GAD alternation (level 4)
-    irc_validate.py    # Sella IRC validation
-  logging/           # Trajectory logging + failure analysis
-    trajectory.py      # TrajectoryLogger -> Parquet
-    mlflow_logger.py   # MLflow offline (file://) wrapper
-    autopsy.py         # 6-class failure classification
-    schema.py          # PyArrow schema definitions
-  data/              # Dataset loading
-    transition1x.py    # Transition1xDataset, UsePos
+  projection/        # Eckart/mass-weighting, reduced-basis Hessian
+  calculator/        # HIP predict_fn, ASE adapter for Sella IRC
+  geometry/          # Kabsch+Hungarian alignment, noise, interpolation
+  search/            # GAD loop, NR+GAD flip-flop, IRC validation
+  logging/           # Parquet trajectories, MLflow offline, failure autopsy
+  data/              # Transition1x dataset loader
   orchestration/     # Hydra entry point
-    run.py             # @hydra.main
-configs/             # Hydra config tree
-scripts/             # Analysis (DuckDB), env setup
+configs/             # Hydra: search/, starting/, calculator/, cluster/
+scripts/             # SLURM scripts, DuckDB analysis, env setup
 ```
 
 ## Key concepts
 
-- **predict_fn interface**: `predict_fn(coords, atomic_nums, do_hessian, require_grad) -> dict` with keys `energy`, `forces`, `hessian`. All algorithms use this; backend lives in `calculator/hip.py`.
-- **HIP only**: GPU-accelerated ML potential (Equiformer). No SCINE in this codebase.
-- **Eckart projection**: Raw Hessians have 5-6 rigid-body null modes. `vib_eig()` in `projection/hessian.py` returns a full-rank (3N-k, 3N-k) vibrational Hessian — no threshold filtering needed.
-- **TS convergence**: **n_neg == 1 AND force_norm < 0.01 eV/A**. Non-negotiable. No eigenvalue product gates, no threshold relaxation.
+- **predict_fn interface**: All algorithms use `predict_fn(coords, atomic_nums, do_hessian, require_grad) -> dict`.
+- **HIP only**: GPU ML potential (Equiformer). No SCINE.
+- **Eckart projection**: `vib_eig()` returns full-rank (3N-k) vibrational Hessian. No threshold filtering.
+- **TS convergence**: **n_neg == 1 AND force_norm < 0.01 eV/A**. Non-negotiable.
 
-## Bottom-up feature levels
+## Cluster setup
 
-| Level | Config | Feature | Description |
-|-------|--------|---------|-------------|
-| 0 | `pure_gad` | Baseline | Raw Hessian, fixed dt, Euler steps |
-| 1 | `gad_tracked` | + Mode tracking | k=8 candidate eigenvector tracking |
-| 2 | `gad_projected` | + Eckart projection | Reduced-basis vibrational Hessian |
-| 3 | `gad_adaptive_dt` | + Adaptive dt | Eigenvalue-clamped timestep |
-| 4 | `nr_gad_flipflop` | + NR refinement | State-based NR when n_neg==1 |
+### Narval (primary) — A100 MIG slicing
+
+Narval's MIG lets you slice a single A100 into isolated mini-GPUs. HIP inference on small molecules uses <2GB VRAM, so a `2g.10gb` slice (10GB, 2/8 compute) is plenty. This packs ~14 independent jobs per physical A100.
+
+```
+Account:   def-aspuru
+GPU:       a100_2g.10gb:1 (MIG slice)
+CPU:       2 cores per job
+RAM:       8GB per job
+Project:   /lustre06/project/6033559/memoozd
+Scratch:   /lustre07/scratch/memoozd
+```
+
+### Trillium (secondary) — H100 full GPUs
+
+Override with `cluster=trillium` for large molecules or training.
+
+```
+Account:   rrg-aspuru
+GPU:       1× H100-SXM (full)
+CPU:       12 cores per job
+RAM:       64GB per job
+Project:   /project/rrg-aspuru/memoozd
+Scratch:   /scratch/memoozd
+```
 
 ## Running experiments
 
 ```bash
-# Setup
-source /project/rrg-aspuru/memoozd/GADplus/.venv/bin/activate
-export PYTHONPATH=/project/rrg-aspuru/memoozd/GADplus:$PYTHONPATH
+# Setup (once, on Narval)
+bash scripts/setup_env.sh
 
-# Local single run
-python -m gadplus.orchestration.run search=gad_projected starting=noised_ts
+# Activate
+source .venv/bin/activate
 
-# SLURM sweep (all methods x all noise levels)
-python -m gadplus.orchestration.run --multirun \
-    hydra/launcher=submitit_slurm \
-    search=pure_gad,gad_tracked,gad_projected,gad_adaptive_dt,nr_gad_flipflop \
-    starting.noise_levels_pm=0,1,3,5,10,15
+# Single run on a reserved node
+salloc --account=def-aspuru --gpus=a100_2g.10gb:1 --cpus-per-task=2 --mem=8G --time=6:00:00
+srun python -m gadplus.orchestration.run search=gad_projected max_samples=50
+
+# Submit as SLURM job
+sbatch scripts/run_narval.slurm
+
+# Sweep: all methods × all noise levels (launches hundreds of MIG jobs)
+bash scripts/run_narval_sweep.sh
+
+# Overnight reserved-node workflow
+salloc --account=def-aspuru --gpus=a100:1 --cpus-per-task=12 --mem=64G --time=12:00:00
+bash scripts/run_narval_reserved.sh
 
 # Analysis
-python scripts/analyze.py /scratch/memoozd/gadplus/runs/
+python scripts/analyze.py /lustre07/scratch/memoozd/gadplus/runs/
+
+# On Trillium instead
+python -m gadplus.orchestration.run cluster=trillium search=gad_projected max_samples=50
 ```
 
-## Key paths
+## Bottom-up feature levels
 
-- HIP checkpoint: `/project/rrg-aspuru/memoozd/models/hip_v2.ckpt`
-- Transition1x: `/project/rrg-aspuru/memoozd/data/transition1x.h5`
-- Output: `/scratch/memoozd/gadplus/runs/`
-- MLflow: `file:///scratch/memoozd/gadplus/mlruns`
-- SLURM account: `rrg-aspuru`
+| Level | Config | What's added |
+|-------|--------|-------------|
+| 0 | `pure_gad` | Raw Hessian, fixed dt, Euler steps |
+| 1 | `gad_tracked` | + Mode tracking (k=8) |
+| 2 | `gad_projected` | + Eckart projection |
+| 3 | `gad_adaptive_dt` | + Eigenvalue-clamped dt |
+| 4 | `nr_gad_flipflop` | + NR refinement at saddle |
+
+## Key paths (Narval)
+
+- HIP checkpoint: `/lustre06/project/6033559/memoozd/models/hip_v2.ckpt`
+- Transition1x: `/lustre06/project/6033559/memoozd/data/transition1x.h5`
+- Output: `/lustre07/scratch/memoozd/gadplus/runs/`
+- MLflow: `file:///lustre07/scratch/memoozd/gadplus/mlruns`
+
+## Performance notes
+
+- Threading is pinned: OMP=1, torch=2 (avoids contention on MIG shared nodes)
+- Dataset is loaded once into memory; samples processed sequentially on GPU
+- Each sample's trajectory is flushed to its own Parquet file (crash-safe)
+- DuckDB analysis works on partial results (glob over whatever Parquet files exist)
+- No internet on compute nodes: MLflow uses `file://` URI, no wandb
 
 ## Don't
 
@@ -95,3 +115,4 @@ python scripts/analyze.py /scratch/memoozd/gadplus/runs/
 - Don't add features without independent benchmarking justification
 - Don't use path-based state (trajectory history) in optimizers
 - Don't import HIP in core/ or projection/ — use the predict_fn interface
+- Don't add Co-Authored-By lines to git commits

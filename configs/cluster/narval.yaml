@@ -1,17 +1,33 @@
-# Narval (Calcul Québec) — A100 with MIG slicing
-# Use MIG slices for massive throughput on sequential MLIP inference.
-# A 2g.10gb slice gives ~1/4 A100 compute + 10GB VRAM — more than enough
-# for single-molecule Hessian evaluation.
-account: def-aspMDes   # UPDATE: replace with your Narval allocation
-gpus_per_node: 0        # MIG uses --gres instead of --gpus-per-node
-cpus_per_task: 2
-mem_gb: 8
-time_min: 360
-gres: "gpu:a100_2g.10gb:1"  # MIG slice: 10GB VRAM, 2/8 compute
+# Narval (Calcul Québec) — A100-40GB with MIG slicing
+#
+# HIP inference on small molecules uses <2GB VRAM. A 2g.10gb MIG slice
+# gives 10GB VRAM + 2/8 compute — plenty for sequential Hessian evaluation.
+# This lets you pack ~14 independent jobs per physical A100.
+#
+# Narval policy: min 1h jobs, max 7 days, max 1000 jobs queued.
+# GPU nodes: 159 nodes × 4 A100-SXM4-40GB each, 48 cores/node, 498GB RAM.
+#
+# MIG slices available:
+#   1g.5gb  — 1/8 compute, 5GB  (cheapest, may be tight for Hessian autodiff)
+#   2g.10gb — 2/8 compute, 10GB (sweet spot for HIP inference)
+#   3g.20gb — 3/8 compute, 20GB (for larger molecules)
+#   4g.20gb — 4/8 compute, 20GB (fewer available)
+
+account: def-aspuru
+gpus: "a100_2g.10gb:1"   # MIG slice via --gpus= (Narval syntax)
+cpus_per_task: 2          # 2 CPU cores per MIG slice (more isn't useful)
+mem_gb: 8                 # 8GB RAM per job (HIP + dataset fits easily)
+time_min: 360             # 6 hours default
+
+# Threading: pin to 2 threads to match cpus_per_task, avoid contention
+omp_num_threads: 1        # BLAS/LAPACK: single-threaded (torch handles parallelism)
+torch_num_threads: 2      # PyTorch intra-op threads
+
 modules:
   - StdEnv/2023
   - python/3.11
   - cuda/12.6
-# Paths (override in config.yaml or CLI)
-# project_dir: /lustre06/project/6033559/memoozd
-# scratch_dir: /lustre07/scratch/memoozd
+
+# Narval Lustre paths
+project_dir: /lustre06/project/6033559/memoozd
+scratch_dir: /lustre07/scratch/memoozd

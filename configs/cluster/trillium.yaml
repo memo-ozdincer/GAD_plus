@@ -1,9 +1,21 @@
+# Trillium (SciNet) — H100 GPUs (secondary cluster)
+# 4×H100-SXM per node, 96 cores, 755GB RAM
+# No MIG slicing — must request full GPUs (1 or 4)
+# Use Narval for throughput; Trillium for large-molecule or training jobs.
+
 account: rrg-aspuru
-gpus_per_node: 1
+gpus: 1                   # --gpus-per-node=1 (full H100)
 cpus_per_task: 12
 mem_gb: 64
-time_min: 360        # 6 hours
+time_min: 360
+
+omp_num_threads: 1
+torch_num_threads: 4
+
 modules:
   - StdEnv/2023
   - python/3.11.5
   - cuda/12.6
+
+project_dir: /project/rrg-aspuru/memoozd
+scratch_dir: /scratch/memoozd
