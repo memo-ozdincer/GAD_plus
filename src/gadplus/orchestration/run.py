@@ -29,7 +29,7 @@ from gadplus.geometry.noise import add_gaussian_noise
 from gadplus.geometry.starting import make_starting_coords
 from gadplus.logging.trajectory import TrajectoryLogger
 from gadplus.logging.autopsy import classify_failure
-from gadplus.projection.masses import atomic_nums_to_symbols
+from gadplus.projection import atomic_nums_to_symbols
 from gadplus.search.gad_search import GADSearchConfig, run_gad_search
 from gadplus.search.nr_gad_flipflop import NRGADConfig, run_nr_gad_flipflop
 

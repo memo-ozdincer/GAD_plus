@@ -24,9 +24,9 @@ from gadplus.core.gad import compute_gad_vector_tracked, prepare_hessian
 from gadplus.core.mode_tracking import pick_tracked_mode
 from gadplus.core.convergence import is_ts_converged, force_mean
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
-from gadplus.projection.hessian import vib_eig
-from gadplus.projection.gad_projected import gad_dynamics_projected_torch
-from gadplus.projection.masses import atomic_nums_to_symbols
+from gadplus.projection import vib_eig
+from gadplus.projection import gad_dynamics_projected
+from gadplus.projection import atomic_nums_to_symbols
 from gadplus.logging.trajectory import TrajectoryLogger
 
 
@@ -179,7 +179,7 @@ def run_gad_search(
             )
             v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
 
-            gad_vec, v_proj, _info = gad_dynamics_projected_torch(
+            gad_vec, v_proj, _info = gad_dynamics_projected(
                 coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
             )
             v_prev = v_proj.detach().clone().reshape(-1)

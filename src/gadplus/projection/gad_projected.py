@@ -1,4 +1,7 @@
-"""GAD dynamics with Eckart projection.
+"""GAD dynamics with Eckart projection (differentiable).
+
+All operations use pure torch — autograd flows through the entire projection
+pipeline. This is critical for HIP's require_grad=True path.
 
 Computes the GAD direction with consistent projection of gradient, guide vector,
 and output to prevent leakage into the translation/rotation null space.
@@ -7,8 +10,9 @@ from __future__ import annotations
 
 import torch
 
-from .masses import get_mass_weights_torch
+from .masses import get_mass_weights_torch, mass_weigh_hessian_torch, MASS_DICT, _to_torch_double
 from .eckart import eckartprojection_torch
+from .hessian import reduced_basis_hessian_torch
 
 
 def gad_dynamics_projected_torch(

@@ -8,5 +8,7 @@ defaults:
 
 seed: 42
 max_samples: 300
-split: test
+# Available splits: train (9561), test (287), val (225)
+# We didn't train on T1x so train split is fair game for evaluation.
+split: train
 output_dir: /lustre07/scratch/memoozd/gadplus/runs/${now:%Y%m%d_%H%M%S}

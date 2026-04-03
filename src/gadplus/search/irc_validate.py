@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from ase import Atoms
 
-from gadplus.projection.masses import Z_TO_SYMBOL
+from gadplus.projection import Z_TO_SYMBOL
 
 
 @dataclass
