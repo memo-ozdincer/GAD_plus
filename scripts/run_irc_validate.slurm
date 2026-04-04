@@ -3,12 +3,13 @@
 #SBATCH --gpus=a100_2g.10gb:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=1:00:00
-#SBATCH --output=/lustre07/scratch/memoozd/gadplus/logs/irc_%j.out
-#SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/irc_%j.err
+#SBATCH --time=2:00:00
+#SBATCH --output=/lustre07/scratch/memoozd/gadplus/logs/irc_%A_%a.out
+#SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/irc_%A_%a.err
+#SBATCH --array=0-2
 #
-# Phase 5: IRC validation on converged TS from Phase 2.
-# Validates first 10 converged TS at noise=10pm.
+# Phase 5: IRC validation on converged TS from Phase 2 (300 samples).
+# Array: 3 noise levels (0pm, 10pm, 50pm), 30 converged TS each.
 #
 # Submit:  sbatch scripts/run_irc_validate.slurm
 
@@ -28,15 +29,21 @@ export WANDB_MODE=disabled
 export WANDB_DISABLED=true
 export PYTHONUNBUFFERED=1
 export TMPDIR="$SCRATCH/gadplus/tmp"
-mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/irc_validation"
+mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/irc_validation_300"
 
-echo "Job $SLURM_JOB_ID on $(hostname)"
+NOISE_PMS=(0 10 50)
+NOISE_PM=${NOISE_PMS[$SLURM_ARRAY_TASK_ID]}
+
+echo "Job $SLURM_JOB_ID, array task $SLURM_ARRAY_TASK_ID, noise_pm=$NOISE_PM"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || true
 
 python -u "$PROJECT_DIR/scripts/irc_validate.py" \
-    --noise-pm 10 \
-    --max-validate 10 \
+    --noise-pm "$NOISE_PM" \
+    --max-validate 30 \
     --irc-steps 100 \
-    --rmsd-threshold 0.3
+    --rmsd-threshold 0.3 \
+    --survey-dir "$SCRATCH/gadplus/runs/noise_survey_300" \
+    --n-dataset-samples 300 \
+    --output-dir "$SCRATCH/gadplus/runs/irc_validation_300"
 
 echo "Done."

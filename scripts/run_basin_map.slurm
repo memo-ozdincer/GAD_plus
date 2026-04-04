@@ -28,13 +28,13 @@ export WANDB_MODE=disabled
 export WANDB_DISABLED=true
 export PYTHONUNBUFFERED=1
 export TMPDIR="$SCRATCH/gadplus/tmp"
-mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/basin_map"
+mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/basin_map_50"
 
 echo "Job $SLURM_JOB_ID on $(hostname)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || true
 
 python -u "$PROJECT_DIR/scripts/basin_map.py" \
-    --n-samples 20 \
+    --n-samples 50 \
     --n-steps 300 \
     --dt 0.01 \
     --split train

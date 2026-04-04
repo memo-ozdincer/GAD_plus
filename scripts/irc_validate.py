@@ -26,7 +26,11 @@ def main():
     parser.add_argument("--max-validate", type=int, default=10, help="Max converged TS to validate")
     parser.add_argument("--irc-steps", type=int, default=100, help="Max IRC steps per direction")
     parser.add_argument("--rmsd-threshold", type=float, default=0.3, help="RMSD threshold for matching (A)")
+    parser.add_argument("--survey-dir", type=str, default=None,
+                        help="Directory with noise survey results")
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--n-dataset-samples", type=int, default=300,
+                        help="Number of dataset samples to load (must cover sample_ids in survey)")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -51,7 +55,7 @@ def main():
     else:
         sys.exit("transition1x.h5 not found")
 
-    survey_dir = "/lustre07/scratch/memoozd/gadplus/runs/noise_survey"
+    survey_dir = args.survey_dir or "/lustre07/scratch/memoozd/gadplus/runs/noise_survey_300"
     output_dir = args.output_dir or "/lustre07/scratch/memoozd/gadplus/runs/irc_validation"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -81,7 +85,7 @@ def main():
     # ---- Load dataset to get reference geometries ----
     from gadplus.data.transition1x import Transition1xDataset, UsePos
     dataset = Transition1xDataset(
-        h5_path, split="train", max_samples=50,
+        h5_path, split="train", max_samples=args.n_dataset_samples,
         transform=UsePos("pos_transition"),
     )
 

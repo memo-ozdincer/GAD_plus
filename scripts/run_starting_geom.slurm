@@ -3,7 +3,7 @@
 #SBATCH --gpus=a100_2g.10gb:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=1:00:00
+#SBATCH --time=3:00:00
 #SBATCH --output=/lustre07/scratch/memoozd/gadplus/logs/startgeom_%A_%a.out
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/startgeom_%A_%a.err
 #SBATCH --array=0-3
@@ -29,7 +29,7 @@ export WANDB_MODE=disabled
 export WANDB_DISABLED=true
 export PYTHONUNBUFFERED=1
 export TMPDIR="$SCRATCH/gadplus/tmp"
-mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/starting_geom"
+mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/starting_geom_300"
 
 START_TYPES=(noised_ts reactant product midpoint)
 START=${START_TYPES[$SLURM_ARRAY_TASK_ID]}
@@ -39,12 +39,12 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || tr
 
 python -u "$PROJECT_DIR/scripts/starting_geom.py" \
     --start "$START" \
-    --n-samples 50 \
+    --n-samples 300 \
     --n-steps 300 \
     --dt 0.01 \
     --k-track 0 \
     --noise 0.01 \
     --split train \
-    --output-dir "$SCRATCH/gadplus/runs/starting_geom"
+    --output-dir "$SCRATCH/gadplus/runs/starting_geom_300"
 
 echo "Done."
