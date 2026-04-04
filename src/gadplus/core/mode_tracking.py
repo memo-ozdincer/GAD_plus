@@ -31,10 +31,13 @@ def pick_tracked_mode(
         j: Index of the selected candidate (0..k-1).
         overlap: |dot(v_prev, v)| before sign correction (1.0 if v_prev is None).
     """
-    if v_prev is None:
+    if v_prev is None or k == 0:
         v0 = evecs[:, 0]
+        if v_prev is not None and torch.dot(v0, v_prev.reshape(-1)) < 0:
+            v0 = -v0
         v0 = v0 / (v0.norm() + 1e-12)
-        return v0, 0, 1.0
+        overlap = float(torch.abs(torch.dot(v0, v_prev.reshape(-1))).item()) if v_prev is not None else 1.0
+        return v0, 0, overlap
 
     k_eff = int(min(int(k), int(evecs.shape[1])))
     V = evecs[:, :k_eff]

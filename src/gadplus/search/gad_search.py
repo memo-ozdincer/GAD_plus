@@ -113,15 +113,12 @@ def run_gad_search(
         energy = float(out["energy"].detach().reshape(-1)[0].item()) if isinstance(out["energy"], torch.Tensor) else float(out["energy"])
         fn = force_mean(forces)
 
-        # Vibrational eigendecomposition
-        if cfg.use_projection:
-            evals_vib, evecs_vib_3N, Q_vib = vib_eig(
-                hessian, coords, atomsymbols, purify=cfg.purify_hessian,
-            )
-        else:
-            num_atoms = int(forces.shape[0])
-            hess = prepare_hessian(hessian, num_atoms)
-            evals_vib, evecs_vib_3N = torch.linalg.eigh(hess)
+        # Vibrational eigendecomposition — ALWAYS use Eckart projection for
+        # n_neg counting (CLAUDE.md: n_neg on projected vibrational Hessian).
+        # use_projection controls GAD vector computation, not convergence check.
+        evals_vib, evecs_vib_3N, Q_vib = vib_eig(
+            hessian, coords, atomsymbols, purify=cfg.purify_hessian,
+        )
 
         n_neg = int((evals_vib < 0).sum().item())
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
@@ -171,8 +168,10 @@ def run_gad_search(
         # Compute GAD direction
         if cfg.use_projection:
             # Mode tracking on projected eigenvectors
-            k_track = min(cfg.k_track, evecs_vib_3N.shape[1])
-            V_cand = evecs_vib_3N[:, :k_track].to(device=forces.device, dtype=forces.dtype)
+            k_track = cfg.k_track
+            n_evecs = evecs_vib_3N.shape[1]
+            k_eff = min(k_track, n_evecs) if k_track > 0 else n_evecs
+            V_cand = evecs_vib_3N[:, :max(k_eff, 1)].to(device=forces.device, dtype=forces.dtype)
             v_prev_local = (
                 v_prev.to(device=forces.device, dtype=forces.dtype).reshape(-1)
                 if v_prev is not None else None
