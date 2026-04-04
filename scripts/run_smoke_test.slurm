@@ -24,6 +24,7 @@ export PYTHONPATH="$PROJECT_DIR/src:$PYTHONPATH"
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export MPLBACKEND=Agg
+export WANDB_MODE=disabled
 export TMPDIR="$SCRATCH/gadplus/tmp"
 mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs"
 
