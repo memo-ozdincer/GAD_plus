@@ -246,6 +246,25 @@ Noise (pm) & Converged & Rate (\%) & Avg.\ Steps & Avg.\ Time (s) \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.88\textwidth]{figures/fig1_conv_vs_noise.png}
+\caption{Convergence rate vs.\ noise level for Level~2 (gad\_projected, 300 samples,
+blue circles) and Level~0 (pure\_gad, 50 samples, red squares). The Eckart projection
+provides $+68$\,pp improvement at 50\,pm. Level~2 maintains a $\sim$70\% plateau
+from 10--70\,pm before gradual decline.}
+\label{fig:conv_vs_noise}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/fig6_steps_vs_noise.png}
+\caption{Average steps to convergence vs.\ noise level (converged runs only, 300
+samples). Error bars show interquartile range. Steps scale approximately linearly
+with noise ($\sim$0.8 steps per pm).}
+\label{fig:steps_vs_noise}
+\end{figure}
+
 \subsection{Analysis}
 
 \begin{itemize}[leftmargin=2em]
@@ -330,6 +349,15 @@ Product            & 9/300   & 3.0  & 65  & 22.6 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig2_starting_geometry.png}
+\caption{Convergence rate by starting geometry (300 train-split samples).
+GAD works best from noised TS (70\%) and midpoint interpolation (29\%).
+Equilibrium geometries (reactant, product) are near-useless.}
+\label{fig:starting_geometry}
+\end{figure}
+
 \subsection{Analysis}
 
 \begin{itemize}[leftmargin=2em]
@@ -389,8 +417,34 @@ Each trajectory is plotted as a $2\times2$ grid:
           is at a higher-order saddle.
 \end{itemize}
 
-\noindent Plots saved to:\\
-\texttt{/lustre07/scratch/memoozd/gadplus/runs/noise\_survey/plots/\{fast,slow,failure\}\_convergence.png}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig5_trajectories.png}
+\caption{Representative GAD trajectories from the 300-sample noise survey.
+\textbf{Top row:} fast convergence (low noise, few steps).
+\textbf{Middle row:} slow convergence (high noise, many steps with $n_{\mathrm{neg}}$
+oscillations). \textbf{Bottom row:} failure (force norm plateaus above threshold).
+Columns: energy, force norm (log), $n_{\mathrm{neg}}$, lowest eigenvalues.}
+\label{fig:trajectories}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig8_avg_force_trajectory.png}
+\caption{Average force norm trajectory for converged (green) vs.\ failed (red) runs
+at 50\,pm and 100\,pm noise. Converged runs show exponential force decay; failed runs
+plateau above the 0.01\,eV/\AA\ threshold.}
+\label{fig:avg_force}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/fig9_dist_to_ts.png}
+\caption{Average RMSD to the known TS over GAD steps (converged runs only).
+At all noise levels, the trajectory monotonically approaches the known TS.
+Higher noise starts farther away and converges more slowly.}
+\label{fig:dist_to_ts}
+\end{figure}
 
 \subsection{Observations}
 
@@ -493,6 +547,16 @@ ID & Formula & Intended & Half & RMSD$\to$R (\AA) & RMSD$\to$P (\AA) \\
           yet run.
 \end{itemize}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/fig7_irc_rmsd.png}
+\caption{IRC validation: RMSD to known reactant vs.\ RMSD to known product for
+10 converged TS at 10\,pm noise. Green shaded region is the ``intended'' quadrant
+(both RMSD $<0.3$\,\AA). Half-intended cases (orange) match one endpoint but not
+the other.}
+\label{fig:irc_rmsd}
+\end{figure}
+
 
 %======================================================================
 \section{Experiment 6: Basin of Attraction Mapping}
@@ -559,6 +623,17 @@ Noise (pm) & Converged & Same TS & Diff.\ TS & Avg.\ RMSD (\AA) \\
           desirable safety property.
 \end{itemize}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig3_basin_mapping.png}
+\caption{\textbf{Left:} RMSD to original TS for each converged run vs.\ noise level.
+Blue dots are ``same TS'' (RMSD $<0.1$\,\AA); red crosses are ``different TS.''
+All converged runs below 100\,pm return to the same TS. \textbf{Right:} Convergence
+rate (blue) and same-TS rate (green) vs.\ noise. The gap (red fill) at 200\,pm shows
+where GAD starts finding different transition states.}
+\label{fig:basin_mapping}
+\end{figure}
+
 
 %======================================================================
 \section{Experiment 7: Method Comparison}
@@ -607,6 +682,15 @@ gad\_adaptive\_tight     & 54 & 34 & 30 & 20 & 14 & 6  \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig4_method_heatmap.png}
+\caption{Method comparison heatmap: convergence rate (\%) for 5 GAD variants across
+6 noise levels (50 samples each). \texttt{gad\_small\_dt} dominates at $\leq$100\,pm.
+Adaptive dt consistently underperforms. NR-GAD ping-pong not shown (crashed, fix pending).}
+\label{fig:method_heatmap}
+\end{figure}
 
 \subsection{Analysis}
 
