@@ -2,7 +2,6 @@
 #SBATCH --account=rrg-aspuru
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=64G
 #SBATCH --time=1:00:00
 #SBATCH --output=/scratch/memoozd/gadplus/logs/smoke_%j.out
 #SBATCH --error=/scratch/memoozd/gadplus/logs/smoke_%j.err
