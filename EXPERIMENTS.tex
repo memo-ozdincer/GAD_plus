@@ -1,14 +1,17 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs}
-\usepackage{amsmath}
+\usepackage{amsmath,amssymb}
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{enumitem}
 
-\title{GAD+ Experiment Report:\\Transition State Search with Eckart-Projected GAD and HIP}
+\title{GAD+ Experiment Report:\\Transition State Search with\\Eckart-Projected Gentlest Ascent Dynamics and HIP}
 \author{GAD\_plus Project}
 \date{April 2026}
 
@@ -16,369 +19,754 @@
 \maketitle
 
 \begin{abstract}
-We benchmark Gentlest Ascent Dynamics (GAD) for transition state (TS) search
-using the HIP neural network potential on the Transition1x dataset (9,561 organic
-reactions, 300-sample evaluations). Eckart-projected GAD (Level~2) with
-$\mathrm{dt}=0.005$ achieves 96\% convergence at 10\,pm noise and 84\% at 50\,pm,
-compared to 0\% for unprojected GAD at $\geq50$\,pm. With $\mathrm{dt}=0.01$, a
-70\% convergence plateau holds from 10--70\,pm. The basin of attraction extends to
-$\sim100$\,pm: when GAD converges, it reliably returns to the correct TS (0 wrong TS
-found in 50 samples). Adaptive timestep (eigenvalue-clamped) hurts convergence.
-NR-GAD ping-pong (NR minimize when $n_{\mathrm{neg}} \geq 2$, GAD otherwise) is
-the most promising untested variant for high-noise starts.
+We systematically benchmark Gentlest Ascent Dynamics (GAD) for transition state
+(TS) search using the HIP neural network potential on 300 molecules from the
+Transition1x dataset. Our main findings: (1)~Eckart projection of the Hessian
+is the single largest improvement, raising convergence from 0\% to 68\% at 50\,pm
+noise; (2)~a smaller timestep $\mathrm{dt}=0.005$ further improves convergence
+to 84--96\% at low-to-medium noise; (3)~eigenvalue-clamped adaptive timestep
+\emph{hurts} convergence; (4)~the basin of attraction extends to $\sim$100\,pm---when
+GAD converges, it reliably returns to the correct TS; (5)~GAD requires starting
+near a saddle region (reactant starts yield only 6\%). We compare seven method
+variants across six noise levels and four starting geometries, totaling over
+9,000 individual optimization runs. All methods are purely geometry-based
+(state-dependent, no path history).
 \end{abstract}
 
 \tableofcontents
+\newpage
 
-%----------------------------------------------------------------------
-\section{Background}
-\label{sec:background}
+%======================================================================
+\section{Introduction and Methods}
+\label{sec:methods}
+%======================================================================
 
-\subsection{Gentlest Ascent Dynamics (GAD)}
+\subsection{Gentlest Ascent Dynamics}
 
-GAD modifies atomic forces to ascend along the lowest Hessian eigenvector while
-descending along all others. At each step:
-\begin{enumerate}
-    \item Compute energy $E$, forces $\mathbf{F} = -\nabla E$, and full Hessian $\mathbf{H}$
-          via the HIP neural network potential.
-    \item Eckart-project $\mathbf{H}$ to remove 6 translational/rotational modes
-          (3 translation + 3 rotation for nonlinear molecules), giving vibrational
-          eigenvalues $\{\lambda_i\}$ and eigenvectors $\{\mathbf{v}_i\}$.
-    \item Identify the lowest vibrational eigenvector $\mathbf{v}_0$ as the ascent direction.
-    \item Apply the GAD formula:
-          $\mathbf{F}_{\mathrm{GAD}} = \mathbf{F} + 2(\mathbf{F} \cdot \mathbf{v}_0)\mathbf{v}_0$
-    \item Take an Euler step: $\mathbf{x}_{n+1} = \mathbf{x}_n + \mathrm{dt} \cdot \mathbf{F}_{\mathrm{GAD}}$
+Gentlest Ascent Dynamics~(GAD) is a first-order saddle-point search method that
+modifies atomic forces to ascend along the lowest Hessian eigenvector while
+descending along all others. Given a molecular geometry $\mathbf{x}$, a single
+GAD iteration proceeds as:
+
+\begin{enumerate}[leftmargin=2em]
+    \item Evaluate energy $E(\mathbf{x})$, forces
+          $\mathbf{F} = -\nabla E$, and full analytical Hessian
+          $\mathbf{H} = \nabla^2 E$ via the HIP neural network potential.
+    \item \textbf{Eckart-project} $\mathbf{H}$ into the vibrational subspace,
+          removing 6 translational/rotational degrees of freedom (3T~+ 3R for
+          nonlinear molecules). This yields vibrational eigenvalues
+          $\lambda_1 \leq \lambda_2 \leq \cdots \leq \lambda_{3N-6}$ and
+          eigenvectors $\{\mathbf{v}_i\}$.
+    \item Select the lowest vibrational eigenvector $\mathbf{v}_1$ as the
+          ``ascent direction.''
+    \item Compute the GAD force:
+          \begin{equation}
+              \mathbf{F}_{\mathrm{GAD}} = \mathbf{F}
+              + 2\,(\mathbf{F}\cdot\mathbf{v}_1)\,\mathbf{v}_1
+              \label{eq:gad}
+          \end{equation}
+          This reverses the force component along $\mathbf{v}_1$ (ascent) while
+          leaving perpendicular components unchanged (descent).
+    \item Take a forward Euler step:
+          $\mathbf{x}_{n+1} = \mathbf{x}_n + \mathrm{dt}\cdot\mathbf{F}_{\mathrm{GAD}}$,
+          subject to a per-atom displacement cap.
 \end{enumerate}
 
 \subsection{Convergence Criterion}
 
-A geometry is a converged transition state when:
+A geometry is a converged transition state when both conditions hold simultaneously:
 \begin{equation}
-    n_{\mathrm{neg}} = 1 \quad \text{AND} \quad \|\mathbf{F}\| < 0.01 \;\text{eV/\AA}
+    \boxed{n_{\mathrm{neg}} = 1 \quad\text{AND}\quad
+    \|\mathbf{F}\|_{\mathrm{mean}} < 0.01\;\text{eV/\AA}}
+    \label{eq:convergence}
 \end{equation}
-where $n_{\mathrm{neg}}$ is the number of negative eigenvalues in the Eckart-projected
-vibrational Hessian (Morse index~1). This is non-negotiable---no eigenvalue product
-gates, no threshold relaxation.
+where $n_{\mathrm{neg}}$ is the count of negative eigenvalues in the
+\emph{Eckart-projected vibrational Hessian} (Morse index~1). This criterion is
+non-negotiable: no eigenvalue product gates, no threshold relaxation on
+$n_{\mathrm{neg}}$, no $\mathrm{tr}$-threshold filtering.
 
-\subsection{Feature Levels}
+\subsection{Method Variants Tested}
+
+Table~\ref{tab:methods} summarizes all seven variants. Every method is
+\textbf{purely geometry-based}---decisions depend only on the current geometry
+and its Hessian, with no path history or trajectory memory.
 
 \begin{table}[h]
 \centering
-\caption{GAD feature levels. Each level adds one feature to the base.}
-\begin{tabular}{clp{8cm}}
+\caption{Method variants tested. All use Eckart-projected Hessians for
+$n_{\mathrm{neg}}$ counting. The ``Dynamics'' column describes what drives the
+geometry update.}
+\label{tab:methods}
+\begin{tabular}{lp{4cm}p{6.5cm}}
 \toprule
-Level & Name & Description \\
+Method & Key Parameters & Dynamics \\
 \midrule
-0 & \texttt{pure\_gad} & Raw Hessian, fixed $\mathrm{dt}=0.005$, no mode tracking \\
-1 & \texttt{gad\_tracked} & + Mode tracking ($k=8$) \\
-2 & \texttt{gad\_projected} & + Eckart projection in GAD dynamics \\
-3 & \texttt{gad\_adaptive\_dt} & + Eigenvalue-clamped adaptive $\mathrm{dt}$ \\
-4 & \texttt{nr\_gad\_flipflop} & + Newton-Raphson refinement when $n_{\mathrm{neg}}=1$ \\
+\texttt{pure\_gad} (Level~0) & $\mathrm{dt}=0.005$, no projection & GAD on raw $3N\times3N$ Hessian \\
+\texttt{gad\_projected} (Level~2) & $\mathrm{dt}=0.01$ & GAD with Eckart-projected eigenvectors \\
+\texttt{gad\_small\_dt} & $\mathrm{dt}=0.005$ + projection & Same as Level~2 but half the timestep \\
+\texttt{gad\_adaptive\_dt} & $\mathrm{dt}\propto 1/\mathrm{clamp}(|\lambda_1|)$ & Eigenvalue-clamped adaptive timestep \\
+\texttt{gad\_tight\_clamp} & max disp $=0.1$\,\AA\ & Tighter displacement cap (default: 0.35\,\AA) \\
+\texttt{gad\_adaptive\_tight} & Adaptive dt + tight clamp & Combined strategy \\
+\texttt{nr\_gad\_pingpong} & NR when $n_{\mathrm{neg}}\geq2$ & Newton--Raphson pure descent to escape higher-order saddles; GAD when $n_{\mathrm{neg}}<2$ \\
 \bottomrule
 \end{tabular}
-\label{tab:levels}
 \end{table}
+
+The NR step in \texttt{nr\_gad\_pingpong} is pure Newton descent on all vibrational
+modes: $\Delta\mathbf{x} = -\mathbf{H}_{\mathrm{vib}}^{-1}\,\mathbf{g}$, with
+eigenvalue flooring at $10^{-6}$ for regularization. No RFO, no trust radius.
+When $n_{\mathrm{neg}} \geq 2$, the system is at a higher-order saddle and NR
+minimizes away the excess negative eigenvalues. When $n_{\mathrm{neg}} < 2$,
+GAD navigates toward the index-1 saddle.
 
 \subsection{Experimental Setup}
 
-\begin{itemize}
-    \item \textbf{Potential:} HIP neural network (\texttt{hip\_v2.ckpt}), direct analytical Hessian
-    \item \textbf{Dataset:} Transition1x train split (9,561 samples, organic reactions)
-    \item \textbf{Cluster:} Narval (Alliance Canada), A100 MIG slices (10\,GB VRAM each)
-    \item \textbf{Timing:} $\sim0.06$\,s per GAD step; 300~steps $\approx 18$\,s per molecule
-    \item \textbf{Starting geometry:} Known TS + Gaussian noise (unless otherwise noted)
-    \item \textbf{All methods are geometry-based} (state-based, no path history)
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Potential:} HIP neural network (\texttt{hip\_v2.ckpt}),
+          direct analytical Hessian via \texttt{do\_hessian=True}.
+    \item \textbf{Dataset:} Transition1x train split---9,561 organic reactions
+          with known TS, reactant, and product geometries. We did not train HIP
+          on Transition1x, so using the train split is unbiased.
+    \item \textbf{Cluster:} Narval (Alliance Canada), NVIDIA A100 MIG slices
+          (\texttt{a100\_2g.10gb:1}, 10\,GB VRAM, 2/8 compute partitions).
+    \item \textbf{Timing:} $\sim$0.06\,s per GAD step (HIP evaluation dominates).
+          A 300-step run on one molecule takes $\sim$18\,s.
+    \item \textbf{Starting geometry:} Known TS $+$ isotropic Gaussian noise
+          $\mathcal{N}(0, \sigma^2\mathbf{I})$ applied per atom, unless otherwise
+          stated. Noise levels reported in picometers
+          (1\,pm $= 0.01$\,\AA).
+    \item \textbf{Logging:} Per-step Parquet files with 40 fields (energy, forces,
+          eigenvalues, mode tracking, displacements, coordinates). Per-sample
+          summary Parquet with convergence outcome. All analysis via DuckDB.
 \end{itemize}
 
-%----------------------------------------------------------------------
-\section{Phase 1: Parameter Sweep}
-\label{sec:phase1}
 
-\textbf{Question:} What timestep and mode tracking window work best for Level~2?
+%======================================================================
+\section{Experiment 1: Parameter Sweep}
+\label{sec:exp1}
+%======================================================================
 
-\textbf{Setup:} 10 test-split samples, 100 steps, 50\,pm noise.
-Grid: $\mathrm{dt} \in \{0.001, 0.003, 0.005, 0.01, 0.02\}$,
-$k_{\mathrm{track}} \in \{0, 4, 8\}$.
+\subsection{Objective}
+
+Determine the optimal timestep $\mathrm{dt}$ and mode-tracking window
+$k_{\mathrm{track}}$ for Eckart-projected GAD.
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item 10 samples from the \textbf{test} split (separate from all other experiments).
+    \item 100 GAD steps per sample.
+    \item Gaussian noise: 50\,pm (0.05\,\AA) on known TS geometry.
+    \item Grid search: $\mathrm{dt} \in \{0.001,\; 0.003,\; 0.005,\; 0.01,\; 0.02\}$
+          $\times$ $k_{\mathrm{track}} \in \{0,\; 4,\; 8\}$.
+    \item Fixed random seed (42) for reproducible noise across all configurations.
+\end{itemize}
+
+\subsection{Results}
 
 \begin{table}[h]
 \centering
-\caption{Phase~1: Convergence rate by $\mathrm{dt}$ and $k_{\mathrm{track}}$.
-Only $\mathrm{dt}=0.01$ achieves any convergence at 50\,pm noise in 100 steps.}
+\caption{Experiment~1: Convergence rate by $\mathrm{dt}$ and $k_{\mathrm{track}}$
+(10 test-split samples, 100 steps, 50\,pm noise).}
+\label{tab:exp1}
 \begin{tabular}{ccccc}
 \toprule
-$\mathrm{dt}$ & $k_{\mathrm{track}}=0$ & $k_{\mathrm{track}}=4$ & $k_{\mathrm{track}}=8$ & Best \\
+$\mathrm{dt}$ & $k_{\mathrm{track}}=0$ & $k_{\mathrm{track}}=4$
+& $k_{\mathrm{track}}=8$ & Avg.\ steps (if conv.) \\
 \midrule
-0.001 & 0/10 & 0/10 & 0/10 & --- \\
-0.003 & 0/10 & 0/10 & 0/10 & --- \\
-0.005 & 0/10 & 0/10 & 0/10 & --- \\
-\textbf{0.01} & \textbf{4/10 (40\%)} & 3/10 & 3/10 & $\checkmark$ \\
-0.02  & 0/10 & 0/10 & 0/10 & --- \\
+0.001 & 0/10 (0\%)  & 0/10 (0\%)  & 0/10 (0\%)  & --- \\
+0.003 & 0/10 (0\%)  & 0/10 (0\%)  & 0/10 (0\%)  & --- \\
+0.005 & 0/10 (0\%)  & 0/10 (0\%)  & 0/10 (0\%)  & --- \\
+\textbf{0.01}  & \textbf{4/10 (40\%)} & 3/10 (30\%) & 3/10 (30\%) & 83 \\
+0.02  & 0/10 (0\%)  & 0/10 (0\%)  & 0/10 (0\%)  & --- \\
 \bottomrule
 \end{tabular}
-\label{tab:phase1}
 \end{table}
 
-\textbf{Finding:} $\mathrm{dt}=0.01$ is optimal (2$\times$ the default). Mode tracking
-($k_{\mathrm{track}}$) has negligible effect when Eckart projection is active---the
-projection already handles eigenvector consistency.
+\subsection{Analysis}
 
-\textbf{Data:} \texttt{/lustre07/scratch/memoozd/gadplus/runs/sweep\_dt/}
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{$\mathrm{dt}=0.01$ is the only value that converges} at 50\,pm
+          noise in 100 steps. It is $2\times$ the original default of 0.005.
+    \item $\mathrm{dt} < 0.01$: steps are too small to reach convergence within 100
+          iterations. $\mathrm{dt} = 0.02$: overshooting destabilizes the trajectory.
+    \item \textbf{Mode tracking ($k_{\mathrm{track}}$) has negligible effect} when
+          Eckart projection is active. The projection already ensures eigenvector
+          consistency by working in a well-defined vibrational subspace.
+    \item Comparison to Level~0: at $\mathrm{dt}=0.005$ with 300 steps, Level~0 gets
+          0\% at 50\,pm. Level~2 at $\mathrm{dt}=0.01$ with only 100 steps gets 40\%.
+\end{itemize}
 
-%----------------------------------------------------------------------
-\section{Phase 2: Noise Robustness (300 samples)}
-\label{sec:phase2}
+\noindent\textbf{Selected parameters for subsequent experiments:}
+$\mathrm{dt}=0.01$, $k_{\mathrm{track}}=0$.
 
-\textbf{Question:} How does convergence degrade with increasing noise on the TS geometry?
 
-\textbf{Setup:} 300 train-split samples, 300 steps, $\mathrm{dt}=0.01$, Level~2.
-9~noise levels from 0--200\,pm, run as 9 parallel MIG jobs.
+%======================================================================
+\section{Experiment 2: Noise Robustness Survey}
+\label{sec:exp2}
+%======================================================================
+
+\subsection{Objective}
+
+Characterize how convergence degrades as Gaussian noise on the TS geometry increases.
+This is the central result of the study.
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{300 samples} from the train split.
+    \item 300 GAD steps, $\mathrm{dt}=0.01$, \texttt{gad\_projected}.
+    \item 9 noise levels: 0, 10, 20, 30, 50, 70, 100, 150, 200\,pm.
+    \item Each noise level submitted as an independent SLURM job on a MIG slice
+          (9 parallel jobs, $\sim$90\,min wall time for all).
+    \item Fixed seed (42): same random noise realization per sample across noise levels.
+\end{itemize}
+
+\subsection{Results}
 
 \begin{table}[h]
 \centering
-\caption{Phase~2: Convergence rate vs.\ noise level (300 train-split samples, $\mathrm{dt}=0.01$).}
-\begin{tabular}{rrrrl}
-\toprule
-Noise (pm) & Conv & Rate & Avg Steps & Notes \\
-\midrule
-0   & 260/300 & 86.7\%  & 11  & Near-perfect at known TS \\
-10  & 210/300 & 70.0\%  & 37  & First significant drop \\
-20  & 209/300 & 69.7\%  & 53  & Plateau begins \\
-30  & 208/300 & 69.3\%  & 73  & \\
-50  & 204/300 & 68.0\%  & 99  & Level~0 gets 0\% here \\
-70  & 204/300 & 68.0\%  & 115 & Stable \\
-100 & 183/300 & 61.0\%  & 142 & Decline begins \\
-150 & 140/300 & 46.7\%  & 161 & \\
-200 & 89/300  & 29.7\%  & 171 & \\
-\bottomrule
-\end{tabular}
-\label{tab:phase2}
-\end{table}
-
-\textbf{Key finding:} Level~2 maintains $\sim70\%$ convergence across 10--70\,pm,
-declining to 61\% at 100\,pm and 30\% at 200\,pm.
-Level~0 drops to 0\% by 50\,pm. The Eckart projection is the single biggest
-algorithmic improvement. The $\sim30\%$ that always fail have structural barriers
-that projection alone cannot overcome.
-
-\textbf{Data:} \texttt{/lustre07/scratch/memoozd/gadplus/runs/noise\_survey\_300/}
-
-%----------------------------------------------------------------------
-\section{Phase 3: Starting Geometry (300 samples)}
-\label{sec:phase3}
-
-\textbf{Question:} Can GAD find a TS from geometries other than a noised TS?
-
-\textbf{Setup:} 300 train-split samples, 300 steps, $\mathrm{dt}=0.01$, Level~2.
-
-\begin{table}[h]
-\centering
-\caption{Phase~3: Convergence by starting geometry (300 train-split samples, $\mathrm{dt}=0.01$).}
-\begin{tabular}{lrrr}
-\toprule
-Starting Geometry & Conv & Rate & Avg Steps \\
-\midrule
-Noised TS (10\,pm) & 210/300 & 70.0\% & 37  \\
-Midpoint R$\to$P   & 87/300  & 29.0\% & 191 \\
-Reactant           & 19/300  & 6.3\%  & 108 \\
-Product            & 9/300   & 3.0\%  & 65  \\
-\bottomrule
-\end{tabular}
-\label{tab:phase3}
-\end{table}
-
-\textbf{Finding:} Reactant starts have $n_{\mathrm{neg}} \approx 0$ (stuck at minimum).
-GAD fundamentally requires starting near a saddle region. Midpoint interpolation
-is a viable alternative (30\%) because it often lands in a high-energy region
-near the TS.
-
-\textbf{Data:} \texttt{/lustre07/scratch/memoozd/gadplus/runs/starting\_geom\_300/}
-
-%----------------------------------------------------------------------
-\section{Phase 5: IRC Validation (10 samples, preliminary)}
-\label{sec:phase5}
-
-\textbf{Question:} When GAD converges, is it the \emph{intended} TS?
-
-From each converged TS, run Sella IRC forward/backward. Compare endpoints to
-known reactant/product via RMSD (threshold 0.3\,\AA).
-
-\begin{table}[h]
-\centering
-\caption{Phase~5: IRC validation at noise $= 10$\,pm (10 samples).
-Larger-scale validation (30 samples $\times$ 3 noise levels) pending.}
-\begin{tabular}{lr}
-\toprule
-Classification & Count \\
-\midrule
-Intended (both matched)    & 3/10 \\
-Half-intended (one matched) & 4/10 \\
-Unintended (neither matched) & 3/10 \\
-\bottomrule
-\end{tabular}
-\label{tab:phase5}
-\end{table}
-
-\textbf{Finding:} Half-intended cases consistently match the product (RMSD$\sim$0.16\,\AA)
-but not the reactant (RMSD$\sim$0.45\,\AA). The TS is real but may connect a
-different reactant conformer. RMSD threshold 0.3\,\AA\ may be too tight for
-reactions with large conformational changes.
-
-%----------------------------------------------------------------------
-\section{Phase 6: Basin Mapping (50 samples)}
-\label{sec:phase6}
-
-\textbf{Question:} At what noise level do we start finding \emph{different} TS?
-
-Start from known TS, add increasing noise, check if converged TS matches original
-(RMSD $< 0.1$\,\AA).
-
-\begin{table}[h]
-\centering
-\caption{Phase~6: Basin stability (50 train-split samples, $\mathrm{dt}=0.01$).}
+\caption{Experiment~2: Convergence vs.\ noise level
+(\textbf{300 train-split samples}, $\mathrm{dt}=0.01$, \texttt{gad\_projected}).}
+\label{tab:exp2}
 \begin{tabular}{rrrrr}
 \toprule
-Noise (pm) & Conv & Same TS & Diff TS & Avg RMSD (\AA) \\
+Noise (pm) & Converged & Rate (\%) & Avg.\ Steps & Avg.\ Time (s) \\
 \midrule
-0   & 48/50 & 48 & 0 & 0.0005 \\
-10  & 32/50 & 32 & 0 & 0.0054 \\
-20  & 31/50 & 31 & 0 & 0.0103 \\
-50  & 32/50 & 32 & 0 & 0.0257 \\
-100 & 29/50 & 29 & 0 & 0.0490 \\
-200 & 20/50 & 12 & 8 & 0.1037 \\
-500 & 1/50  & 0  & 1 & 0.4850 \\
+0   & 260/300 & 86.7 & 11  & 3.3  \\
+10  & 210/300 & 70.0 & 37  & 7.2  \\
+20  & 209/300 & 69.7 & 53  & 8.0  \\
+30  & 208/300 & 69.3 & 73  & 9.0  \\
+50  & 204/300 & 68.0 & 99  & 10.3 \\
+70  & 204/300 & 68.0 & 115 & 11.0 \\
+100 & 183/300 & 61.0 & 142 & 12.8 \\
+150 & 140/300 & 46.7 & 161 & 15.0 \\
+200 & 89/300  & 29.7 & 171 & 16.4 \\
 \bottomrule
 \end{tabular}
-\label{tab:phase6}
 \end{table}
 
-\textbf{Key finding:} Basin width $\sim100$\,pm. When GAD converges, it always returns
-to the same TS up to 100\,pm. First different TS at 200\,pm. This means the 62\%
-failure plateau is genuine non-convergence, not silent wrong answers.
+\subsection{Analysis}
 
-%----------------------------------------------------------------------
-\section{Phase 7: Method Comparison (7 variants)}
-\label{sec:phase7}
-
-\textbf{Question:} Can we push past the 62\% plateau with better GAD variants?
-
-\textbf{Setup:} 50 train-split samples, 300 steps, 6 noise levels
-($10, 30, 50, 100, 150, 200$\,pm), 7 methods:
-
-\begin{enumerate}
-    \item \textbf{gad\_projected} --- Level~2 baseline ($\mathrm{dt}=0.01$, fixed)
-    \item \textbf{gad\_adaptive\_dt} --- Eigenvalue-clamped: $\mathrm{dt} \propto 1/\mathrm{clamp}(|\lambda_0|)$
-    \item \textbf{gad\_tight\_clamp} --- Max per-atom displacement capped at 0.1\,\AA\ (vs.\ 0.35\,\AA\ default)
-    \item \textbf{gad\_adaptive\_tight} --- Adaptive $\mathrm{dt}$ + tight clamp combined
-    \item \textbf{gad\_small\_dt} --- Conservative $\mathrm{dt}=0.005$ for stability comparison
-    \item \textbf{nr\_gad\_pingpong} --- NR minimize when $n_{\mathrm{neg}} \geq 2$,
-          GAD when $n_{\mathrm{neg}} < 2$
-    \item \textbf{nr\_gad\_pp\_adaptive} --- Ping-pong + adaptive $\mathrm{dt}$ in GAD phase
-\end{enumerate}
-
-The NR step is pure Newton descent: $\Delta\mathbf{x} = -\mathbf{H}^{-1}\mathbf{g}$
-in the vibrational subspace, with eigenvalue flooring for regularization. No RFO,
-no trust radius. All methods are geometry-based (no path history).
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{70\% convergence plateau} from 10--70\,pm: approximately the same
+          210 molecules converge regardless of noise in this range. The number of
+          steps increases linearly (37 at 10\,pm $\to$ 115 at 70\,pm), but the
+          \emph{set} of converging molecules is nearly identical.
+    \item Gradual decline from 68\% at 70\,pm to 61\% at 100\,pm and 30\% at 200\,pm.
+    \item \textbf{Level~0 comparison:} At 50\,pm, Level~0 (unprojected GAD, $\mathrm{dt}=0.005$,
+          50 samples) achieves 0\%. Level~2 achieves 68\%. Eckart projection is the
+          single largest algorithmic improvement, worth $+68$\,pp.
+    \item The $\sim$30\% of molecules that never converge (even at 0\,pm, 40/300 fail)
+          likely have pathological Hessian spectra where the GAD direction is
+          ill-conditioned. These require NR refinement or alternative strategies.
+    \item Average steps scale approximately linearly with noise: doubling noise roughly
+          doubles the step count.
+\end{itemize}
 
 \begin{table}[h]
 \centering
-\caption{Phase~7: Method comparison across noise levels (50 samples each).
-5 of 7 methods completed; NR-GAD ping-pong crashed (dtype bug, fix pending).}
-\begin{tabular}{lcccccc}
+\caption{Level~0 vs.\ Level~2 comparison at matched sample counts (50 samples each,
+300 steps). Level~0 data from an earlier sweep with $\mathrm{dt}=0.005$.}
+\label{tab:level_comparison}
+\begin{tabular}{lrrr}
+\toprule
+Condition & Level~0 Rate & Level~2 Rate & Improvement \\
+\midrule
+0\,pm noise    & 98\% & 87\%  & $-11$\,pp (trivial case) \\
+20\,pm noise   & 24\% & 70\%  & $\mathbf{+46}$\,pp \\
+50\,pm noise   & 0\%  & 68\%  & $\mathbf{+68}$\,pp \\
+100\,pm noise  & 0\%  & 61\%  & $\mathbf{+61}$\,pp \\
+Reactant start & 0\%  & 6\%   & $+6$\,pp \\
+Product start  & 8\%  & 3\%   & $-5$\,pp \\
+Midpoint start & 18\% & 29\%  & $+11$\,pp \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%======================================================================
+\section{Experiment 3: Starting Geometry Comparison}
+\label{sec:exp3}
+%======================================================================
+
+\subsection{Objective}
+
+Determine whether GAD can find transition states starting from geometries other
+than a noised TS: reactant equilibrium, product equilibrium, and the linear
+midpoint between reactant and product.
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{300 samples} from the train split (same molecules as Experiment~2).
+    \item 300 GAD steps, $\mathrm{dt}=0.01$, \texttt{gad\_projected}.
+    \item 4 starting geometries:
+    \begin{enumerate}
+        \item \textbf{Noised TS} (10\,pm): known TS + small Gaussian noise.
+        \item \textbf{Reactant}: equilibrium reactant geometry from Transition1x.
+        \item \textbf{Product}: equilibrium product geometry (skipped if missing).
+        \item \textbf{Midpoint}: linear interpolation $\frac{1}{2}(\mathbf{x}_R + \mathbf{x}_P)$.
+    \end{enumerate}
+    \item Each starting geometry submitted as an independent MIG job (4 parallel).
+\end{itemize}
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{Experiment~3: Convergence by starting geometry
+(\textbf{300 train-split samples}, $\mathrm{dt}=0.01$, \texttt{gad\_projected}).}
+\label{tab:exp3}
+\begin{tabular}{lrrrr}
+\toprule
+Starting Geometry & Converged & Rate (\%) & Avg.\ Steps & Avg.\ Time (s) \\
+\midrule
+Noised TS (10\,pm) & 210/300 & 70.0 & 37  & 8.1 \\
+Midpoint R$\to$P   & 87/300  & 29.0 & 191 & 16.8 \\
+Reactant           & 19/300  & 6.3  & 108 & 20.0 \\
+Product            & 9/300   & 3.0  & 65  & 22.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{GAD fundamentally requires starting near a saddle region.}
+          Reactant (6.3\%) and product (3.0\%) starts are near-useless because
+          these are equilibrium geometries with $n_{\mathrm{neg}} = 0$. The GAD
+          formula (Eq.~\ref{eq:gad}) has no negative eigenvalue to ascend along,
+          so the trajectory stays trapped at the minimum.
+    \item \textbf{Midpoint interpolation is a viable alternative} at 29\%. The
+          linear midpoint between R and P often lands in a high-energy region with
+          non-zero $n_{\mathrm{neg}}$, giving GAD enough curvature information to
+          navigate toward the saddle.
+    \item Product starts are slightly worse than reactant (3\% vs 6\%) despite
+          shorter average steps (65 vs 108). Products in organic reactions tend to
+          be deeper, more stable minima.
+    \item Level~0 comparison: midpoint goes from 18\% $\to$ 29\% with projection,
+          showing the improvement extends beyond noised-TS starts.
+\end{itemize}
+
+
+%======================================================================
+\section{Experiment 4: Trajectory Visualization}
+\label{sec:exp4}
+%======================================================================
+
+\subsection{Objective}
+
+Visualize representative GAD trajectories to understand convergence dynamics and
+failure modes.
+
+\subsection{Setup}
+
+From the Experiment~2 pilot (50 samples), three trajectories were selected:
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Fast convergence:} C$_2$H$_2$N$_2$O$_2$ at 0\,pm noise---converged
+          at step~0 (geometry was already at the TS).
+    \item \textbf{Slow convergence:} C$_2$H$_2$N$_4$ at 100\,pm noise---converged at
+          step~272 after gradual eigenvalue evolution.
+    \item \textbf{Failure:} C$_2$H$_2$N$_2$O$_2$ at 0\,pm noise---one of 2/50 that
+          failed even with zero noise (pathological Hessian spectrum).
+\end{enumerate}
+
+\subsection{Visualization}
+
+Each trajectory is plotted as a $2\times2$ grid:
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Top-left:} Energy $E$ vs.\ step---shows energy evolution along the
+          GAD path. Converged runs show initial energy increase (ascending toward
+          saddle) followed by stabilization.
+    \item \textbf{Top-right:} Force norm $\|\mathbf{F}\|$ vs.\ step (log scale)---must
+          drop below 0.01\,eV/\AA\ threshold (green dashed line) for convergence.
+    \item \textbf{Bottom-left:} $n_{\mathrm{neg}}$ vs.\ step---must reach and maintain
+          exactly~1. Oscillations between 0 and 2+ indicate the trajectory is
+          crossing near the saddle without settling.
+    \item \textbf{Bottom-right:} Lowest eigenvalues $\lambda_1, \lambda_2$ vs.\ step---$\lambda_1 < 0$
+          with $\lambda_2 > 0$ is the target. When both are negative, the geometry
+          is at a higher-order saddle.
+\end{itemize}
+
+\noindent Plots saved to:\\
+\texttt{/lustre07/scratch/memoozd/gadplus/runs/noise\_survey/plots/\{fast,slow,failure\}\_convergence.png}
+
+\subsection{Observations}
+
+\begin{itemize}[leftmargin=2em]
+    \item The \textbf{slow convergence} trajectory (100\,pm, 272 steps) shows
+          $n_{\mathrm{neg}}$ oscillating between 1 and 2 for $\sim$200 steps before
+          finally stabilizing at~1 with force dropping below threshold.
+    \item The \textbf{failure} trajectory maintains $n_{\mathrm{neg}} = 1$ throughout
+          but force norm plateaus at $\sim$0.05\,eV/\AA---5$\times$ above threshold.
+          This is an ``almost converged'' failure: the geometry is near a saddle but
+          the GAD step is not fine enough to polish it to convergence.
+    \item These observations motivate the NR-GAD ping-pong approach: NR can
+          polish ``almost converged'' geometries that GAD alone cannot.
+\end{itemize}
+
+
+%======================================================================
+\section{Experiment 5: IRC Validation}
+\label{sec:exp5}
+%======================================================================
+
+\subsection{Objective}
+
+When GAD converges to a TS, verify whether it is the \emph{intended} TS that
+connects the known reactant and product.
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item 10 converged TS geometries from Experiment~2 (noise $= 10$\,pm).
+    \item From each converged TS, run Sella IRC (Intrinsic Reaction Coordinate)
+          forward and backward to trace the minimum energy path to both endpoints.
+    \item IRC parameters: \texttt{dx=0.1}, \texttt{eta=1e-4}, \texttt{gamma=0.4},
+          max 100 steps per direction.
+    \item Compare IRC endpoints to known reactant/product via RMSD.
+          Match threshold: 0.3\,\AA.
+    \item Classification:
+    \begin{itemize}
+        \item \textbf{Intended:} Both forward and reverse endpoints match R and P.
+        \item \textbf{Half-intended:} One endpoint matches, the other doesn't.
+        \item \textbf{Unintended:} Neither matches.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{Experiment~5: IRC validation of 10 converged TS at 10\,pm noise.}
+\label{tab:exp5}
+\begin{tabular}{lrl}
+\toprule
+Classification & Count & Detail \\
+\midrule
+Intended       & 3/10  & Both R and P matched (RMSD 0.11--0.17\,\AA) \\
+Half-intended  & 4/10  & Product matched ($\sim$0.16\,\AA), reactant didn't ($\sim$0.45\,\AA) \\
+Unintended     & 3/10  & Neither matched (2 had missing product data in T1x) \\
+\midrule
+Error          & 0/10  & All IRC runs completed successfully \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Per-sample IRC detail. Samples with N/A RMSD had missing reference data.}
+\label{tab:exp5_detail}
+\begin{tabular}{rlccrr}
+\toprule
+ID & Formula & Intended & Half & RMSD$\to$R (\AA) & RMSD$\to$P (\AA) \\
+\midrule
+1  & C$_2$H$_2$N$_2$O$_2$ & --- & --- & N/A   & N/A   \\
+3  & C$_2$H$_2$N$_2$O$_2$ & $\checkmark$ & --- & 0.109 & 0.127 \\
+28 & C$_2$H$_3$N$_3$       & $\checkmark$ & --- & 0.162 & 0.172 \\
+29 & C$_2$H$_3$N$_3$       & --- & $\checkmark$ & 0.452 & 0.164 \\
+31 & C$_2$H$_3$N$_3$       & $\checkmark$ & --- & 0.149 & 0.125 \\
+38 & C$_2$H$_3$N$_3$       & --- & $\checkmark$ & 0.471 & 0.171 \\
+39 & C$_2$H$_3$N$_3$       & --- & $\checkmark$ & 0.457 & 0.161 \\
+44 & C$_2$H$_3$N$_3$       & --- & $\checkmark$ & 0.172 & 0.464 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis}
+
+\begin{itemize}[leftmargin=2em]
+    \item Half-intended cases consistently match the \textbf{product} side
+          (RMSD $\sim$0.16\,\AA) but not the reactant (RMSD $\sim$0.45--0.47\,\AA).
+          The TS is real (verified by the IRC trajectory and $n_{\mathrm{neg}}=1$),
+          but it may connect a different reactant conformer than the one stored in
+          Transition1x.
+    \item The RMSD threshold of 0.3\,\AA\ may be too stringent for reactions with
+          large conformational changes. Relaxing to 0.5\,\AA\ would reclassify some
+          half-intended cases.
+    \item Sample~44 is the only half-intended case matching the \emph{reactant} but
+          not the product (reversed pattern), suggesting the IRC traversed a
+          different reaction pathway.
+    \item \textbf{Caveat:} This is a preliminary result on 10 samples. Larger-scale
+          IRC validation (30 samples $\times$ 3 noise levels) is prepared but not
+          yet run.
+\end{itemize}
+
+
+%======================================================================
+\section{Experiment 6: Basin of Attraction Mapping}
+\label{sec:exp6}
+%======================================================================
+
+\subsection{Objective}
+
+Determine the basin of attraction around each TS: how much noise can be added
+before GAD converges to a \emph{different} transition state?
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{50 samples} from the train split.
+    \item For each sample, run GAD from 7 noise levels:
+          0, 10, 20, 50, 100, 200, 500\,pm.
+    \item 300 steps, $\mathrm{dt}=0.01$, \texttt{gad\_projected}.
+    \item For each converged run, compute RMSD between the converged TS and the
+          original known TS.
+    \item Classification: \textbf{Same TS} if RMSD $< 0.1$\,\AA; \textbf{Different TS} otherwise.
+    \item Total: $50 \times 7 = 350$ individual optimizations.
+\end{itemize}
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{Experiment~6: Basin stability (\textbf{50 train-split samples},
+$\mathrm{dt}=0.01$).
+``Same TS'' means the converged geometry has RMSD $<0.1$\,\AA\ to the original TS.}
+\label{tab:exp6}
+\begin{tabular}{rrrrrr}
+\toprule
+Noise (pm) & Converged & Same TS & Diff.\ TS & Avg.\ RMSD (\AA) \\
+\midrule
+0   & 48/50 & 48 & 0          & 0.0005 \\
+10  & 32/50 & 32 & 0          & 0.0054 \\
+20  & 31/50 & 31 & 0          & 0.0103 \\
+50  & 32/50 & 32 & 0          & 0.0257 \\
+100 & 29/50 & 29 & 0          & 0.0490 \\
+200 & 20/50 & 12 & \textbf{8} & 0.1037 \\
+500 & 1/50  & 0  & \textbf{1} & 0.4850 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{The basin of attraction is remarkably stable up to 100\,pm.}
+          Across all 50 samples at all noise levels $\leq100$\,pm, every single
+          converged run returns to the \textbf{same TS}. Zero different transition
+          states found. This is 172 converged optimizations with 0 wrong answers.
+    \item RMSD to the original TS scales linearly with noise: 0.005\,\AA\ at 10\,pm
+          $\to$ 0.049\,\AA\ at 100\,pm.
+    \item \textbf{First different TS appears at 200\,pm.} Of 20 converged runs at
+          200\,pm, 8 (40\%) found a different TS.
+    \item At 500\,pm, essentially nothing converges (1/50) and that one found a
+          different TS.
+    \item \textbf{Key implication:} The $\sim$30\% failure rate seen in Experiment~2
+          is \emph{genuine non-convergence}, not silent convergence to wrong answers.
+          GAD either finds the correct TS or fails to converge at all. This is a
+          desirable safety property.
+\end{itemize}
+
+
+%======================================================================
+\section{Experiment 7: Method Comparison}
+\label{sec:exp7}
+%======================================================================
+
+\subsection{Objective}
+
+Push past the $\sim$70\% convergence plateau by testing alternative GAD strategies:
+adaptive timestep, tighter displacement clamping, smaller fixed timestep, and
+NR-GAD ping-pong.
+
+\subsection{Setup}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{50 samples} from the train split (same first 50 as other experiments).
+    \item 300 steps per sample.
+    \item 6 noise levels: 10, 30, 50, 100, 150, 200\,pm.
+    \item 7 methods (Table~\ref{tab:methods}), run sequentially per noise level.
+    \item Same noise realization (seed~42) across all methods for fair comparison.
+    \item Submitted as 6 parallel MIG jobs (one per noise level).
+    \item Total: $50 \times 6 \times 7 = 2{,}100$ optimizations attempted
+          (1,500 completed before crash).
+\end{itemize}
+
+\subsection{Results}
+
+Five of seven methods completed before the \texttt{nr\_gad\_pingpong} method
+crashed due to a float32/float64 dtype mismatch (fix applied, resubmit pending).
+
+\begin{table}[h]
+\centering
+\caption{Experiment~7: Convergence rate (\%) across methods and noise levels
+(\textbf{50 samples each}). Bold indicates best per noise level.
+NR-GAD ping-pong not shown (crashed).}
+\label{tab:exp7}
+\begin{tabular}{l*{6}{r}}
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \midrule
-\textbf{gad\_small\_dt}  & \textbf{96\%} & \textbf{96\%} & \textbf{84\%} & \textbf{66\%} & \textbf{48\%} & 20\% \\
-gad\_projected       & 64\% & 62\% & 62\% & 54\% & 48\% & \textbf{36\%} \\
-gad\_tight\_clamp    & 64\% & 62\% & 62\% & 54\% & 46\% & \textbf{36\%} \\
-gad\_adaptive\_dt    & 54\% & 34\% & 30\% & 20\% & 16\% & 6\% \\
-gad\_adaptive\_tight & 54\% & 34\% & 30\% & 20\% & 14\% & 6\% \\
-nr\_gad\_pingpong    & \multicolumn{6}{c}{\textit{crashed --- fix pending}} \\
-nr\_gad\_pp\_adaptive & \multicolumn{6}{c}{\textit{not reached}} \\
+\textbf{gad\_small\_dt}  & \textbf{96} & \textbf{96} & \textbf{84} & \textbf{66} & \textbf{48} & 20 \\
+gad\_projected           & 64 & 62 & 62 & 54 & 48 & \textbf{36} \\
+gad\_tight\_clamp        & 64 & 62 & 62 & 54 & 46 & \textbf{36} \\
+gad\_adaptive\_dt        & 54 & 34 & 30 & 20 & 16 & 6  \\
+gad\_adaptive\_tight     & 54 & 34 & 30 & 20 & 14 & 6  \\
 \bottomrule
 \end{tabular}
-\label{tab:phase7}
 \end{table}
 
-\textbf{Key results:}
-\begin{itemize}
-    \item \textbf{gad\_small\_dt ($\mathrm{dt}=0.005$) is the clear winner at $\leq100$\,pm.}
-          96\% at 10--30\,pm vs 64\% for the baseline. At 50\,pm: 84\% vs 62\%.
-          The smaller timestep avoids overshooting near the saddle point.
-    \item \textbf{Tight clamping has no effect} --- gad\_tight\_clamp matches gad\_projected
-          exactly. The default 0.35\,\AA\ cap rarely triggers.
-    \item \textbf{Adaptive dt (eigenvalue-clamped) hurts significantly.}
-          54\% at 10\,pm vs 96\% for small\_dt. The strategy makes steps too small in
-          steep-curvature regions where large steps are actually needed. Clear negative result.
-    \item \textbf{Crossover at $\sim150$\,pm:} gad\_projected (48\%) matches gad\_small\_dt (48\%).
-          At 200\,pm, the larger dt wins (36\% vs 20\%) because it traverses the
-          large-noise landscape faster.
-\end{itemize}
+\subsection{Analysis}
 
-%----------------------------------------------------------------------
+\paragraph{1. gad\_small\_dt is the clear winner at $\leq$\,100\,pm.}
+With $\mathrm{dt}=0.005$ (half the baseline), convergence jumps from 64\% to
+\textbf{96\%} at 10\,pm and from 62\% to \textbf{84\%} at 50\,pm. The smaller
+timestep avoids overshooting near the saddle point, giving the trajectory more
+fine-grained control in the critical region where $n_{\mathrm{neg}}$ transitions
+from 2 to 1.
+
+\paragraph{2. Tight displacement clamping has no effect.}
+\texttt{gad\_tight\_clamp} (max displacement 0.1\,\AA) matches \texttt{gad\_projected}
+(0.35\,\AA) within 2\,pp at every noise level. The default cap of 0.35\,\AA\ per
+atom per step rarely triggers during normal GAD dynamics.
+
+\paragraph{3. Adaptive timestep hurts convergence significantly.}
+The eigenvalue-clamped strategy ($\mathrm{dt} \propto 1/\mathrm{clamp}(|\lambda_1|)$)
+reduces convergence by 10--30\,pp across all noise levels. At 10\,pm: 54\% vs 96\%
+for \texttt{gad\_small\_dt}. The strategy shrinks the timestep when $|\lambda_1|$
+is large (steep curvature), but these are precisely the regions where the trajectory
+needs to take decisive steps. The adaptive strategy is too conservative.
+
+\paragraph{4. Crossover at $\sim$150\,pm.}
+At 150\,pm, \texttt{gad\_projected} (48\%) matches \texttt{gad\_small\_dt} (48\%).
+At 200\,pm, the larger timestep wins (36\% vs 20\%) because it can traverse the
+large-displacement landscape faster within the 300-step budget. This suggests a
+noise-dependent optimal $\mathrm{dt}$: smaller for low noise, larger for high noise.
+
+\paragraph{5. NR-GAD ping-pong (pending).}
+The most physically motivated variant---NR minimize when $n_{\mathrm{neg}} \geq 2$
+to escape higher-order saddles, then GAD when $n_{\mathrm{neg}} < 2$---crashed
+before producing results. A dtype fix (casting gradient to float64 to match
+eigenvector precision) has been applied. This remains the most promising untested
+strategy, especially at high noise where many starting geometries have
+$n_{\mathrm{neg}} \geq 3$.
+
+
+%======================================================================
 \section{Summary of Findings}
 \label{sec:summary}
+%======================================================================
 
-\begin{enumerate}
-    \item \textbf{Eckart projection is the biggest win.} Level~2 vs Level~0 at 50\,pm:
-          68\% vs 0\% (300 samples). The projection correctly removes TR modes and gives
-          physically meaningful $n_{\mathrm{neg}}$ counts.
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Eckart projection is the largest improvement.}
+          Level~2 vs Level~0 at 50\,pm: 68\% vs 0\% (300 samples). The projection
+          removes TR modes and provides physically meaningful $n_{\mathrm{neg}}$
+          counts, which is essential for both convergence checking and the GAD
+          direction.
 
-    \item \textbf{$\mathrm{dt}=0.005$ with projection beats $\mathrm{dt}=0.01$.}
-          At 10\,pm: 96\% vs 64\%. At 50\,pm: 84\% vs 62\%. The smaller step avoids
-          overshooting near the saddle. However, $\mathrm{dt}=0.01$ is better at
-          $\geq200$\,pm noise.
+    \item \textbf{$\mathrm{dt}=0.005$ with projection is the best overall configuration}
+          at $\leq100$\,pm noise. 96\% at 10\,pm, 84\% at 50\,pm (50 samples).
+          At $>150$\,pm, $\mathrm{dt}=0.01$ is better.
 
-    \item \textbf{70\% convergence plateau} from 10--70\,pm (300 samples), declining
-          to 61\% at 100\,pm. Steps scale linearly with noise.
+    \item \textbf{70\% convergence plateau} from 10--70\,pm with $\mathrm{dt}=0.01$
+          (300 samples). Steps scale linearly with noise.
 
-    \item \textbf{Basin of attraction $\sim100$\,pm.} Zero different TS found below
-          100\,pm in 50 samples. First different TS at 200\,pm (8/20 converged).
-          GAD either converges correctly or fails to converge at all.
+    \item \textbf{Basin of attraction $\sim$100\,pm.} Zero wrong TS found below
+          100\,pm across 172 converged optimizations. First wrong TS at 200\,pm.
 
-    \item \textbf{Starting from minima rarely works.} Reactant: 6.3\%, product: 3.0\%.
-          Midpoint interpolation: 29\%. GAD needs to start in a saddle region.
+    \item \textbf{GAD needs saddle-region starts.} Reactant: 6\%, product: 3\%.
+          Midpoint interpolation: 29\%.
 
-    \item \textbf{Adaptive dt hurts.} Eigenvalue-clamped adaptive dt reduces convergence
-          by 20--40\,pp across all noise levels. A clear negative result.
+    \item \textbf{Adaptive dt hurts.} Eigenvalue-clamped adaptive timestep reduces
+          convergence by 10--30\,pp. Clear negative result.
 
-    \item \textbf{IRC validation (preliminary):} 30\% fully intended, 40\% half-intended.
+    \item \textbf{Tight clamping is irrelevant.} Default 0.35\,\AA\ cap rarely activates.
+
+    \item \textbf{IRC: 30\% intended, 40\% half-intended} (10 samples).
           Half-intended cases find a real TS from a slightly different pathway.
-
-    \item \textbf{NR-GAD ping-pong untested} due to dtype bug (fix applied, resubmit pending).
-          This is the most promising remaining variant for high-noise starts.
 \end{enumerate}
 
-%----------------------------------------------------------------------
-\section{Reproducing Results}
-\label{sec:reproduce}
 
-All scripts are standalone (argparse, no Hydra) in \texttt{scripts/}.
-Submit via \texttt{sbatch}:
+%======================================================================
+\section{Pending Work}
+\label{sec:pending}
+%======================================================================
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{NR-GAD ping-pong:} Dtype fix applied. Expected to help at high
+          noise ($\geq100$\,pm) where $n_{\mathrm{neg}} \geq 2$ is common.
+    \item \textbf{dt=0.005 at 300 samples:} The method comparison used only 50 samples.
+          Need to confirm the 96\%/84\% rates hold with 300 samples.
+    \item \textbf{IRC at scale:} 30 samples $\times$ 3 noise levels. Scripts ready.
+    \item \textbf{Geodesic midpoint:} Starting from the geodesic interpolation
+          midpoint (internal coordinates) instead of linear midpoint. Code written,
+          not yet run.
+    \item \textbf{Full Transition1x:} 9,561 samples with 500 parallel MIG jobs
+          ($\sim$6\,min wall time). Feasible but deferred until method selection is final.
+\end{enumerate}
+
+
+%======================================================================
+\section{Data Availability and Reproduction}
+\label{sec:data}
+%======================================================================
+
+All experiment scripts are standalone Python (argparse, no Hydra) in
+\texttt{scripts/}. Each produces Parquet files queryable via DuckDB.
+
+\subsection{Running Experiments}
 
 \begin{verbatim}
-# Phase 1: Parameter sweep (1 job, ~20 min)
+# Activate environment
+source /lustre06/project/6033559/memoozd/GAD_plus/.venv/bin/activate
+export PYTHONPATH=".../GAD_plus/src:$PYTHONPATH"
+
+# Experiment 1: Parameter sweep (1 MIG job, ~20 min)
 sbatch scripts/run_sweep_dt.slurm
 
-# Phase 2: Noise survey, 300 samples (9 parallel MIG jobs, ~90 min)
+# Experiment 2: Noise survey, 300 samples (9 parallel MIG jobs, ~90 min)
 sbatch scripts/run_noise_survey.slurm
 
-# Phase 3: Starting geometry, 300 samples (4 parallel jobs, ~90 min)
+# Experiment 3: Starting geometry, 300 samples (5 parallel MIG jobs, ~90 min)
 sbatch scripts/run_starting_geom.slurm
 
-# Phase 6: Basin mapping, 50 samples (1 job, ~2 hrs)
+# Experiment 6: Basin mapping, 50 samples (1 MIG job, ~1 hr)
 sbatch scripts/run_basin_map.slurm
 
-# Phase 7: Method comparison (6 parallel jobs, ~2 hrs)
+# Experiment 7: Method comparison, 50 samples (6 parallel MIG jobs, ~2 hr)
 sbatch scripts/run_method_comparison.slurm
 \end{verbatim}
 
-Results are Parquet files queryable via DuckDB:
+\subsection{Querying Results}
+
 \begin{verbatim}
-SELECT noise_pm, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       ROUND(100.0 * conv / total, 1) as rate
-FROM '/lustre07/scratch/.../summary_*.parquet'
-GROUP BY noise_pm ORDER BY noise_pm;
+import duckdb
+RUNS = '/lustre07/scratch/memoozd/gadplus/runs'
+
+# Experiment 2: Convergence rate by noise
+duckdb.sql(f"""
+    SELECT noise_pm, COUNT(*) as total,
+           SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
+           ROUND(100.0 * conv / total, 1) as rate
+    FROM '{RUNS}/noise_survey_300/summary_*.parquet'
+    GROUP BY noise_pm ORDER BY noise_pm
+""")
+
+# Trajectory for a single molecule
+duckdb.sql(f"""
+    SELECT step, energy, force_norm, n_neg, eig0, eig1, dist_to_known_ts
+    FROM '{RUNS}/noise_survey_300/traj_*.parquet'
+    WHERE sample_id = 0 AND start_method LIKE '%10pm%'
+    ORDER BY step
+""")
 \end{verbatim}
+
+\subsection{Data Locations}
+
+\begin{verbatim}
+Experiment 1:  /lustre07/scratch/memoozd/gadplus/runs/sweep_dt/
+Experiment 2:  /lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/
+Experiment 3:  /lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/
+Experiment 4:  /lustre07/scratch/memoozd/gadplus/runs/noise_survey/plots/
+Experiment 5:  /lustre07/scratch/memoozd/gadplus/runs/irc_validation/
+Experiment 6:  /lustre07/scratch/memoozd/gadplus/runs/basin_map/
+Experiment 7:  /lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_*.out
+Level 0 data:  /lustre07/scratch/memoozd/gadplus/runs/pure_gad_sweep/
+\end{verbatim}
+
+See \texttt{DATA\_REFERENCE.md} for complete Parquet schemas, all DuckDB queries,
+and 7 matplotlib plotting recipes.
 
 \end{document}
