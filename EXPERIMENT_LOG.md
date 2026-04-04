@@ -79,3 +79,57 @@ Plots saved: /lustre07/scratch/memoozd/gadplus/runs/noise_survey/plots/
   - failure.png
 
 Next: Phase 5 IRC validation on converged TS from Phase 2.
+
+## Phase 5: IRC validation — 2026-04-04
+
+Config: 10 converged TS from Phase 2 at noise=10pm, IRC 100 steps, RMSD threshold=0.3A
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| Intended | 3 | Both reactant and product matched (RMSD < 0.3A) |
+| Half-intended | 4 | One endpoint matched, other didn't |
+| Unintended | 3 | Neither matched (2 had missing product data → NaN RMSD) |
+| Error | 0 | All IRC runs completed successfully |
+
+Per-sample: Intended samples had RMSD~0.1-0.17A to both endpoints. Half-intended consistently matched product (RMSD~0.16A) but not reactant (RMSD~0.45-0.47A). Samples with NaN RMSD likely had missing product geometry in T1x data.
+
+Finding: 30% fully intended, 70% partial or unintended. The half-intended cases suggest GAD finds a real TS but from a slightly rotated basin. RMSD threshold 0.3A may be too tight for some reactions with large conformational changes.
+
+Data: /lustre07/scratch/memoozd/gadplus/runs/irc_validation/irc_validation_10pm.parquet
+Job: 58834594
+
+## Phase 6: Basin mapping — 2026-04-04
+
+Config: 20 train samples, 7 noise levels (0-500pm), 300 steps, dt=0.01, RMSD threshold=0.1A
+
+| Noise (pm) | Conv | Same TS | Diff TS | Avg RMSD |
+|------------|------|---------|---------|----------|
+| 0 | 19/20 | 19 | 0 | 0.0005 |
+| 10 | 13/20 | 13 | 0 | 0.0060 |
+| 20 | 14/20 | 14 | 0 | 0.0105 |
+| 50 | 13/20 | 13 | 0 | 0.0243 |
+| 100 | 12/20 | 12 | 0 | 0.0452 |
+| 200 | 2/20 | 1 | 1 | 0.1178 |
+| 500 | 0/20 | 0 | 0 | — |
+
+Finding: Basin of attraction is remarkably stable up to 100pm — when GAD converges, it always returns to the SAME TS (0 different TS found up to 100pm). RMSD scales linearly with noise (0.005A at 10pm → 0.045A at 100pm). First different TS appears at 200pm. At 500pm nothing converges.
+
+Key insight: GAD's basin of attraction is ~100pm wide. Below this threshold, convergence determines success; above it, the landscape becomes unpredictable. The 62% convergence plateau from Phase 2 is NOT because GAD finds different TS — it's because 38% of samples genuinely fail to converge.
+
+Data: /lustre07/scratch/memoozd/gadplus/runs/basin_map/basin_map_results.parquet
+Job: 58834606
+
+---
+
+## Summary of all phases
+
+| Phase | Key Result |
+|-------|-----------|
+| 1. Parameter sweep | dt=0.01 optimal (2x default), k_track irrelevant with projection |
+| 2. Noise robustness | 62% plateau from 10-100pm (Level 0: 0% at 50pm) |
+| 3. Starting geometry | Noised TS 64% > midpoint 30% > reactant 14% > product 4% |
+| 4. Trajectories | Visualized fast/slow/failure cases |
+| 5. IRC validation | 30% intended, 40% half-intended, 30% unintended |
+| 6. Basin mapping | Same TS recovered up to 100pm; basin width ~100pm |
+
+**Main finding:** Eckart projection (Level 2) is the single biggest improvement over pure GAD (Level 0). Combined with dt=0.01, it extends the working range from <20pm to ~100pm noise. The 38% failure rate is structural — these samples need NR refinement (Level 4) or adaptive dt (Level 3).
