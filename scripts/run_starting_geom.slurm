@@ -6,7 +6,7 @@
 #SBATCH --time=3:00:00
 #SBATCH --output=/lustre07/scratch/memoozd/gadplus/logs/startgeom_%A_%a.out
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/startgeom_%A_%a.err
-#SBATCH --array=0-3
+#SBATCH --array=0-4
 #
 # Phase 3: Starting geometry comparison (gad_projected, Level 2).
 # 4 starting geometries as array job, 50 samples x 300 steps each.
@@ -31,7 +31,7 @@ export PYTHONUNBUFFERED=1
 export TMPDIR="$SCRATCH/gadplus/tmp"
 mkdir -p "$TMPDIR" "$SCRATCH/gadplus/logs" "$SCRATCH/gadplus/runs/starting_geom_300"
 
-START_TYPES=(noised_ts reactant product midpoint)
+START_TYPES=(noised_ts reactant product midpoint geodesic_mid)
 START=${START_TYPES[$SLURM_ARRAY_TASK_ID]}
 
 echo "Job $SLURM_JOB_ID, array task $SLURM_ARRAY_TASK_ID, start=$START"

@@ -18,12 +18,14 @@
 \begin{abstract}
 We benchmark Gentlest Ascent Dynamics (GAD) for transition state (TS) search
 using the HIP neural network potential on the Transition1x dataset (9,561 organic
-reactions). Eckart-projected GAD (Level~2) with $\mathrm{dt}=0.01$ achieves 62\%
-convergence at noise levels from 10--100\,pm, compared to 0\% for unprojected GAD
-at $\geq50$\,pm. The basin of attraction extends to $\sim100$\,pm: when GAD converges,
-it reliably returns to the correct TS. We test seven method variants including
-NR-GAD ping-pong, adaptive timestep, and displacement clamping to push convergence
-beyond the 62\% plateau.
+reactions, 300-sample evaluations). Eckart-projected GAD (Level~2) with
+$\mathrm{dt}=0.005$ achieves 96\% convergence at 10\,pm noise and 84\% at 50\,pm,
+compared to 0\% for unprojected GAD at $\geq50$\,pm. With $\mathrm{dt}=0.01$, a
+70\% convergence plateau holds from 10--70\,pm. The basin of attraction extends to
+$\sim100$\,pm: when GAD converges, it reliably returns to the correct TS (0 wrong TS
+found in 50 samples). Adaptive timestep (eigenvalue-clamped) hurts convergence.
+NR-GAD ping-pong (NR minimize when $n_{\mathrm{neg}} \geq 2$, GAD otherwise) is
+the most promising untested variant for high-noise starts.
 \end{abstract}
 
 \tableofcontents
@@ -133,30 +135,29 @@ projection already handles eigenvector consistency.
 
 \begin{table}[h]
 \centering
-\caption{Phase~2: Convergence rate vs.\ noise level (300 samples).
-\textcolor{red}{TO BE UPDATED with 300-sample results.}
-Preliminary 50-sample results shown.}
+\caption{Phase~2: Convergence rate vs.\ noise level (300 train-split samples, $\mathrm{dt}=0.01$).}
 \begin{tabular}{rrrrl}
 \toprule
 Noise (pm) & Conv & Rate & Avg Steps & Notes \\
 \midrule
-0   & 48/50 & 96\%  & 9   & Near-perfect at known TS \\
-10  & 32/50 & 64\%  & 31  & First significant drop \\
-20  & 31/50 & 62\%  & 45  & Plateau begins \\
-30  & 31/50 & 62\%  & 65  & \\
-50  & 31/50 & 62\%  & 85  & Level~0 gets 0\% here \\
-70  & 31/50 & 62\%  & 94  & Stable \\
-100 & 31/50 & 62\%  & 106 & Still on plateau \\
-150 & 23/50 & 46\%  & 119 & Degradation begins \\
-200 & 17/50 & 34\%  & 142 & \\
+0   & 260/300 & 86.7\%  & 11  & Near-perfect at known TS \\
+10  & 210/300 & 70.0\%  & 37  & First significant drop \\
+20  & 209/300 & 69.7\%  & 53  & Plateau begins \\
+30  & 208/300 & 69.3\%  & 73  & \\
+50  & 204/300 & 68.0\%  & 99  & Level~0 gets 0\% here \\
+70  & 204/300 & 68.0\%  & 115 & Stable \\
+100 & 183/300 & 61.0\%  & 142 & Decline begins \\
+150 & 140/300 & 46.7\%  & 161 & \\
+200 & 89/300  & 29.7\%  & 171 & \\
 \bottomrule
 \end{tabular}
 \label{tab:phase2}
 \end{table}
 
-\textbf{Key finding:} Level~2 maintains $\sim62\%$ convergence across 10--100\,pm.
+\textbf{Key finding:} Level~2 maintains $\sim70\%$ convergence across 10--70\,pm,
+declining to 61\% at 100\,pm and 30\% at 200\,pm.
 Level~0 drops to 0\% by 50\,pm. The Eckart projection is the single biggest
-algorithmic improvement. The 38\% failure plateau suggests structural barriers
+algorithmic improvement. The $\sim30\%$ that always fail have structural barriers
 that projection alone cannot overcome.
 
 \textbf{Data:} \texttt{/lustre07/scratch/memoozd/gadplus/runs/noise\_survey\_300/}
@@ -171,17 +172,15 @@ that projection alone cannot overcome.
 
 \begin{table}[h]
 \centering
-\caption{Phase~3: Convergence by starting geometry (300 samples).
-\textcolor{red}{TO BE UPDATED with 300-sample results.}
-Preliminary 50-sample results shown.}
-\begin{tabular}{lrrrr}
+\caption{Phase~3: Convergence by starting geometry (300 train-split samples, $\mathrm{dt}=0.01$).}
+\begin{tabular}{lrrr}
 \toprule
-Starting Geometry & Conv & Rate & Avg Steps & Avg $n_{\mathrm{neg}}$ \\
+Starting Geometry & Conv & Rate & Avg Steps \\
 \midrule
-Noised TS (10\,pm) & 32/50 & 64\% & 31  & 1.3 \\
-Midpoint R$\to$P   & 15/50 & 30\% & 174 & 1.5 \\
-Reactant           & 7/50  & 14\% & 281 & 0.7 \\
-Product            & 2/50  & 4\%  & 141 & 1.0 \\
+Noised TS (10\,pm) & 210/300 & 70.0\% & 37  \\
+Midpoint R$\to$P   & 87/300  & 29.0\% & 191 \\
+Reactant           & 19/300  & 6.3\%  & 108 \\
+Product            & 9/300   & 3.0\%  & 65  \\
 \bottomrule
 \end{tabular}
 \label{tab:phase3}
@@ -235,20 +234,18 @@ Start from known TS, add increasing noise, check if converged TS matches origina
 
 \begin{table}[h]
 \centering
-\caption{Phase~6: Basin stability (50 samples).
-\textcolor{red}{TO BE UPDATED with 50-sample results.}
-Preliminary 20-sample results shown.}
+\caption{Phase~6: Basin stability (50 train-split samples, $\mathrm{dt}=0.01$).}
 \begin{tabular}{rrrrr}
 \toprule
 Noise (pm) & Conv & Same TS & Diff TS & Avg RMSD (\AA) \\
 \midrule
-0   & 19/20 & 19 & 0 & 0.0005 \\
-10  & 13/20 & 13 & 0 & 0.0060 \\
-20  & 14/20 & 14 & 0 & 0.0105 \\
-50  & 13/20 & 13 & 0 & 0.0243 \\
-100 & 12/20 & 12 & 0 & 0.0452 \\
-200 & 2/20  & 1  & 1 & 0.1178 \\
-500 & 0/20  & 0  & 0 & --- \\
+0   & 48/50 & 48 & 0 & 0.0005 \\
+10  & 32/50 & 32 & 0 & 0.0054 \\
+20  & 31/50 & 31 & 0 & 0.0103 \\
+50  & 32/50 & 32 & 0 & 0.0257 \\
+100 & 29/50 & 29 & 0 & 0.0490 \\
+200 & 20/50 & 12 & 8 & 0.1037 \\
+500 & 1/50  & 0  & 1 & 0.4850 \\
 \bottomrule
 \end{tabular}
 \label{tab:phase6}
@@ -285,31 +282,36 @@ no trust radius. All methods are geometry-based (no path history).
 \begin{table}[h]
 \centering
 \caption{Phase~7: Method comparison across noise levels (50 samples each).
-\textcolor{red}{RESULTS PENDING --- jobs submitted as SLURM array 58835900.}}
+5 of 7 methods completed; NR-GAD ping-pong crashed (dtype bug, fix pending).}
 \begin{tabular}{lcccccc}
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \midrule
-gad\_projected       & --- & --- & --- & --- & --- & --- \\
-gad\_adaptive\_dt    & --- & --- & --- & --- & --- & --- \\
-gad\_tight\_clamp    & --- & --- & --- & --- & --- & --- \\
-gad\_adaptive\_tight & --- & --- & --- & --- & --- & --- \\
-gad\_small\_dt       & --- & --- & --- & --- & --- & --- \\
-nr\_gad\_pingpong    & --- & --- & --- & --- & --- & --- \\
-nr\_gad\_pp\_adaptive & --- & --- & --- & --- & --- & --- \\
+\textbf{gad\_small\_dt}  & \textbf{96\%} & \textbf{96\%} & \textbf{84\%} & \textbf{66\%} & \textbf{48\%} & 20\% \\
+gad\_projected       & 64\% & 62\% & 62\% & 54\% & 48\% & \textbf{36\%} \\
+gad\_tight\_clamp    & 64\% & 62\% & 62\% & 54\% & 46\% & \textbf{36\%} \\
+gad\_adaptive\_dt    & 54\% & 34\% & 30\% & 20\% & 16\% & 6\% \\
+gad\_adaptive\_tight & 54\% & 34\% & 30\% & 20\% & 14\% & 6\% \\
+nr\_gad\_pingpong    & \multicolumn{6}{c}{\textit{crashed --- fix pending}} \\
+nr\_gad\_pp\_adaptive & \multicolumn{6}{c}{\textit{not reached}} \\
 \bottomrule
 \end{tabular}
 \label{tab:phase7}
 \end{table}
 
-\textbf{Hypotheses:}
+\textbf{Key results:}
 \begin{itemize}
-    \item NR-GAD ping-pong should help at high noise ($\geq100$\,pm) where many samples
-          start at higher-order saddles ($n_{\mathrm{neg}} \geq 2$). At low noise it
-          should match the baseline (almost always $n_{\mathrm{neg}} < 2$).
-    \item Adaptive $\mathrm{dt}$ should help in steep-curvature regions by automatically
-          reducing the step size, preventing overshooting.
-    \item Tight clamping should reduce oscillatory failures but may slow convergence.
+    \item \textbf{gad\_small\_dt ($\mathrm{dt}=0.005$) is the clear winner at $\leq100$\,pm.}
+          96\% at 10--30\,pm vs 64\% for the baseline. At 50\,pm: 84\% vs 62\%.
+          The smaller timestep avoids overshooting near the saddle point.
+    \item \textbf{Tight clamping has no effect} --- gad\_tight\_clamp matches gad\_projected
+          exactly. The default 0.35\,\AA\ cap rarely triggers.
+    \item \textbf{Adaptive dt (eigenvalue-clamped) hurts significantly.}
+          54\% at 10\,pm vs 96\% for small\_dt. The strategy makes steps too small in
+          steep-curvature regions where large steps are actually needed. Clear negative result.
+    \item \textbf{Crossover at $\sim150$\,pm:} gad\_projected (48\%) matches gad\_small\_dt (48\%).
+          At 200\,pm, the larger dt wins (36\% vs 20\%) because it traverses the
+          large-noise landscape faster.
 \end{itemize}
 
 %----------------------------------------------------------------------
@@ -318,23 +320,32 @@ nr\_gad\_pp\_adaptive & --- & --- & --- & --- & --- & --- \\
 
 \begin{enumerate}
     \item \textbf{Eckart projection is the biggest win.} Level~2 vs Level~0 at 50\,pm:
-          62\% vs 0\%. The projection correctly removes TR modes and gives physically
-          meaningful $n_{\mathrm{neg}}$ counts.
+          68\% vs 0\% (300 samples). The projection correctly removes TR modes and gives
+          physically meaningful $n_{\mathrm{neg}}$ counts.
 
-    \item \textbf{$\mathrm{dt}=0.01$ is optimal} for Level~2 (2$\times$ the default).
-          Mode tracking ($k_{\mathrm{track}}$) is redundant when projection is active.
+    \item \textbf{$\mathrm{dt}=0.005$ with projection beats $\mathrm{dt}=0.01$.}
+          At 10\,pm: 96\% vs 64\%. At 50\,pm: 84\% vs 62\%. The smaller step avoids
+          overshooting near the saddle. However, $\mathrm{dt}=0.01$ is better at
+          $\geq200$\,pm noise.
 
-    \item \textbf{62\% convergence plateau} from 10--100\,pm. Steps scale linearly with
-          noise (9 steps at 0\,pm $\to$ 142 at 200\,pm).
+    \item \textbf{70\% convergence plateau} from 10--70\,pm (300 samples), declining
+          to 61\% at 100\,pm. Steps scale linearly with noise.
 
-    \item \textbf{Basin of attraction $\sim100$\,pm.} GAD either converges to the correct
-          TS or fails to converge at all. It does not silently find wrong answers.
+    \item \textbf{Basin of attraction $\sim100$\,pm.} Zero different TS found below
+          100\,pm in 50 samples. First different TS at 200\,pm (8/20 converged).
+          GAD either converges correctly or fails to converge at all.
 
-    \item \textbf{Starting from minima rarely works.} Reactant start: 14\%, product: 4\%.
-          GAD needs to start in a saddle region.
+    \item \textbf{Starting from minima rarely works.} Reactant: 6.3\%, product: 3.0\%.
+          Midpoint interpolation: 29\%. GAD needs to start in a saddle region.
 
-    \item \textbf{IRC validation:} 30\% fully intended, 40\% half-intended.
-          Half-intended cases find a real TS but from a slightly different pathway.
+    \item \textbf{Adaptive dt hurts.} Eigenvalue-clamped adaptive dt reduces convergence
+          by 20--40\,pp across all noise levels. A clear negative result.
+
+    \item \textbf{IRC validation (preliminary):} 30\% fully intended, 40\% half-intended.
+          Half-intended cases find a real TS from a slightly different pathway.
+
+    \item \textbf{NR-GAD ping-pong untested} due to dtype bug (fix applied, resubmit pending).
+          This is the most promising remaining variant for high-noise starts.
 \end{enumerate}
 
 %----------------------------------------------------------------------

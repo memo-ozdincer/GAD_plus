@@ -55,6 +55,18 @@ def get_starting_coords(sample, start_type: str, device, noise: float = 0.01):
             return 0.5 * (pos_r + pos_p)
         return None
 
+    elif start_type == "geodesic_mid":
+        if hasattr(sample, "pos_reactant") and hasattr(sample, "pos_product"):
+            pos_r = sample.pos_reactant.to(device)
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                return None
+            from gadplus.geometry.interpolation import geodesic_interpolation
+            # 3 images: reactant, midpoint, product
+            images = geodesic_interpolation(pos_r, pos_p, n_images=3)
+            return images[1]  # midpoint
+        return None
+
     else:
         raise ValueError(f"Unknown start_type: {start_type}")
 
@@ -62,7 +74,7 @@ def get_starting_coords(sample, start_type: str, device, noise: float = 0.01):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", type=str, required=True,
-                        choices=["noised_ts", "reactant", "product", "midpoint"])
+                        choices=["noised_ts", "reactant", "product", "midpoint", "geodesic_mid"])
     parser.add_argument("--n-samples", type=int, default=50)
     parser.add_argument("--n-steps", type=int, default=300)
     parser.add_argument("--dt", type=float, default=0.01)

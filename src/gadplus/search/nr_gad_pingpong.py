@@ -190,7 +190,7 @@ def run_nr_gad_pingpong(
         if phase == "nr":
             # NR minimization: pure Newton descent on all modes
             n_nr_steps += 1
-            grad = -forces.reshape(-1)
+            grad = -forces.reshape(-1).to(evecs_vib_3N.dtype)
             delta_x, _info = nr_minimize_step(
                 grad, evals_vib, evecs_vib_3N,
                 max_step=cfg.nr_max_step,
