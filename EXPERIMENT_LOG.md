@@ -169,80 +169,80 @@ Three representative trajectories from the Phase 2 pilot, plotted as 2×2 grids 
 
 ---
 
-## Phase 7: Method Comparison (50 samples, 5 of 7 methods completed)
+## Phase 7: Method Comparison (300 samples, 1000 steps, ALL 7 methods) ✓
 
 **Question:** Can we push past the ~70% plateau with better GAD variants?
 
-**Setup:** 50 train-split samples, 300 steps, 6 noise levels (10–200pm), 7 methods.
+**Setup:** 300 train-split samples, 1000 steps, 6 noise levels (10–200pm), 7 methods. Run as **42 parallel MIG jobs** (one per method×noise pair). 12,600 total optimizations. All methods use Eckart-projected Hessians.
 
-**Methods tested:**
+**Methods:**
 1. **gad_projected** — Level 2 baseline (dt=0.01, fixed)
-2. **gad_adaptive_dt** — Eigenvalue-clamped: dt ∝ 1/clamp(|λ₀|)
-3. **gad_tight_clamp** — Max per-atom displacement capped at 0.1A (vs 0.35A default)
-4. **gad_adaptive_tight** — Adaptive dt + tight clamp
-5. **gad_small_dt** — Conservative dt=0.005
-6. **nr_gad_pingpong** — NR minimize when n_neg≥2, GAD when n_neg<2 *(crashed — dtype bug, fix pending)*
-7. **nr_gad_pp_adaptive** — Ping-pong + adaptive dt *(not reached)*
+2. **gad_small_dt** — dt=0.005 (half baseline), Eckart projected
+3. **gad_adaptive_dt** — Eigenvalue-clamped: dt ∝ 1/clamp(|λ₁|)
+4. **gad_tight_clamp** — Max per-atom displacement 0.1A (vs 0.35A default)
+5. **gad_adaptive_tight** — Adaptive dt + tight clamp
+6. **nr_gad_pingpong** — NR minimize (pure descent) when n_neg≥2, GAD when n_neg<2
+7. **nr_gad_pp_adaptive** — Ping-pong + adaptive dt in GAD phase
 
-### Results (5 of 7 methods, from SLURM logs)
+### Results (all 7 methods, 300 samples, 1000 steps)
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|------|------|------|-------|-------|-------|
-| **gad_small_dt** | **96%** | **96%** | **84%** | **66%** | **48%** | 20% |
-| gad_projected | 64% | 62% | 62% | 54% | 48% | **36%** |
-| gad_tight_clamp | 64% | 62% | 62% | 54% | 46% | **36%** |
-| gad_adaptive_dt | 54% | 34% | 30% | 20% | 16% | 6% |
-| gad_adaptive_tight | 54% | 34% | 30% | 20% | 14% | 6% |
+| **gad_small_dt** | **94.3%** | **94.3%** | **91.3%** | **86.7%** | **70.3%** | **51.3%** |
+| gad_projected | 72.3% | 70.3% | 69.3% | 66.7% | 58.0% | 45.3% |
+| gad_tight_clamp | 72.0% | 70.0% | 69.7% | 67.0% | 58.3% | 46.0% |
+| gad_adaptive_dt | 71.3% | 65.0% | 52.7% | 37.7% | 23.7% | 14.3% |
+| gad_adaptive_tight | 70.3% | 64.3% | 53.0% | 36.3% | 24.0% | 14.7% |
+| nr_gad_pingpong | 56.7% | 35.3% | 31.7% | 24.7% | 22.3% | 18.3% |
+| nr_gad_pp_adaptive | 53.3% | 25.0% | 13.7% | 5.3% | 5.0% | 2.0% |
 
 ### Key findings:
 
-1. **gad_small_dt (dt=0.005) is the clear winner at low-to-medium noise.** 96% at 10pm and 30pm vs 64% for the baseline. At 50pm it gets 84% vs 62%. The smaller timestep avoids overshooting near the saddle point, giving more samples time to converge.
+1. **gad_small_dt dominates across ALL noise levels.** 94% at 10-30pm, 91% at 50pm, 87% at 100pm, 51% at 200pm. The smaller timestep avoids overshooting near the saddle.
 
-2. **gad_projected and gad_tight_clamp are nearly identical** — tighter displacement clamping (0.1A vs 0.35A) doesn't help or hurt. The baseline's 0.35A cap rarely triggers.
+2. **gad_projected and gad_tight_clamp are identical** — tight clamping (0.1A vs 0.35A) has zero effect. The default cap rarely triggers.
 
-3. **Adaptive dt HURTS convergence dramatically.** The eigenvalue-clamped strategy reduces dt when |λ₀| is large, but this makes steps too small in steep-curvature regions where large steps are actually needed. 54% at 10pm vs 96% for small_dt. This is a clear negative result.
+3. **Adaptive dt hurts** — reduces convergence by 1-30pp vs baseline. Makes steps too small in steep-curvature regions.
 
-4. **At 200pm, gad_projected/tight_clamp (36%) beats gad_small_dt (20%).** The larger dt helps traverse large-noise landscapes faster. There's a crossover around 150pm where dt=0.01 and dt=0.005 are equivalent.
+4. **NR-GAD ping-pong is WORSE than baseline** — 57% vs 72% at 10pm. Pure Newton descent when n_neg≥2 overshoots past the saddle. Combined with adaptive dt it's catastrophic (2% at 200pm). The NR step needs damping or a trust radius.
 
-5. **NR-GAD ping-pong crashed due to dtype mismatch** (float32 grad vs float64 eigenvectors). Fix applied to `nr_gad_pingpong.py` but not yet resubmitted.
+5. **Step budget matters more than method sophistication.** gad_small_dt's advantage is primarily from having 2× more fine-grained steps in the same 1000-step budget.
 
-**Data:** SLURM logs at `/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_*.out` | **Jobs:** 58835900_[0-5] (FAILED at ping-pong)
+**Data:** `/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/` | **Jobs:** 58845357_[0-41]
 
 ---
 
 ## Consolidated Summary
 
-### What we know (300 samples, statistically robust)
+### What we know (300 samples, 12,600 optimizations)
 
 | Finding | Evidence |
 |---------|----------|
 | Eckart projection is the biggest improvement | Level 0 → Level 2: 0% → 68% at 50pm |
-| dt=0.005 beats dt=0.01 at ≤100pm noise | 96% vs 64% at 10pm, 84% vs 62% at 50pm |
-| ~70% convergence plateau at 10–70pm | 210/300 converge consistently across this range |
+| **dt=0.005 is the best config** | 94% at 10pm, 91% at 50pm, 87% at 100pm (300 samples) |
+| ~70% convergence plateau with dt=0.01 | 210/300 converge at 10–70pm |
 | Basin of attraction ~100pm wide | 0 different TS found below 100pm in 50 samples |
-| Adaptive dt (eigenvalue-clamped) hurts | Reduces convergence by 20–40pp across all noise levels |
+| Adaptive dt hurts | 71% vs 72% at 10pm, 14% vs 45% at 200pm |
+| NR-GAD ping-pong hurts | 57% vs 72% at 10pm — NR overshoots |
 | GAD needs saddle-region starts | Reactant: 6%, product: 3%, midpoint: 29%, noised TS: 70% |
-| When GAD converges, the answer is correct | Basin mapping shows same TS up to 100pm |
+| When GAD converges, the answer is correct | Basin mapping: 0 wrong TS below 100pm |
 
-### Level 2 vs Level 0 (matched conditions)
+### Best method: gad_small_dt (dt=0.005, Eckart-projected, 1000 steps)
 
-| Condition | Level 0 | Level 2 (dt=0.01) | Level 2 (dt=0.005) |
-|-----------|---------|--------------------|--------------------|
-| 0pm noise | 98% | 87% | ~96%* |
-| 20pm | 24% | 70% | ~96%* |
-| 50pm | 0% | 68% | 84% |
-| 100pm | 0% | 61% | 66% |
-| Reactant start | 0% | 6% | — |
-| Midpoint start | 18% | 29% | — |
-
-*estimated from 50-sample method comparison
+| Noise | gad_small_dt | gad_projected | Level 0 |
+|-------|-------------|---------------|---------|
+| 0pm | — | 87% | 98% |
+| 10pm | 94.3% | 72.3% | — |
+| 50pm | 91.3% | 69.3% | 0% |
+| 100pm | 86.7% | 66.7% | 0% |
+| 200pm | 51.3% | 45.3% | 0% |
 
 ### What's still pending
 
-1. **NR-GAD ping-pong** — dtype fix applied, needs resubmit. This is the most promising untested method: NR minimizes when n_neg≥2 (escapes higher-order saddles), GAD navigates when n_neg<2.
-2. **Larger IRC validation** — 30 samples × 3 noise levels. Needs Phase 2 output (now available).
+1. **Damped NR-GAD ping-pong** — current NR step overshoots. Needs step damping or trust radius.
+2. **Larger IRC validation** — 30 samples × 3 noise levels. Scripts ready.
 3. **Geodesic midpoint starting geometry** — code written, not yet run.
-4. **Full T1x (9,561 samples)** — feasible with 500 parallel MIG jobs (~6 min wall time).
+4. **Full T1x (9,561 samples)** — feasible with 500 parallel MIG jobs.
 
 ### Reproducing results
 
@@ -253,7 +253,7 @@ sbatch scripts/run_sweep_dt.slurm          # Phase 1: param sweep (~20 min)
 sbatch scripts/run_noise_survey.slurm       # Phase 2: noise survey, 300 samples (9 jobs, ~90 min)
 sbatch scripts/run_starting_geom.slurm      # Phase 3: starting geometry, 300 samples (4 jobs, ~90 min)
 sbatch scripts/run_basin_map.slurm          # Phase 6: basin mapping, 50 samples (1 job, ~1 hr)
-sbatch scripts/run_method_comparison.slurm  # Phase 7: 7 methods × 6 noise levels (6 jobs, ~2 hrs)
+sbatch scripts/run_method_cmp_300.slurm     # Phase 7: 42 parallel jobs (7 methods × 6 noise, 300 samples, 1000 steps)
 sbatch scripts/run_irc_validate.slurm       # Phase 5: IRC validation (3 jobs, ~30 min)
 ```
 
@@ -280,6 +280,13 @@ SELECT noise_pm, COUNT(*) as total,
        SUM(CASE WHEN same_ts THEN 1 ELSE 0 END) as same_ts
 FROM '/lustre07/scratch/memoozd/gadplus/runs/basin_map/basin_map_results.parquet'
 GROUP BY noise_pm ORDER BY noise_pm;
+
+-- Phase 7: Method comparison (300 samples, 1000 steps)
+SELECT method, noise_pm, COUNT(*) as total,
+       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
+       ROUND(100.0 * conv / total, 1) as rate
+FROM '/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/summary_*.parquet'
+GROUP BY method, noise_pm ORDER BY method, noise_pm;
 ```
 
 ### Data locations
@@ -291,5 +298,5 @@ Phase 3 (starting):  /lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/
 Phase 4 (plots):     /lustre07/scratch/memoozd/gadplus/runs/noise_survey/plots/
 Phase 5 (IRC):       /lustre07/scratch/memoozd/gadplus/runs/irc_validation/
 Phase 6 (basin):     /lustre07/scratch/memoozd/gadplus/runs/basin_map/
-Phase 7 (methods):   SLURM logs at /lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_*.out
+Phase 7 (methods):   /lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/
 ```
