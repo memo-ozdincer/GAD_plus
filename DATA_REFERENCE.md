@@ -37,8 +37,12 @@ All data lives under `/lustre07/scratch/memoozd/gadplus/runs/`. Each experiment 
 ├── basin_map/                     # Phase 6: basin mapping (50 samples, FINAL)
 │   └── basin_map_results.parquet    # 350 rows (50 samples × 7 noise levels)
 │
-├── method_comparison/             # Phase 7: 7-method comparison (PARTIAL — crashed at ping-pong)
+├── method_comparison/             # Phase 7 PARTIAL: crashed at ping-pong (5 of 7 methods)
 │   └── traj_*.parquet               # 1504 trajectory files (5 of 7 methods completed)
+│
+├── method_cmp_300/                # Phase 7 FINAL: 7 methods × 6 noise (300 samples, 1000 steps)
+│   ├── summary_{method}_{noise}pm.parquet  # 42 files (one per method×noise)
+│   └── traj_*.parquet                       # trajectory files per sample
 │
 ├── sweep_dt/                      # Phase 1
 │   └── sweep_dt_results.parquet
@@ -336,22 +340,29 @@ FROM '{RUNS}/pure_gad_sweep/summary_*.parquet'
 GROUP BY start_method ORDER BY start_method;
 ```
 
-### Phase 7: Method Comparison (from SLURM logs, no Parquet)
+### Phase 7: Method Comparison (300 samples, 1000 steps, 42 configs)
 
-The method comparison crashed before saving Parquet. Results extracted from SLURM logs:
+```sql
+-- Convergence rate by method and noise
+SELECT method, noise_pm,
+       COUNT(*) as total,
+       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
+       ROUND(100.0 * conv / total, 1) as rate,
+       ROUND(AVG(CASE WHEN converged THEN converged_step END), 0) as avg_steps
+FROM '{RUNS}/method_cmp_300/summary_*.parquet'
+GROUP BY method, noise_pm
+ORDER BY method, noise_pm;
 
+-- Pivot table
+SELECT * FROM (
+    SELECT method, noise_pm,
+           ROUND(100.0 * SUM(CASE WHEN converged THEN 1 ELSE 0 END) / COUNT(*), 1) as rate
+    FROM '{RUNS}/method_cmp_300/summary_*.parquet'
+    GROUP BY method, noise_pm
+) PIVOT (MAX(rate) FOR noise_pm IN (10, 30, 50, 100, 150, 200));
 ```
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_0.out  # 10pm
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_1.out  # 30pm
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_2.out  # 50pm
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_3.out  # 100pm
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_4.out  # 150pm
-/lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_5.out  # 200pm
-```
 
-Extract summaries: `grep "^  => " /lustre07/scratch/memoozd/gadplus/logs/methodcmp_58835900_*.out`
-
-Trajectory parquets exist for the 5 completed methods:
+Earlier partial run (crashed at ping-pong, 5 of 7 methods):
 ```sql
 SELECT search_method, COUNT(DISTINCT sample_id) as samples
 FROM '{RUNS}/method_comparison/traj_*.parquet'
@@ -475,28 +486,26 @@ plt.savefig('starting_geom.png', dpi=150, bbox_inches='tight')
 ```python
 import numpy as np
 
-# Data from SLURM logs (5 methods × 6 noise levels)
-methods = ['gad_small_dt', 'gad_projected', 'gad_tight_clamp', 'gad_adaptive_dt', 'gad_adaptive_tight']
-noise_levels = [10, 30, 50, 100, 150, 200]
-rates = np.array([
-    [96, 96, 84, 66, 48, 20],   # gad_small_dt
-    [64, 62, 62, 54, 48, 36],   # gad_projected
-    [64, 62, 62, 54, 46, 36],   # gad_tight_clamp
-    [54, 34, 30, 20, 16, 6],    # gad_adaptive_dt
-    [54, 34, 30, 20, 14, 6],    # gad_adaptive_tight
-])
+# Can now read directly from Parquet:
+df = duckdb.execute("""
+    SELECT method, noise_pm,
+           ROUND(100.0 * SUM(CASE WHEN converged THEN 1 ELSE 0 END) / COUNT(*), 1) as rate
+    FROM '/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/summary_*.parquet'
+    GROUP BY method, noise_pm
+""").df()
+pivot = df.pivot_table(index='method', columns='noise_pm', values='rate')
 
-fig, ax = plt.subplots(figsize=(10, 5))
-im = ax.imshow(rates, cmap='RdYlGn', vmin=0, vmax=100, aspect='auto')
-ax.set_xticks(range(len(noise_levels)))
-ax.set_xticklabels([f'{n}pm' for n in noise_levels])
-ax.set_yticks(range(len(methods)))
-ax.set_yticklabels(methods)
-for i in range(len(methods)):
-    for j in range(len(noise_levels)):
-        ax.text(j, i, f'{rates[i,j]}%', ha='center', va='center', fontweight='bold')
+fig, ax = plt.subplots(figsize=(10, 6))
+im = ax.imshow(pivot.values, cmap='RdYlGn', vmin=0, vmax=100, aspect='auto')
+ax.set_xticks(range(len(pivot.columns)))
+ax.set_xticklabels([f'{n}pm' for n in pivot.columns])
+ax.set_yticks(range(len(pivot.index)))
+ax.set_yticklabels(pivot.index)
+for i in range(len(pivot.index)):
+    for j in range(len(pivot.columns)):
+        ax.text(j, i, f'{pivot.values[i,j]:.0f}%', ha='center', va='center', fontweight='bold')
 plt.colorbar(im, label='Convergence rate (%)')
-plt.title('Method Comparison (50 samples per cell)')
+plt.title('Method Comparison (300 samples, 1000 steps)')
 plt.tight_layout()
 plt.savefig('method_heatmap.png', dpi=150)
 ```
@@ -572,6 +581,19 @@ All SLURM output at `/lustre07/scratch/memoozd/gadplus/logs/`:
 | 58834594 | 5 | IRC validation 10 samples | COMPLETED |
 | 58835840 | 6 | Basin mapping 50 samples | COMPLETED |
 | 58835900_[0-5] | 7 | Method comparison 50 samples | FAILED (ping-pong dtype) |
+| 58845357_[0-41] | 7 | Method comparison 300 samples, 1000 steps | COMPLETED |
+
+## Data Locations
+
+| Experiment | Path |
+|------------|------|
+| Phase 1 (dt sweep) | `/lustre07/scratch/memoozd/gadplus/runs/sweep_dt/` |
+| Phase 2 (noise 300) | `/lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/` |
+| Phase 3 (start geom 300) | `/lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/` |
+| Phase 5 (IRC) | `/lustre07/scratch/memoozd/gadplus/runs/irc_validation/` |
+| Phase 6 (basin map) | `/lustre07/scratch/memoozd/gadplus/runs/basin_map/` |
+| Phase 7 (method cmp, partial) | `/lustre07/scratch/memoozd/gadplus/runs/method_comparison/` |
+| Phase 7 (method cmp, FINAL) | `/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/` |
 
 ## Dataset Reference
 
