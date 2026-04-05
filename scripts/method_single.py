@@ -24,8 +24,17 @@ METHOD_CONFIGS = {
     "gad_adaptive_dt": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.35),
     "gad_tight_clamp": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.1),
     "gad_adaptive_tight": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.1),
-    "nr_gad_pingpong": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=False, max_disp=0.35),
-    "nr_gad_pp_adaptive": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=True, max_disp=0.35),
+    "nr_gad_pingpong": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=False, max_disp=0.35,
+                            nr_damping=1.0, nr_max_step_norm=0.3),  # original (undamped)
+    "nr_gad_pp_adaptive": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=True, max_disp=0.35,
+                               nr_damping=1.0, nr_max_step_norm=0.3),
+    # Damped NR-GAD variants
+    "nr_gad_damped_02": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                             nr_damping=0.2, nr_max_step_norm=0.1),
+    "nr_gad_damped_01": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                             nr_damping=0.1, nr_max_step_norm=0.05),
+    "nr_gad_damped_03": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                             nr_damping=0.3, nr_max_step_norm=0.15),
 }
 
 
@@ -37,6 +46,8 @@ def main():
     parser.add_argument("--n-steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split", type=str, default="train")
+    parser.add_argument("--random-offset", type=int, default=0,
+                        help="Skip first N samples (for randomized sampling from full dataset)")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -77,7 +88,8 @@ def main():
     # ---- Load dataset ----
     from gadplus.data.transition1x import Transition1xDataset, UsePos
     dataset = Transition1xDataset(
-        h5_path, split=args.split, max_samples=args.n_samples,
+        h5_path, split=args.split,
+        max_samples=args.n_samples + args.random_offset,
         transform=UsePos("pos_transition"),
     )
     print(f"Loaded {len(dataset)} samples (split={args.split})")
@@ -102,23 +114,30 @@ def main():
             use_adaptive_dt=mcfg["adaptive"],
             dt_min=1e-4, dt_max=0.05,
             nr_max_step=0.3, nr_eig_floor=1e-6,
+            nr_damping=mcfg.get("nr_damping", 0.2),
+            nr_max_step_norm=mcfg.get("nr_max_step_norm", 0.1),
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
         )
 
+    # ---- Sample range (supports random offset into full dataset) ----
+    offset = args.random_offset
+    sample_indices = list(range(offset, len(dataset)))
+    print(f"Sample range: [{offset}, {len(dataset)}) = {len(sample_indices)} samples")
+
     # ---- Pre-generate noise ----
     torch.manual_seed(args.seed)
-    noise_vecs = []
-    for i in range(len(dataset)):
+    noise_vecs = {}
+    for i in sample_indices:
         sample = dataset[i]
-        noise_vecs.append(torch.randn_like(sample.pos) * args.noise)
+        noise_vecs[i] = torch.randn_like(sample.pos) * args.noise
 
     # ---- Run ----
     run_id = f"{args.method}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     results = []
     t_total = time.time()
 
-    for i in range(len(dataset)):
+    for i in sample_indices:
         sample = dataset[i]
         coords_ts = sample.pos.to(device)
         z = sample.z.to(device)

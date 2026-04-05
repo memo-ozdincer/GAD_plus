@@ -41,9 +41,11 @@ class NRGADPingPongConfig:
     use_adaptive_dt: bool = False
     dt_min: float = 1e-4
     dt_max: float = 0.05
-    # NR parameters (pure descent, full Hessian inversion)
-    nr_max_step: float = 0.3       # Max per-atom displacement in NR step
+    # NR parameters (damped descent, full Hessian inversion)
+    nr_max_step: float = 0.3       # Max per-component step in NR
     nr_eig_floor: float = 1e-6     # Floor for eigenvalue inversion (regularization)
+    nr_damping: float = 0.2        # Global NR step damping (0 < d <= 1)
+    nr_max_step_norm: float = 0.1  # Max total NR step norm (Angstrom)
     # Shared
     max_atom_disp: float = 0.35
     min_interatomic_dist: float = 0.4
@@ -58,11 +60,17 @@ def nr_minimize_step(
     *,
     max_step: float = 0.3,
     eig_floor: float = 1e-6,
+    damping: float = 1.0,
+    max_step_norm: float = 0.1,
 ) -> tuple[torch.Tensor, dict[str, float]]:
-    """Pure Newton descent step: delta_x = -H^{-1} g in vibrational subspace.
+    """Damped Newton descent step: delta_x = -alpha * H^{-1} g in vibrational subspace.
 
     All modes are minimized (descended). No TS mode ascent.
     Eigenvalues are floored at eig_floor to avoid division by near-zero.
+
+    The step is damped in two ways:
+      1. Global damping factor `damping` (0 < damping <= 1) scales the entire step.
+      2. Total step norm is capped at `max_step_norm` (Angstrom).
 
     Args:
         grad: (D,) gradient = -forces, in same space as evecs.
@@ -70,6 +78,8 @@ def nr_minimize_step(
         evecs_vib: (D, M) vibrational eigenvectors.
         max_step: Max per-component step magnitude.
         eig_floor: Floor for |eigenvalue| to regularize near-zero modes.
+        damping: Global step damping factor (0 < damping <= 1).
+        max_step_norm: Max total step norm (Angstrom). Rescales if exceeded.
 
     Returns:
         delta_x: (D,) displacement.
@@ -86,12 +96,22 @@ def nr_minimize_step(
     # Cap individual components
     step_coeffs = torch.clamp(step_coeffs, -max_step, max_step)
 
+    # Apply global damping
+    step_coeffs = step_coeffs * damping
+
     delta_x = evecs_vib @ step_coeffs
 
+    # Cap total step norm
+    step_norm = float(delta_x.norm().item())
+    if step_norm > max_step_norm and step_norm > 0:
+        delta_x = delta_x * (max_step_norm / step_norm)
+        step_norm = max_step_norm
+
     info = {
-        "step_norm": float(delta_x.norm().item()),
+        "step_norm": step_norm,
         "n_modes_used": int((step_coeffs.abs() > 1e-12).sum().item()),
         "max_eig_used": float(evals_vib.abs().max().item()),
+        "damping": damping,
     }
     return delta_x, info
 
@@ -195,6 +215,8 @@ def run_nr_gad_pingpong(
                 grad, evals_vib, evecs_vib_3N,
                 max_step=cfg.nr_max_step,
                 eig_floor=cfg.nr_eig_floor,
+                damping=cfg.nr_damping,
+                max_step_norm=cfg.nr_max_step_norm,
             )
             step_disp = delta_x.reshape(-1, 3).to(coords.dtype)
             step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
