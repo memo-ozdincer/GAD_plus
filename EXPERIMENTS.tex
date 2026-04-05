@@ -649,83 +649,85 @@ NR-GAD ping-pong.
 \subsection{Setup}
 
 \begin{itemize}[leftmargin=2em]
-    \item \textbf{50 samples} from the train split (same first 50 as other experiments).
-    \item 300 steps per sample.
+    \item \textbf{300 samples} from the train split.
+    \item \textbf{1000 steps} per sample (increased from 300 to give all methods
+          sufficient budget).
     \item 6 noise levels: 10, 30, 50, 100, 150, 200\,pm.
-    \item 7 methods (Table~\ref{tab:methods}), run sequentially per noise level.
+    \item 7 methods (Table~\ref{tab:methods}).
     \item Same noise realization (seed~42) across all methods for fair comparison.
-    \item Submitted as 6 parallel MIG jobs (one per noise level).
-    \item Total: $50 \times 6 \times 7 = 2{,}100$ optimizations attempted
-          (1,500 completed before crash).
+    \item Submitted as \textbf{42 parallel MIG jobs} (one per method$\times$noise pair).
+    \item Total: $300 \times 6 \times 7 = 12{,}600$ individual optimizations.
+    \item All methods use Eckart-projected Hessians for both $n_{\mathrm{neg}}$
+          counting and GAD dynamics.
 \end{itemize}
 
 \subsection{Results}
 
-Five of seven methods completed before the \texttt{nr\_gad\_pingpong} method
-crashed due to a float32/float64 dtype mismatch (fix applied, resubmit pending).
-
 \begin{table}[h]
 \centering
-\caption{Experiment~7: Convergence rate (\%) across methods and noise levels
-(\textbf{50 samples each}). Bold indicates best per noise level.
-NR-GAD ping-pong not shown (crashed).}
+\caption{Experiment~7: Convergence rate (\%) across all 7 methods and 6 noise levels
+(\textbf{300 samples, 1000 steps each}). Bold indicates best per column.
+All methods use Eckart-projected Hessians.}
 \label{tab:exp7}
 \begin{tabular}{l*{6}{r}}
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \midrule
-\textbf{gad\_small\_dt}  & \textbf{96} & \textbf{96} & \textbf{84} & \textbf{66} & \textbf{48} & 20 \\
-gad\_projected           & 64 & 62 & 62 & 54 & 48 & \textbf{36} \\
-gad\_tight\_clamp        & 64 & 62 & 62 & 54 & 46 & \textbf{36} \\
-gad\_adaptive\_dt        & 54 & 34 & 30 & 20 & 16 & 6  \\
-gad\_adaptive\_tight     & 54 & 34 & 30 & 20 & 14 & 6  \\
+\textbf{gad\_small\_dt}  & \textbf{94.3} & \textbf{94.3} & \textbf{91.3} & \textbf{86.7} & \textbf{70.3} & \textbf{51.3} \\
+gad\_projected           & 72.3 & 70.3 & 69.3 & 66.7 & 58.0 & 45.3 \\
+gad\_tight\_clamp        & 72.0 & 70.0 & 69.7 & 67.0 & 58.3 & 46.0 \\
+gad\_adaptive\_dt        & 71.3 & 65.0 & 52.7 & 37.7 & 23.7 & 14.3 \\
+gad\_adaptive\_tight     & 70.3 & 64.3 & 53.0 & 36.3 & 24.0 & 14.7 \\
+nr\_gad\_pingpong        & 56.7 & 35.3 & 31.7 & 24.7 & 22.3 & 18.3 \\
+nr\_gad\_pp\_adaptive    & 53.3 & 25.0 & 13.7 &  5.3 &  5.0 &  2.0 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/fig4_method_heatmap.png}
-\caption{Method comparison heatmap: convergence rate (\%) for 5 GAD variants across
-6 noise levels (50 samples each). \texttt{gad\_small\_dt} dominates at $\leq$100\,pm.
-Adaptive dt consistently underperforms. NR-GAD ping-pong not shown (crashed, fix pending).}
+\includegraphics[width=0.95\textwidth]{figures/fig4_method_heatmap.png}
+\caption{Method comparison heatmap: convergence rate (\%) for all 7 GAD variants across
+6 noise levels (300 samples, 1000 steps). \texttt{gad\_small\_dt} dominates across all
+noise levels. Adaptive dt and NR-GAD ping-pong consistently underperform the baseline.}
 \label{fig:method_heatmap}
 \end{figure}
 
 \subsection{Analysis}
 
-\paragraph{1. gad\_small\_dt is the clear winner at $\leq$\,100\,pm.}
-With $\mathrm{dt}=0.005$ (half the baseline), convergence jumps from 64\% to
-\textbf{96\%} at 10\,pm and from 62\% to \textbf{84\%} at 50\,pm. The smaller
-timestep avoids overshooting near the saddle point, giving the trajectory more
-fine-grained control in the critical region where $n_{\mathrm{neg}}$ transitions
-from 2 to 1.
+\paragraph{1. gad\_small\_dt is the clear winner across all noise levels.}
+With $\mathrm{dt}=0.005$ (half the baseline) and 1000 steps, convergence reaches
+\textbf{94.3\%} at 10--30\,pm, \textbf{91.3\%} at 50\,pm, and \textbf{86.7\%} at
+100\,pm. Even at 200\,pm it leads with 51.3\%. The smaller timestep avoids
+overshooting near the saddle point, giving the trajectory fine-grained control
+in the critical region where $n_{\mathrm{neg}}$ transitions from 2 to 1.
 
 \paragraph{2. Tight displacement clamping has no effect.}
 \texttt{gad\_tight\_clamp} (max displacement 0.1\,\AA) matches \texttt{gad\_projected}
-(0.35\,\AA) within 2\,pp at every noise level. The default cap of 0.35\,\AA\ per
+(0.35\,\AA) within 1\,pp at every noise level. The default cap of 0.35\,\AA\ per
 atom per step rarely triggers during normal GAD dynamics.
 
 \paragraph{3. Adaptive timestep hurts convergence significantly.}
 The eigenvalue-clamped strategy ($\mathrm{dt} \propto 1/\mathrm{clamp}(|\lambda_1|)$)
-reduces convergence by 10--30\,pp across all noise levels. At 10\,pm: 54\% vs 96\%
-for \texttt{gad\_small\_dt}. The strategy shrinks the timestep when $|\lambda_1|$
+reduces convergence by 1--30\,pp vs the baseline at all noise levels. At 200\,pm:
+14.3\% vs 45.3\% for baseline. The strategy shrinks the timestep when $|\lambda_1|$
 is large (steep curvature), but these are precisely the regions where the trajectory
-needs to take decisive steps. The adaptive strategy is too conservative.
+needs to take decisive steps.
 
-\paragraph{4. Crossover at $\sim$150\,pm.}
-At 150\,pm, \texttt{gad\_projected} (48\%) matches \texttt{gad\_small\_dt} (48\%).
-At 200\,pm, the larger timestep wins (36\% vs 20\%) because it can traverse the
-large-displacement landscape faster within the 300-step budget. This suggests a
-noise-dependent optimal $\mathrm{dt}$: smaller for low noise, larger for high noise.
+\paragraph{4. NR-GAD ping-pong performs worse than pure GAD.}
+Ping-pong (NR when $n_{\mathrm{neg}} \geq 2$, GAD otherwise) achieves only 56.7\%
+at 10\,pm vs 72.3\% for the baseline. The pure Newton descent step when
+$n_{\mathrm{neg}} \geq 2$ appears too aggressive, overshooting past the saddle
+region rather than gently descending to $n_{\mathrm{neg}} = 1$. Combined with
+adaptive dt (\texttt{nr\_gad\_pp\_adaptive}), the results are catastrophic: 2\% at
+200\,pm. The NR step may need damping or a trust radius to be useful.
 
-\paragraph{5. NR-GAD ping-pong (pending).}
-The most physically motivated variant---NR minimize when $n_{\mathrm{neg}} \geq 2$
-to escape higher-order saddles, then GAD when $n_{\mathrm{neg}} < 2$---crashed
-before producing results. A dtype fix (casting gradient to float64 to match
-eigenvector precision) has been applied. This remains the most promising untested
-strategy, especially at high noise where many starting geometries have
-$n_{\mathrm{neg}} \geq 3$.
+\paragraph{5. Step budget matters more than method sophistication.}
+The gap between \texttt{gad\_small\_dt} (94\%) and \texttt{gad\_projected} (72\%)
+at 10\,pm is primarily a step budget effect: dt=0.005 with 1000 steps gives
+an effective path length of 5.0, vs dt=0.01 with 1000 steps giving 10.0.
+The smaller steps allow the trajectory to navigate the saddle region more precisely,
+even though each individual step covers less ground.
 
 
 %======================================================================
@@ -740,9 +742,9 @@ $n_{\mathrm{neg}} \geq 3$.
           counts, which is essential for both convergence checking and the GAD
           direction.
 
-    \item \textbf{$\mathrm{dt}=0.005$ with projection is the best overall configuration}
-          at $\leq100$\,pm noise. 96\% at 10\,pm, 84\% at 50\,pm (50 samples).
-          At $>150$\,pm, $\mathrm{dt}=0.01$ is better.
+    \item \textbf{$\mathrm{dt}=0.005$ with projection is the best overall configuration.}
+          94\% at 10\,pm, 91\% at 50\,pm, 87\% at 100\,pm, 51\% at 200\,pm
+          (300 samples, 1000 steps). Dominates at every noise level.
 
     \item \textbf{70\% convergence plateau} from 10--70\,pm with $\mathrm{dt}=0.01$
           (300 samples). Steps scale linearly with noise.
@@ -758,6 +760,10 @@ $n_{\mathrm{neg}} \geq 3$.
 
     \item \textbf{Tight clamping is irrelevant.} Default 0.35\,\AA\ cap rarely activates.
 
+    \item \textbf{NR-GAD ping-pong hurts.} Pure Newton descent when $n_{\mathrm{neg}} \geq 2$
+          overshoots past the saddle (56.7\% vs 72.3\% baseline at 10\,pm).
+          Needs damping or trust radius.
+
     \item \textbf{IRC: 30\% intended, 40\% half-intended} (10 samples).
           Half-intended cases find a real TS from a slightly different pathway.
 \end{enumerate}
@@ -769,16 +775,16 @@ $n_{\mathrm{neg}} \geq 3$.
 %======================================================================
 
 \begin{enumerate}[leftmargin=2em]
-    \item \textbf{NR-GAD ping-pong:} Dtype fix applied. Expected to help at high
-          noise ($\geq100$\,pm) where $n_{\mathrm{neg}} \geq 2$ is common.
-    \item \textbf{dt=0.005 at 300 samples:} The method comparison used only 50 samples.
-          Need to confirm the 96\%/84\% rates hold with 300 samples.
+    \item \textbf{Damped NR-GAD ping-pong:} The current NR step (pure Newton descent)
+          overshoots. Adding step damping ($\alpha \cdot \Delta\mathbf{x}$ with
+          $\alpha < 1$) or a simple trust radius may recover the physical intuition.
     \item \textbf{IRC at scale:} 30 samples $\times$ 3 noise levels. Scripts ready.
     \item \textbf{Geodesic midpoint:} Starting from the geodesic interpolation
           midpoint (internal coordinates) instead of linear midpoint. Code written,
           not yet run.
     \item \textbf{Full Transition1x:} 9,561 samples with 500 parallel MIG jobs
-          ($\sim$6\,min wall time). Feasible but deferred until method selection is final.
+          ($\sim$6\,min wall time). Feasible now that \texttt{gad\_small\_dt} is
+          confirmed as the best method.
 \end{enumerate}
 
 
