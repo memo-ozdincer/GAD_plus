@@ -97,6 +97,27 @@ Equilibrium geometries are near-useless.
 \end{minipage}
 
 %----------------------------------------------------------------------
+\section*{2b. Geodesic Midpoint \small(204/300 samples$^\dagger$, dt=0.005, 1000 steps)}
+
+Geodesic interpolation in internal coordinates vs linear midpoint.
+
+\begin{tabular}{lrrrr}
+\toprule
+Start & Samples & Conv & Rate & Avg Steps \\
+\midrule
+Linear midpoint (dt=0.01, 300 steps) & 300 & 87 & 29.0\% & 191 \\
+\textbf{Geodesic midpoint} (dt=0.005, 1000 steps) & 204$^\dagger$ & 94 & \textbf{46.1\%} & 459 \\
+\bottomrule
+\end{tabular}
+
+{\small $^\dagger$Job timed out at sample 204/300. Salvaged from trajectory Parquet files.}
+
+\textbf{Takeaway:} Geodesic midpoint reaches 46\% (vs 29\% linear). Part of the gain
+is from better config (dt=0.005, 1000 steps vs dt=0.01, 300 steps), but geodesic
+interpolation places the starting geometry closer to the reaction path.
+Needs rerun with matched configs to isolate the geodesic effect.
+
+%----------------------------------------------------------------------
 \section*{3. Basin of Attraction \small(50 samples, dt=0.01, 300 steps)}
 
 At what noise level does GAD start finding a \textit{different} TS?
@@ -195,11 +216,14 @@ Noise & 1000 steps & 2000 steps & 3000 steps \\
 50pm & 91.3\% & --- & 93.0\% (+1.7) \\
 100pm & 86.7\% & --- & 88.7\% (+2.0) \\
 150pm & 70.3\% & 74.0\% (+3.7) & timed out \\
+200pm & 51.3\% & 58.2\%$^\dagger$ (+6.9) & 60.7\%$^\dagger$ (+9.4) \\
 \bottomrule
 \end{tabular}
 
-\textbf{Takeaway:} Ceiling is $\sim$96\%. 3$\times$ the compute gives only 1--2pp.
-The remaining $\sim$4\% are structurally hard molecules.
+{\small $^\dagger$Salvaged from timed-out jobs (275/300 and 224/300 samples completed).}
+
+\textbf{Takeaway:} Ceiling is $\sim$96\% at low noise (diminishing returns). At high noise
+(200pm), more steps help substantially: +9.4pp from 1000$\to$3000 steps.
 
 %----------------------------------------------------------------------
 \section*{7. Trajectory Analysis}
@@ -265,7 +289,7 @@ Finding & Evidence \\
 \textbf{Adaptive dt hurts} & $-$20--30pp vs baseline \\
 \textbf{NR-GAD hurts (even damped)} & Pure GAD is strictly better \\
 \textbf{Tight clamping: no effect} & 0.1\AA\ vs 0.35\AA\ cap, $<$1pp \\
-\textbf{Midpoint start viable} & 29\% without knowing TS \\
+\textbf{Midpoint start viable} & 29\% linear, 46\% geodesic \\
 \bottomrule
 \end{tabular}
 \end{center}

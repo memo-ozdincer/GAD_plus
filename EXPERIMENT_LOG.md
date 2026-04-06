@@ -110,6 +110,31 @@ The 50-sample estimates were noisy — 300 samples gives tighter confidence inte
 
 **Data:** `/lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/` | **Jobs:** 58835839_[0-3]
 
+### Geodesic Midpoint (salvaged, 204/300 samples, dt=0.005, 1000 steps)
+
+| Start | Samples | Conv | Rate | Avg Steps |
+|-------|---------|------|------|-----------|
+| Linear midpoint (dt=0.01, 300 steps) | 300 | 87 | 29.0% | 191 |
+| **Geodesic midpoint (dt=0.005, 1000 steps)** | 204† | 94 | **46.1%** | 459 |
+
+†Job timed out. Results salvaged from trajectory Parquet files.
+
+**Finding:** Geodesic midpoint at 46% vs linear at 29%. Confounded by different dt/steps — needs matched-config rerun to isolate geodesic effect.
+
+**Data:** `/lustre07/scratch/memoozd/gadplus/runs/geodesic_mid/` | **Job:** 58852072_0 (TIMEOUT)
+
+---
+
+### Salvaged 200pm High Step Count Results
+
+| Steps | Samples | Conv | Rate | Δ vs 1000 steps |
+|-------|---------|------|------|-----------------|
+| 1000 | 300 | 154 | 51.3% | — |
+| 2000† | 275 | 160 | 58.2% | +6.9pp |
+| 3000† | 224 | 136 | 60.7% | +9.4pp |
+
+†Timed out, salvaged from trajectories. At high noise, more steps help substantially.
+
 ---
 
 ## Phase 4: Trajectory Visualization
