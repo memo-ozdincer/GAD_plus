@@ -44,6 +44,15 @@ All data lives under `/lustre07/scratch/memoozd/gadplus/runs/`. Each experiment 
 │   ├── summary_{method}_{noise}pm.parquet  # 42 files (one per method×noise)
 │   └── traj_*.parquet                       # trajectory files per sample
 │
+├── targeted/                      # Damped NR-GAD, high step counts, randomized samples
+│   ├── summary_{method}_{noise}pm.parquet  # Per-config summaries
+│   └── traj_*.parquet
+│
+├── irc_validation_300/            # IRC validation at scale (30 samples × 3 noise)
+│   ├── irc_validation_10pm.parquet
+│   ├── irc_validation_50pm.parquet
+│   └── irc_validation_100pm.parquet
+│
 ├── sweep_dt/                      # Phase 1
 │   └── sweep_dt_results.parquet
 │
@@ -582,6 +591,8 @@ All SLURM output at `/lustre07/scratch/memoozd/gadplus/logs/`:
 | 58835840 | 6 | Basin mapping 50 samples | COMPLETED |
 | 58835900_[0-5] | 7 | Method comparison 50 samples | FAILED (ping-pong dtype) |
 | 58845357_[0-41] | 7 | Method comparison 300 samples, 1000 steps | COMPLETED |
+| 58852071_[0-41] | 8-10 | Damped NR-GAD, high steps, randomized | 42 COMPLETED, 4 TIMEOUT |
+| 58852072_[0-3] | 8-10 | Geodesic midpoint + IRC at scale | 2 COMPLETED, 1 TIMEOUT |
 
 ## Data Locations
 
@@ -594,6 +605,8 @@ All SLURM output at `/lustre07/scratch/memoozd/gadplus/logs/`:
 | Phase 6 (basin map) | `/lustre07/scratch/memoozd/gadplus/runs/basin_map/` |
 | Phase 7 (method cmp, partial) | `/lustre07/scratch/memoozd/gadplus/runs/method_comparison/` |
 | Phase 7 (method cmp, FINAL) | `/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/` |
+| Targeted tests | `/lustre07/scratch/memoozd/gadplus/runs/targeted/` |
+| IRC at scale | `/lustre07/scratch/memoozd/gadplus/runs/irc_validation_300/` |
 
 ## Dataset Reference
 
