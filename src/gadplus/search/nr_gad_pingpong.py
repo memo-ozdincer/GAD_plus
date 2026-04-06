@@ -26,7 +26,7 @@ from gadplus.core.types import PredictFn
 from gadplus.core.mode_tracking import pick_tracked_mode
 from gadplus.core.convergence import is_ts_converged, force_mean
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
-from gadplus.projection import vib_eig, gad_dynamics_projected, atomic_nums_to_symbols
+from gadplus.projection import vib_eig, gad_dynamics_projected, preconditioned_gad_dynamics_projected, atomic_nums_to_symbols
 from gadplus.logging.trajectory import TrajectoryLogger
 from .gad_search import SearchResult
 
@@ -46,6 +46,8 @@ class NRGADPingPongConfig:
     nr_eig_floor: float = 1e-6     # Floor for eigenvalue inversion (regularization)
     nr_damping: float = 0.2        # Global NR step damping (0 < d <= 1)
     nr_max_step_norm: float = 0.1  # Max total NR step norm (Angstrom)
+    # Descent mode when n_neg >= 2: "newton", "gradient", or "preconditioned"
+    descent_mode: str = "newton"
     # Shared
     max_atom_disp: float = 0.35
     min_interatomic_dist: float = 0.4
@@ -208,18 +210,43 @@ def run_nr_gad_pingpong(
         coords_prev = coords.clone()
 
         if phase == "nr":
-            # NR minimization: pure Newton descent on all modes
             n_nr_steps += 1
-            grad = -forces.reshape(-1).to(evecs_vib_3N.dtype)
-            delta_x, _info = nr_minimize_step(
-                grad, evals_vib, evecs_vib_3N,
-                max_step=cfg.nr_max_step,
-                eig_floor=cfg.nr_eig_floor,
-                damping=cfg.nr_damping,
-                max_step_norm=cfg.nr_max_step_norm,
-            )
-            step_disp = delta_x.reshape(-1, 3).to(coords.dtype)
-            step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
+
+            if cfg.descent_mode == "gradient":
+                # B1: Plain gradient descent — just follow forces
+                step_disp = cfg.gad_dt * forces
+                step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
+            elif cfg.descent_mode == "preconditioned":
+                # Preconditioned descent: dt · |H|⁻¹ · F (gad_blend_weight=0)
+                # Uses same machinery as preconditioned GAD, but w=0 → pure descent
+                n_evecs = evecs_vib_3N.shape[1]
+                k_eff = min(cfg.k_track, n_evecs) if cfg.k_track > 0 else n_evecs
+                V_cand = evecs_vib_3N[:, :max(k_eff, 1)].to(device=forces.device, dtype=forces.dtype)
+                v_prev_local = (
+                    v_prev.to(device=forces.device, dtype=forces.dtype).reshape(-1)
+                    if v_prev is not None else None
+                )
+                v, _, _ = pick_tracked_mode(V_cand, v_prev_local, k=cfg.k_track)
+                gad_vec, v_proj, _ = preconditioned_gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                    evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
+                    eig_floor=cfg.nr_eig_floor, gad_blend_weight=0.0,
+                )
+                v_prev = v_proj.detach().clone().reshape(-1)
+                step_disp = cfg.gad_dt * gad_vec
+                step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
+            else:
+                # Default: Newton descent on all modes
+                grad = -forces.reshape(-1).to(evecs_vib_3N.dtype)
+                delta_x, _info = nr_minimize_step(
+                    grad, evals_vib, evecs_vib_3N,
+                    max_step=cfg.nr_max_step,
+                    eig_floor=cfg.nr_eig_floor,
+                    damping=cfg.nr_damping,
+                    max_step_norm=cfg.nr_max_step_norm,
+                )
+                step_disp = delta_x.reshape(-1, 3).to(coords.dtype)
+                step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
         else:
             # GAD navigation (projected)
             n_gad_steps += 1
@@ -231,9 +258,18 @@ def run_nr_gad_pingpong(
                 if v_prev is not None else None
             )
             v, _, _ = pick_tracked_mode(V_cand, v_prev_local, k=cfg.k_track)
-            gad_vec, v_proj, _ = gad_dynamics_projected(
-                coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
-            )
+
+            if cfg.descent_mode == "preconditioned":
+                # Preconditioned GAD (w=1) for consistency with precond descent phase
+                gad_vec, v_proj, _ = preconditioned_gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                    evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
+                    eig_floor=cfg.nr_eig_floor, gad_blend_weight=1.0,
+                )
+            else:
+                gad_vec, v_proj, _ = gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                )
             v_prev = v_proj.detach().clone().reshape(-1)
 
             # Adaptive or fixed dt

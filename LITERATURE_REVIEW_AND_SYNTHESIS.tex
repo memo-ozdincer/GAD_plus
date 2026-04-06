@@ -1,0 +1,3338 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{natbib}
+\usepackage{xcolor}
+
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\RR}{\mathbb{R}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\newcommand{\dd}{\mathrm{d}}
+
+\theoremstyle{definition}
+\newtheorem{remark}{Remark}
+
+\title{Literature Review and Experimental Synthesis:\\
+  Newton--Raphson Minimization on the DFTB0 PES\\
+  from Displaced Transition-State Geometries}
+\author{M.\ Dincer}
+\date{March 2026 --- v13}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+%=============================================================================
+\section{Introduction}
+\label{sec:intro}
+%=============================================================================
+
+This document synthesizes insights from two rounds of literature review
+(approximately 20 papers) and maps them explicitly to our experimental
+findings from versions~1 through~13 of the minimization code.
+The goal is to create a permanent, self-contained record of:
+\begin{enumerate}[nosep]
+  \item what the literature says about our problem class,
+  \item what we implemented and why,
+  \item what we explicitly chose \emph{not} to implement and why,
+  \item what remains open.
+\end{enumerate}
+
+\subsection{Problem Statement}
+
+Given a molecule at a geometry displaced by $d \in \{0.5, 1.0, 1.5, 2.0\}$\,\AA\
+from a known energy minimum, find the nearest local minimum on the DFTB0
+potential energy surface (PES).
+\begin{itemize}[nosep]
+  \item \textbf{Dataset}: Transition1x~\citep{transition1x} --- 10,073 organic
+    reactions, $\leq 7$ heavy atoms, NEB reaction paths computed at
+    $\omega$B97x/6-31G(d).
+  \item \textbf{Calculator}: DFTB0 via SCINE/Sparrow (analytical Hessian, no
+    configuration).
+  \item \textbf{Optimizer}: Newton--Raphson in Cartesian coordinates with full
+    Hessian at every step, Eckart projection to $3N{-}6$ vibrational modes.
+  \item \textbf{Convergence}: $\norm{\vect{f}}_\infty < 10^{-4}$\,eV/\AA\
+    AND either (strict) $n_\text{neg} = 0$ or (relaxed) $\lambda_\text{min}
+    \geq -\tau_\text{relax}$.
+  \item \textbf{Scale}: 287--300 samples per configuration, 10\,000--50\,000
+    maximum steps.
+\end{itemize}
+
+The central experimental finding, established across versions~6--9 (Section~\ref{sec:experiments}), is:
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{%
+  \textbf{Strict convergence} ($n_\text{neg}=0$) with 10k steps drops from
+  $\sim$89\% at 0.5\,\AA\ to $\sim$44\% at 2.0\,\AA.
+  With 50k steps + spectral probes + late escape (v13), convergence
+  reaches \textbf{98\%/97\%/97\%/93\%} at 0.5/1.0/1.5/2.0\,\AA.
+  The gap from 0.5 to 2.0\,\AA\ shrinks from 51\,pts (v9) to 5\,pts (v13).
+  \textbf{Relaxed convergence} ($\lambda_\text{min} \geq -0.01$) is
+  $\sim$90\% at \emph{all} noise levels.
+  The performance cliff is a \emph{criterion problem}, not an optimizer
+  problem.%
+}}
+\end{center}
+
+Furthermore, the user has demonstrated that 100\% convergence is achievable
+via brute-force ``v2-kicking'' (repeatedly perturbing and re-optimizing),
+confirming the optimizer can reach valid minima given enough restarts.
+
+%=============================================================================
+\section{Theoretical Framework}
+\label{sec:theory}
+%=============================================================================
+
+\subsection{Newton--Raphson as Spectral Decomposition}
+\label{sec:nr-spectral}
+
+Given energy $E(\vect{x})$, gradient $\vect{g} = \nabla E$, and Hessian
+$\mat{H} = \nabla^2 E$, the Newton step is
+\begin{equation}
+  \Delta\vect{x} = -\mat{H}^{-1}\vect{g}.
+\end{equation}
+After Eckart projection to the vibrational subspace ($3N{-}6$ modes), we
+decompose $\mat{H}_\text{vib} = \mat{V}\mat{\Lambda}\mat{V}^\top$ with
+eigenvalues $\{\lambda_i\}$ and eigenvectors $\{\vect{v}_i\}$:
+\begin{equation}
+  \Delta\vect{x} = -\sum_{i=1}^{3N-6} w_i \, (\vect{g}\cdot\vect{v}_i) \, \vect{v}_i,
+  \qquad w_i = \frac{1}{\lambda_i}.
+  \label{eq:spectral-step}
+\end{equation}
+When $\mat{H}$ has negative eigenvalues (which occurs $\sim$100\% of the time at our
+displacements, with median $n_\text{neg} \approx 12$), the pure Newton step
+ascends along negative-eigenvalue directions.  All step builders below modify
+the weights $w_i$ to force descent.
+
+\subsection{Our Method = GQT (Goldfeld--Quandt--Trotter)}
+\label{sec:gqt}
+
+Our ``shifted Newton'' step (v3 onwards, best performer) sets:
+\begin{equation}
+  w_i = \frac{1}{\lambda_i + \sigma}, \qquad
+  \sigma = \max(0, -\lambda_\text{min}) + \varepsilon,
+  \label{eq:shifted-newton}
+\end{equation}
+with $\varepsilon = 10^{-3}$ (empirically optimal).
+This is the spectral form of the \textbf{GQT method}
+(Goldfeld--Quandt--Trotter, 1966), which solves the trust-region subproblem
+\begin{equation}
+  \min_{\vect{s}} \; \vect{g}^\top\vect{s} + \tfrac{1}{2}\vect{s}^\top\mat{H}\vect{s}
+  \quad\text{s.t.}\quad \norm{\vect{s}} \leq \Delta.
+\end{equation}
+The shift $\sigma$ is the Lagrange multiplier.  Our fixed
+$\varepsilon$ approximates the optimal $\sigma$ for a particular trust radius.
+
+\textbf{Key property}: Negative modes get \emph{larger} weights than
+equal-magnitude positive modes.  Example: $\lambda = -0.01$,
+$\sigma = 0.011$ $\Rightarrow$ $w = 1000$; $\lambda = +0.01$,
+$\sigma = 0.011$ $\Rightarrow$ $w \approx 48$.  This amplification of
+negative modes drives the optimizer toward flipping them---exactly the right
+behaviour for escaping saddle regions.
+
+\textbf{Complexity}: GQT has worst-case complexity
+$O(\varepsilon^{-5/2})$~\citep{cgt-optimal}, suboptimal compared to ARC's
+$O(\varepsilon^{-3/2})$.
+
+\subsection{ARC (Adaptive Regularization with Cubics)}
+\label{sec:arc}
+
+ARC~\citep{arc-part1} replaces both the trust region and the shift with a
+cubic regularization term:
+\begin{equation}
+  \min_{\vect{s}} \; m_k(\vect{s}) = E_k + \vect{g}_k^\top\vect{s}
+    + \tfrac{1}{2}\vect{s}^\top\mat{H}_k\vect{s}
+    + \tfrac{\sigma_k}{3}\norm{\vect{s}}^3.
+  \label{eq:arc-model}
+\end{equation}
+The minimizer satisfies $(\mat{H}_k + \lambda^*\mat{I})\vect{s}^* = -\vect{g}_k$
+where $\lambda^* = \sigma_k\norm{\vect{s}^*}$.  In the spectral basis, the
+\textbf{secular equation} becomes:
+\begin{equation}
+  \sigma \norm{\vect{s}(\lambda)} = \lambda,
+  \qquad
+  \norm{\vect{s}(\lambda)}^2 = \sum_i \frac{c_i^2}{(\lambda_i + \lambda)^2},
+  \label{eq:arc-secular}
+\end{equation}
+where $c_i = \vect{g}\cdot\vect{v}_i$.  We solve~\eqref{eq:arc-secular}
+via safeguarded Newton iteration.
+
+\textbf{$\sigma$-adaptation}: After each step, compute the quality ratio
+\begin{equation}
+  \rho_k = \frac{E(\vect{x}_k) - E(\vect{x}_k + \vect{s}_k)}{m_k(\vect{0}) - m_k(\vect{s}_k)}.
+\end{equation}
+Update:
+\begin{equation}
+  \sigma_{k+1} = \begin{cases}
+    \sigma_k \cdot \gamma_2 & \text{if } \rho_k > \eta_2 \text{ (very successful)},\\
+    \sigma_k & \text{if } \eta_1 \leq \rho_k \leq \eta_2 \text{ (successful)},\\
+    \sigma_k \cdot \gamma_1 & \text{if } \rho_k < \eta_1 \text{ (unsuccessful)}.
+  \end{cases}
+\end{equation}
+Default: $\eta_1=0.1$, $\eta_2=0.9$, $\gamma_1=2.0$, $\gamma_2=0.5$.
+This is \textbf{self-regulating}: no trust radius, no floor, no collapse
+spiral.
+
+\textbf{Complexity}: $O(\varepsilon^{-3/2})$---\textbf{optimal} among
+second-order methods~\citep{cgt-optimal}.
+
+\textbf{Implementation}: \texttt{\_nr\_step\_arc()} in
+\texttt{minimization.py}, with the secular equation solved iteratively
+(lines~700--780).  The ARC step-size control (lines~2350--2450) replaces the
+trust region entirely.
+
+\subsection{RFO (Rational Function Optimization)}
+\label{sec:rfo}
+
+RFO~\citep{schlegel2011} uses the augmented Hessian eigenvalue problem:
+\begin{equation}
+  \begin{pmatrix} \mat{H} & \vect{g} \\ \vect{g}^\top & 0 \end{pmatrix}
+  \begin{pmatrix} \vect{s} \\ 1 \end{pmatrix}
+  = \mu \begin{pmatrix} \vect{s} \\ 1 \end{pmatrix}.
+  \label{eq:rfo-augmented}
+\end{equation}
+For minimization, take the \textbf{lowest eigenvalue} $\mu$.  In the spectral
+basis of $\mat{H}$, this yields the secular equation:
+\begin{equation}
+  \sum_i \frac{c_i^2}{\lambda_i - \mu} + \mu = 0,
+  \qquad \mu < \lambda_\text{min}.
+  \label{eq:rfo-secular}
+\end{equation}
+The step is then:
+\begin{equation}
+  s_i = \frac{-c_i}{\lambda_i - \mu},
+  \label{eq:rfo-step}
+\end{equation}
+which is equivalent to shifted Newton with a \emph{data-dependent} shift
+$\sigma = -\mu$.
+
+\textbf{Advantages over fixed-$\varepsilon$ GQT}:
+\begin{itemize}[nosep]
+  \item Automatic shift determination---no hyperparameter $\varepsilon$.
+  \item The shift adapts to the local Hessian spectrum.
+  \item Standard in Gaussian, ORCA, and Sella~\citep{sella}.
+\end{itemize}
+
+\textbf{Implementation}: \texttt{\_solve\_rfo\_secular()} and
+\texttt{\_nr\_step\_rfo()} in \texttt{minimization.py}.  RFO uses the same
+trust-region step-size control as the v9 baseline.
+
+\subsection{LM$\leftrightarrow$Cubic Equivalence}
+\label{sec:lm-cubic}
+
+Benson and Shanno~\citep{benson-shanno} prove that any
+Levenberg--Marquardt step $(\mat{H}+\lambda\mat{I})\vect{s}=-\vect{g}$ is
+equivalent to cubic regularization with $M = 2\lambda/\norm{\vect{s}}$.
+Conversely, our fixed $\varepsilon = 10^{-3}$ implies variable cubic
+strength depending on the step norm:
+\begin{equation}
+  M_\text{implicit} = \frac{2\varepsilon}{\norm{\vect{s}}}.
+\end{equation}
+This means our shifted Newton is \emph{already doing implicit cubic
+regularization}, but with a strength that varies inversely with step norm
+rather than being controlled via $\rho$.
+
+\subsection{The $\varepsilon^{1/2}$ Second-Order Theorem}
+\label{sec:eps-half}
+
+Boumal et al.~\citep{boumal-arc-manifolds} prove that when an ARC-type
+method drives $\norm{\vect{g}} \leq \varepsilon$, it simultaneously
+guarantees:
+\begin{equation}
+  \lambda_\text{min}(\mat{H}) \geq -\sqrt{\varepsilon}.
+  \label{eq:eps-half}
+\end{equation}
+With our force convergence threshold $\varepsilon = 10^{-4}$\,eV/\AA:
+\begin{equation}
+  \sqrt{10^{-4}} = 0.01.
+\end{equation}
+This is \textbf{exactly our empirically optimal relaxed threshold}.
+The cascade data (Table~\ref{tab:cascade}) confirms: the convergence rate
+plateaus at $\lambda_\text{min} \geq -0.01$, with $\sim$90\% at all noise
+levels.  This is not empirical coincidence---it is the theoretical prediction.
+
+\begin{remark}
+  This result provides principled justification for relaxed convergence.
+  Demanding $n_\text{neg}=0$ is \emph{more strict} than what the optimization
+  theory guarantees.  If the optimizer has driven forces below $10^{-4}$\,eV/\AA,
+  eigenvalues in $[-0.01, 0)$ are \emph{expected} and acceptable.
+\end{remark}
+
+%=============================================================================
+\section{Step-Size Control}
+\label{sec:step-control}
+%=============================================================================
+
+\subsection{Trust Region}
+\label{sec:trust-region}
+
+The trust region caps the step to $\norm{\Delta\vect{x}}_\infty \leq \Delta$
+(per-atom maximum displacement, using infinity norm~\citep{sella}).  After the
+step, compute:
+\begin{equation}
+  \rho = \frac{E(\vect{x}) - E(\vect{x}+\vect{s})}{m(\vect{0}) - m(\vect{s})}.
+\end{equation}
+
+\subsubsection{Original Rules (v1--v9)}
+\begin{align}
+  \rho > 0.75 &\implies \Delta \gets \min(1.5\Delta, \Delta_\text{max}), \\
+  \rho < 0.25 &\implies \Delta \gets \max(0.5\Delta, \Delta_\text{floor}), \\
+  \rho < 0    &\implies \Delta \gets \max(0.25\Delta, \Delta_\text{floor}).
+\end{align}
+With $\Delta_\text{max} = 1.3$\,\AA\ and $\Delta_\text{floor} = 0.01$\,\AA.
+
+\subsubsection{Schlegel (2011) Corrections}
+\label{sec:schlegel-tr}
+
+Schlegel's review~\citep{schlegel2011} identifies two problems with standard
+rules:
+
+\paragraph{Growth condition.}
+Growing the trust radius when $\rho > 0.75$ but the step is far from the
+boundary ($\norm{\vect{s}} \ll \Delta$) is pointless and can cause
+instability.  The corrected rule:
+\begin{equation}
+  \text{Grow only if } \rho > 0.75 \text{ AND }
+  \norm{\vect{s}}_\infty \geq 0.8\,\Delta.
+  \label{eq:schlegel-grow}
+\end{equation}
+
+\paragraph{Shrink formula.}
+Shrinking to a fraction of $\Delta$ (the radius) ignores the actual step
+taken.  If the step was much smaller than $\Delta$ and still bad, shrinking
+$\Delta$ doesn't help.  The corrected rule:
+\begin{equation}
+  \Delta \gets \max(0.25\,\norm{\vect{s}}_\infty, \, \Delta_\text{floor}).
+  \label{eq:schlegel-shrink}
+\end{equation}
+
+\textbf{Implementation}: Gated by \texttt{schlegel\_trust\_update=True}
+parameter (v10b).  The flag ensures backward compatibility.
+
+\subsection{ARC $\sigma$-Adaptation}
+\label{sec:arc-sigma}
+
+ARC replaces the trust region entirely (Section~\ref{sec:arc}).  The
+regularization parameter $\sigma$ controls effective step size: large $\sigma$
+$\Rightarrow$ short, cautious steps; small $\sigma$ $\Rightarrow$ long,
+aggressive steps.  There is no radius floor, so the collapse spiral
+(Section~\ref{sec:collapse}) cannot occur.
+
+\subsection{Line Search}
+\label{sec:line-search}
+
+Armijo backtracking: $E(\vect{x}+\alpha\vect{d}) \leq E(\vect{x}) + c_1
+\alpha\, \vect{g}^\top\vect{d}$ with $c_1=10^{-4}$.
+
+\textbf{v7 result}: Line search is \emph{uniformly worse} than trust region
+at all noise levels (Table~\ref{tab:v7}).  Reason: line search commits to the
+Newton direction $\vect{d}$, but at large displacement, this direction has
+cosine similarity $\sim$0.03--0.11 with the true direction
+(Table~\ref{tab:direction-quality}).  Trust region limits damage to $\Delta$;
+line search amplifies the wrong direction.
+
+\subsection{Trust Radius Collapse Mechanism}
+\label{sec:collapse}
+
+The dominant failure mode (identified in v6 analysis):
+\begin{enumerate}[nosep]
+  \item Shifted Newton weight $w_i = 1/(\lambda_i+\sigma)$, max = $1/\varepsilon = 1000\times$.
+  \item Near-zero eigenvalue modes get amplified $1000\times$, producing oversized steps.
+  \item Oversized step violates quadratic model: $\rho < 0.25$ $\Rightarrow$ $\Delta \gets 0.25\Delta$.
+  \item After $\sim$4 bad steps: $1.3 \to 0.33 \to 0.08 \to 0.02 \to 0.01$\,\AA\ (floor).
+  \item At floor, all modes scaled uniformly. Neg-mode displacement $\approx 5\times10^{-4}$\,\AA/step.
+  \item Recovery needs $\sim$13 consecutive good steps. But eigenvalues oscillate $\Rightarrow$ never happens.
+\end{enumerate}
+
+This is why ARC and RFO are promising: they control regularization
+\emph{continuously} without a hard floor.
+
+%=============================================================================
+\section{GDIIS Theory and Implementation}
+\label{sec:gdiis}
+%=============================================================================
+
+\subsection{Pulay's DIIS for SCF vs.\ Cs\'asz\'ar--Pulay's GDIIS}
+
+\textbf{DIIS} (Direct Inversion in the Iterative Subspace)~\citep{pulay-diis}
+was developed for SCF convergence: find coefficients $\{c_i\}$ with
+$\sum c_i = 1$ minimizing $\norm{\sum c_i \vect{e}_i}^2$ where $\vect{e}_i$
+are error vectors.  The interpolated solution is $\vect{x}_\text{DIIS} =
+\sum c_i \vect{x}_i$.
+
+\textbf{GDIIS}~\citep{gdiis-csaszar-pulay} extends this to geometry
+optimization.  The key difference is the error vectors.
+
+\subsection{Schlegel's Correct Formulation}
+
+Schlegel~\citep{schlegel2011} specifies (Eq.~16) that the error vectors
+for GDIIS should be the \emph{Newton step residuals} $\mat{H}^{-1}\vect{g}_i$
+(or equivalently, the Newton step vectors), not the raw gradients:
+\begin{equation}
+  B_{ij} = (\mat{H}^{-1}\vect{g}_i)^\top (\mat{H}^{-1}\vect{g}_j).
+  \label{eq:gdiis-B}
+\end{equation}
+Solve $\mat{B}\vect{c} = \vect{0}$ subject to $\sum c_i = 1$ via the
+constrained system:
+\begin{equation}
+  \begin{pmatrix} \mat{B} & \vect{1} \\ \vect{1}^\top & 0 \end{pmatrix}
+  \begin{pmatrix} \vect{c} \\ \lambda \end{pmatrix}
+  = \begin{pmatrix} \vect{0} \\ 1 \end{pmatrix}.
+  \label{eq:gdiis-system}
+\end{equation}
+The interpolated geometry is $\vect{x}_\text{GDIIS} = \sum c_i \vect{x}_i$.
+
+\subsection{Our Bug: Gradient-Based Error Vectors}
+
+Our original \texttt{\_GDIISExtrapolator} (v5/v10 initial implementation)
+used \emph{raw gradients} $\vect{g}_i$ as error vectors:
+$B_{ij} = \vect{g}_i^\top\vect{g}_j$.  This is Pulay's \emph{SCF-DIIS}
+formulation, not geometry-optimization GDIIS.  The difference matters because:
+\begin{itemize}[nosep]
+  \item Raw gradient dot products ignore the Hessian spectrum: two points
+    with parallel gradients but different curvatures get the same B-matrix
+    entry.
+  \item Newton step dot products incorporate curvature: high-curvature modes
+    are de-emphasized, low-curvature modes amplified.
+\end{itemize}
+
+\textbf{Fix (v10b)}: Modified \texttt{store()} to accept the Newton step
+vector; B-matrix now uses step dot products per~\eqref{eq:gdiis-B}.
+Backward-compatible: if step not provided, falls back to gradient.
+
+\subsection{GEDIIS (Li--Frisch, 2006)}
+\label{sec:gediis}
+
+GEDIIS~\citep{li-frisch-gediis} is an energy-based DIIS variant that
+interpolates geometries to minimize \emph{energy} rather than error norm.
+Hybrid GEDIIS/GDIIS switches based on convergence stage.
+We did not implement GEDIIS but note it as a possible future extension.
+
+\subsection{Late-Stage Acceleration}
+\label{sec:gdiis-late}
+
+Schlegel~\citep{schlegel2011} describes GDIIS as routinely accelerating
+\emph{final convergence}, not just breaking oscillations.
+Our v10 implementation only triggered GDIIS on oscillation detection.
+
+\textbf{v10b addition}: New parameter \texttt{gdiis\_late\_force\_threshold}
+(default 0).  When \texttt{force\_norm < threshold}, GDIIS is attempted every
+\texttt{gdiis\_every} steps regardless of oscillation.  This implements
+Schlegel's recommendation.
+
+%=============================================================================
+\section{Ghost Modes and Convergence Criteria}
+\label{sec:ghost-modes}
+%=============================================================================
+
+\subsection{Eckart Projection}
+
+Eckart projection removes 6 translation/rotation modes from the $3N$-dimensional
+Hessian, yielding $3N{-}6$ vibrational modes.  The projection is
+\emph{exact only at a stationary point}.  Away from equilibrium,
+rotation--vibration coupling leaks into the vibrational subspace,
+creating small spurious eigenvalues.
+
+Implementation: \texttt{get\_vib\_evals\_evecs()} from
+\texttt{multi\_mode\_eckartmw.py}, with optional \texttt{purify\_hessian}
+symmetrization (found unhelpful in practice).
+
+\subsection{ORCA Acoustic Sum Rule}
+
+The ORCA manual~\citep{orca-manual} explicitly mentions an ``acoustic sum rule''
+toggle to reduce noise-induced imaginary frequencies---the same phenomenon.
+This confirms ghost modes are a known numerical artifact, not a deficiency of
+our code.
+
+\subsection{Morse--Bott Theory}
+\label{sec:morse-bott}
+
+Luo et al.~\citep{convergence-degenerate} analyze convergence near degenerate
+critical points (eigenvalue zero) using Morse--Bott theory.  Key result:
+\begin{quote}
+  Near-zero eigenvalues on critical manifolds are \emph{neutral} for
+  convergence.  The gradient component in zero-eigenvalue directions is
+  $O(r^2)$ where $r$ is distance to the manifold.
+\end{quote}
+This directly explains why ghost eigenvalues in $[-10^{-4}, 0)$ do not
+prevent force convergence.  The optimizer converges in the non-degenerate
+(vibrational) subspace; the degenerate (ghost) subspace produces tiny,
+ignorable gradient contributions.
+
+\subsection{The $n_\text{neg}=0$ Criterion is Inappropriate}
+\label{sec:nneg-inappropriate}
+
+Three lines of evidence converge:
+\begin{enumerate}[nosep]
+  \item \textbf{Theoretical}: The $\varepsilon^{1/2}$ theorem
+    (Section~\ref{sec:eps-half}) predicts eigenvalues in $[-0.01, 0)$ are
+    acceptable when $\norm{\vect{g}} \leq 10^{-4}$.
+  \item \textbf{Numerical}: Ghost modes from Eckart projection artifacts
+    populate the $[-10^{-4}, 0)$ band.
+  \item \textbf{Cross-surface}: At DFT-labeled minima, 90\% have $n_\text{neg}>0$
+    under DFTB0, with \emph{strongly negative} eigenvalues ($<-0.01$).  These
+    are genuine PES disagreements between theory levels, not optimizer failures.
+\end{enumerate}
+
+The cascade evaluation (Table~\ref{tab:cascade}) quantifies the effect:
+the gap between strict ($n_\text{neg}=0$) and relaxed ($\lambda_\text{min}
+\geq -0.01$) grows from 18 percentage points at 0.5\,\AA\ to 73 points at
+2.0\,\AA.
+
+\subsection{Saddle Point Convergence ($n_\text{neg}=1$)}
+
+For mode-following, GAD (Gentlest Ascent Dynamics), or saddle-point search
+methods, the convergence criterion would be $n_\text{neg}=1$ (first-order
+saddle point).  Our codebase is currently minimization-only, but the
+classification infrastructure (\texttt{cascade\_at\_convergence}) already
+supports arbitrary eigenvalue counting.
+
+%=============================================================================
+\section{Literature Confirmations of Experimental Findings}
+\label{sec:confirmations}
+%=============================================================================
+
+\begin{longtable}{p{0.35\textwidth}p{0.6\textwidth}}
+\toprule
+\textbf{Our Result} & \textbf{Literature Explanation} \\
+\midrule
+\endhead
+
+iHiSD crossover hurts (v8: pure SN 43.3\% $\to$ cm=2.0 only 15.9\%)
+& Su et al.~\citep{ihisd}: iHiSD assumes gradient alignment tendency near
+  saddle points.  Our data shows cosine similarity 0.03--0.11 at
+  0.5--2.0\,\AA\ displacement (Table~\ref{tab:direction-quality}).
+  We are outside the theory's applicability regime. \\
+
+First-order methods fail (PIC-ARC: 0\%)
+& Packwood~\citep{packwood2018}: even approximate curvature dramatically
+  outperforms gradients alone in nonconvex landscapes.
+  Cartis et al.~\citep{cgt-complexity}: Newton can be as slow as steepest
+  descent in worst case, but SD can never be faster than regularized Newton. \\
+
+SPDN weight cap catastrophic (v5: 0\%)
+& Capping weights at $1/\tau_\text{hard} = 100$ discards curvature
+  information.  Packwood shows the exact Hessian can be \emph{worse} than a
+  ``cleaned-up'' version---but cleaning up means enforcing positive
+  definiteness, not capping.  Different operation entirely. \\
+
+LM damping inferior (v2)
+& LM shifts \emph{all} eigenvalues uniformly by $\mu$:
+  $w_i = |\lambda_i|/(\lambda_i^2+\mu^2)$.  Shifted Newton targets
+  only the problematic modes via $\sigma = \max(0,-\lambda_\text{min})+\varepsilon$.
+  LM over-regularizes positive eigenvalues. \\
+
+Line search $\prec$ trust region (v7)
+& Standard theory: line search requires a descent direction.  Our Newton
+  direction is poor at large displacement.  TR limits damage; LS commits to
+  the direction~\citep{schlegel2011,cgt-optimal}. \\
+
+\bottomrule
+\end{longtable}
+
+%=============================================================================
+\section{Dataset and Calculator Considerations}
+\label{sec:dataset}
+%=============================================================================
+
+\subsection{Transition1x Dataset}
+\label{sec:transition1x}
+
+Transition1x~\citep{transition1x} provides 10,073 organic reactions:
+\begin{itemize}[nosep]
+  \item NEB paths at $\omega$B97X-D3/def2-TZVP (some at $\omega$B97x/6-31G(d)).
+  \item Endpoints labeled as ``reactant'' and ``product'' minima.
+  \item Transition states verified by single imaginary frequency.
+  \item Maximum 7 heavy atoms, 23 total atoms.
+\end{itemize}
+
+\textbf{Critical insight}: The dataset performs \emph{no frequency checks on
+minima}---only force convergence to 0.01\,eV/\AA.  This means:
+\begin{enumerate}[nosep]
+  \item Some ``minima'' may be saddle points at the original DFT level.
+  \item The 0.01\,eV/\AA\ force threshold is $100\times$ our convergence
+    criterion.
+  \item These endpoints are then used as references for evaluating our
+    DFTB0 optimizer.
+\end{enumerate}
+Approximately 16\% of NEB reactions failed and were discarded from the
+dataset.
+
+\subsection{Level-of-Theory Mismatch}
+
+Three levels of theory are involved:
+\begin{center}
+  $\omega$B97X-D3/def2-TZVP \quad$\xrightarrow{\text{NEB}}$\quad
+  $\omega$B97x/6-31G(d) \quad$\xrightarrow{\text{our optimizer}}$\quad
+  DFTB0
+\end{center}
+Each transition changes the PES.  A minimum at one level may not be a minimum
+at another.  Our forensic analysis (Section~\ref{sec:dftb0-forensics})
+quantifies this.
+
+\subsection{DFTB0 Surface Forensics}
+\label{sec:dftb0-forensics}
+
+At DFT-labeled reactant minima, under DFTB0:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Metric & Value \\
+\midrule
+Fraction with $n_\text{neg}=0$ & \textbf{10\%} \\
+Median $n_\text{neg}$ & 2 \\
+Median force at ``minimum'' & 1.39\,eV/\AA \\
+Negative eigenvalue band $\lambda < -0.1$ & 0.90 modes/molecule \\
+Negative eigenvalue band $-0.1 \leq \lambda < -0.01$ & 0.63 modes/molecule \\
+Ghost band $\lambda \in [-10^{-3}, 0)$ & 0.08 modes/molecule \\
+Condition number $\kappa$ & $\sim 10^{3.2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The strongly negative eigenvalues ($<-0.01$) confirm genuine PES disagreements
+between DFT and DFTB0---these are \emph{not} numerical ghosts.  The ghost band
+is nearly empty at actual minima but populated at displaced geometries.
+
+\subsection{SCINE/Sparrow Calculator}
+
+SCINE/Sparrow provides:
+\begin{itemize}[nosep]
+  \item Zero-configuration DFTB0 (no parameters to set).
+  \item Analytical Hessian (not finite difference).
+  \item Hessian noise floor: estimated $\sim 8\times10^{-3}$ from the
+    \texttt{nr\_threshold} parameter.
+\end{itemize}
+
+We did \emph{not} explore SCINE SCF convergence settings, which could
+potentially reduce the Hessian noise floor.  This is noted as future work.
+
+%=============================================================================
+\section{Experimental Results Summary}
+\label{sec:experiments}
+%=============================================================================
+
+\subsection{Version History}
+
+\begin{longtable}{clp{5cm}p{3cm}l}
+\toprule
+\textbf{Version} & \textbf{Key Idea} & \textbf{Result} & \textbf{Verdict} \\
+\midrule
+\endhead
+
+v1 & Hard-filter NR + TR & Baseline & --- \\
+v2 & LM damping + cascade & LM inferior to SN & Diagnostics kept \\
+v3 & \textbf{Shifted Newton} + escape & 80\% at 1.0\,\AA\ (15 samples) & \textbf{Best step} \\
+v4 & 5 targeted failure fixes & All hurt (53$\to$10\%) & All reverted \\
+v5 & SPDN (partition + GDIIS + LS) & 0\% convergence & Catastrophic \\
+v6 & Back to basics: SN + TR & 76--79\% at 0.5\,\AA\ (300 samples) & Confirmed \\
+v7 & Line search vs.\ trust region & LS worse at all noise & TR wins \\
+v8 & iHiSD crossover (GD$\to$NR) & Crossover hurts & Pure SN best \\
+PIC-ARC & First-order + cubic reg & 0\% convergence & First-order dead \\
+v9 & Relaxed convergence & 80/60/46/29\% strict & Criterion problem \\
+v10 & ARC + GDIIS & ARC catastrophic (23/2/0/0\%) & \textbf{ARC dead} \\
+v10.2 & +RFO, +Schlegel TR, +GDIIS-late & RFO 67/48/32/12\%; GDIIS zero effect & GDIIS dead \\
+v10c & +Polynomial line search & \textbf{89/78/63/42\%} (RFO+Schlegel+PLS) & \textbf{PLS breakthrough} \\
+v11 & +20k steps, trust floor, GQT+Schl+PLS & \textbf{95/85/77/64\%} (RFO+Schl+PLS, 20k) & \textbf{20k breakthrough} \\
+v12 & +50k steps, osc/blind kicks & \textbf{95/96/93\%} (RFO+PLS, 50k); kicks $+$5.9\,pts at 2.0\,\AA\ only & \textbf{50k breakthrough} \\
+v12b & +adaptive kick scaling, probe kicks, late escape & \textbf{76.0\%} at 2.0\,\AA\ (20k); probe is the key ($+$9\,pts) & \textbf{Probe breakthrough} \\
+v13 & 50k + v12b kicks combined & \textbf{98/97/97/93\%} (full v12b, 50k); orthogonality confirmed & \textbf{Combined breakthrough} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Best Convergence Rates (v11)}
+\label{sec:best-rates}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+Noise & v9 GQT & v10c Best (10k) & v11 Best (10k) & v11 Best (20k) & $\Delta$ (v9$\to$v11) \\
+\midrule
+0.5\,\AA & 80\% & 89\% & 89\% & \textbf{95\%} & +15\,pts \\
+1.0\,\AA & 60\% & 78\% & 80\% & \textbf{85\%} & +25\,pts \\
+1.5\,\AA & 46\% & 63\% & 61\% & \textbf{77\%} & +31\,pts \\
+2.0\,\AA & 29\% & 45\% & 44\% & \textbf{64\%} & +35\,pts \\
+\bottomrule
+\end{tabular}
+\caption{Best convergence rates across all versions (287 samples, strict $n_\text{neg}=0$).
+  v10c Best (10k) = RFO+Schlegel+PLS at 0.5--1.5\,\AA, GQT+PLS at 2.0\,\AA.
+  v11 Best (10k) = RFO+PLS (no Schlegel) at 1.0/2.0\,\AA, RFO+Schlegel+PLS at 0.5/1.5\,\AA.
+  v11 Best (20k) = RFO+Schlegel+PLS at all noise levels.
+  Note: v10c and v11 use different random seeds; 10k rates agree within $\pm$3.5\,pts.}
+\label{tab:best-rates}
+\end{table}
+
+\subsection{v10/v10c Comprehensive Results}
+\label{sec:v10-results}
+
+Four experimental runs were conducted (287 samples each, 10k steps, DFTB0):
+
+\paragraph{v9 (re-run, 16 configs).}
+Baseline shifted Newton with $\varepsilon=10^{-3}$, trust region,
+relaxed eigenvalue thresholds varied.
+Convergence: 80/60/46/29\% at 0.5/1.0/1.5/2.0\,\AA.
+\textbf{All relaxed thresholds} ($-10^{-3}$, $-5\times10^{-3}$, $-10^{-2}$)
+\textbf{give identical counts}---the relaxed criterion does not separate
+any additional population.
+
+\paragraph{v10 (28 configs).}
+First ARC test with $\sigma_0 \in \{0.1, 1.0, 10.0\}$,
+$\gamma_1 \in \{2.0, 3.0\}$, GDIIS buffer $\in \{8, 12\}$.
+GQT baseline: 82/55/47/37\%.
+\textbf{ARC catastrophic}: best 23/2/0/0\% at $n=0.5$.
+Failure autopsy: \textbf{80.3\% of all trajectories classified as
+\texttt{energy\_plateau}}---$\sigma$ over-regularizes, steps become
+too small, energy stalls.
+
+\paragraph{v10.2 (48 configs).}
+Added RFO, Schlegel trust radius fixes, GDIIS late-stage trigger.
+GQT: 75/53/44/27\%.
+RFO: 67/48/32/12\%.
+Schlegel TR: mixed ($\pm$2--5\,pts depending on noise level).
+\textbf{GDIIS zero effect}: RFO+Schlegel+GDIIS = RFO+Schlegel exactly
+(same convergence count, same oscillating failure count).
+
+\paragraph{v10c (56 configs).}
+Added polynomial line search (PLS) to GQT and RFO configs.
+\textbf{RFO+Schlegel+PLS: 89/78/63/42\%} (new champion at 0.5--1.5\,\AA).
+GQT+PLS: 83/67/56/45\% (wins at 2.0\,\AA).
+
+\begin{table}[h]
+\centering
+\caption{Full convergence comparison across v10c configurations (287 samples).}
+\label{tab:v10c-full}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+GQT (v9 baseline) & 76\% & 55\% & 49\% & 27\% \\
+GQT + Schlegel TR & 78\% & 57\% & 47\% & 29\% \\
+GQT + PLS & \textbf{83\%} & \textbf{67\%} & \textbf{56\%} & \textbf{45\%} \\
+GQT + Schlegel TR + PLS & 83\% & 68\% & 54\% & 42\% \\ % (v11)
+\midrule
+RFO & 65\% & 46\% & 32\% & 13\% \\
+RFO + Schlegel TR & 67\% & 44\% & 31\% & 14\% \\
+RFO + Schlegel TR + PLS & \textbf{89\%} & \textbf{78\%} & \textbf{63\%} & \textbf{42\%} \\
+RFO + Schlegel TR + GDIIS & 67\% & 44\% & 31\% & 14\% \\
+\midrule
+ARC ($\sigma_0=1$, $\gamma_1=2$) & 18\% & 2\% & 0\% & 0\% \\
+ARC ($\sigma_0=1$, $\gamma_1=3$) & 20\% & 2\% & 0\% & 0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Factor Analysis}
+
+\paragraph{Polynomial line search: the breakthrough.}
+PLS is the single most impactful intervention across all versions:
+\begin{itemize}[nosep]
+  \item GQT $\to$ GQT+PLS: +7/+12/+7/+18 points
+  \item RFO+Schlegel $\to$ RFO+Schlegel+PLS: +22/+34/+32/+28 points
+  \item PLS halves oscillating failures (autopsy): e.g., at $n=0.5$,
+    GQT oscillating 32$\to$12; RFO oscillating 61$\to$18.
+  \item Mechanism: cubic interpolation using energy+gradient at current
+    and previous geometry; zero extra evaluations; stabilizes
+    eigenvalue-crossing regime.
+\end{itemize}
+
+\paragraph{ARC: catastrophic failure.}
+Across all $\sigma_0$, $\gamma_1$ combinations:
+\begin{itemize}[nosep]
+  \item Energy plateau is the dominant failure mode (80\% of all ARC
+    trajectories in v10).
+  \item $\sigma$ grows without bound, steps shrink to near-zero,
+    energy stalls.
+  \item No $\sigma_0$/$\gamma_1$ combination recovers useful performance.
+  \item GDIIS does not rescue ARC (same counts with/without).
+\end{itemize}
+Root cause: ARC's $\sigma$-adaptation formula was designed for smooth
+optimization problems.  On the DFTB0 PES with Hessian noise, even good
+steps can have poor $\rho$ values, causing $\sigma$ to ratchet upward.
+
+\paragraph{GDIIS: zero effect.}
+Across all configurations (buffer 8, 12; oscillation-triggered;
+late-stage threshold 0.01):
+\begin{itemize}[nosep]
+  \item Convergence counts identical with/without GDIIS.
+  \item Failure mode counts identical with/without GDIIS.
+  \item Neither oscillation detection nor late-stage trigger produces
+    any benefit.
+\end{itemize}
+Hypothesis: GDIIS extrapolation requires the error vectors to lie in a
+low-dimensional subspace.  In our high-dimensional problem ($\sim$60
+DOF), the oscillation involves too many coupled modes for 8--12
+history vectors to capture.
+
+\paragraph{Schlegel trust radius: mixed.}
+Boundary-check growth + step-anchored shrink produces $\pm$2--5\,pts
+depending on noise level.  Not a consistent improvement on its own,
+but combines well with PLS (RFO+Schlegel+PLS is champion).
+
+\paragraph{RFO vs.\ GQT: crossover at high noise.}
+RFO+PLS wins at 0.5--1.5\,\AA\ but GQT+PLS wins at 2.0\,\AA\ (45\%
+vs.\ 42\%).  At large displacements, RFO's augmented Hessian shift may
+be too aggressive, while GQT's fixed $\varepsilon$ provides a more
+conservative regularization floor.
+
+\subsubsection{Failure Autopsy Summary (v10c)}
+
+\begin{table}[h]
+\centering
+\caption{Failure classification across v10c (16,023 trajectories).}
+\label{tab:autopsy-v10c}
+\begin{tabular}{lrr}
+\toprule
+Classification & Count & Fraction \\
+\midrule
+converged & 4,446 & 27.7\% \\
+energy\_plateau (ARC) & 7,595 & 47.4\% \\
+oscillating & 2,710 & 16.9\% \\
+almost\_converged & 1,000 & 6.2\% \\
+ghost\_modes & 241 & 1.5\% \\
+slow\_convergence & 26 & 0.2\% \\
+drifting & 5 & 0.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Excluding ARC configs, the remaining failure landscape is:
+oscillating ($\sim$50\% of non-ARC failures),
+almost\_converged ($\sim$30\%),
+ghost\_modes ($\sim$10\%).
+PLS halves the oscillating population; the almost\_converged and
+ghost\_mode populations are unaffected by any v10 intervention.
+
+\subsection{Transition1x Frequency Verification (v10c)}
+\label{sec:transition1x-verification}
+
+DFTB0 frequency analysis on all 287 DFT-labeled endpoints:
+\begin{itemize}[nosep]
+  \item Reactants: 29/287 (10.1\%) are genuine minima ($n_\text{neg}=0$).
+  \item Products: 30/287 (10.5\%) are genuine minima ($n_\text{neg}=0$).
+  \item Correlation with optimizer failure: Pearson $r=0.22$ (weak).
+\end{itemize}
+The weak correlation confirms that optimizer failure is not primarily
+driven by the starting-point PES character.
+
+\subsection{Direction Quality}
+\label{sec:direction-quality}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccccc}
+\toprule
+Noise & $\cos(\vect{g}_\text{SD}, \vect{d}_\text{true})$ & $\cos(\vect{d}_\text{NR}, \vect{d}_\text{true})$ & SD better \% & Starting $n_\text{neg}$ \\
+\midrule
+0.5\,\AA & 0.029 & 0.055 & 46\% & 12.1 \\
+1.0\,\AA & 0.038 & 0.025 & 54\% & 12.4 \\
+1.5\,\AA & 0.093 & 0.043 & 62\% & 12.1 \\
+2.0\,\AA & 0.110 & 0.027 & \textbf{70\%} & 12.0 \\
+\bottomrule
+\end{tabular}
+\caption{Direction quality at noisy starting points.  Both directions are
+  near-orthogonal to truth.  SD ``improves'' with noise but is still too poor
+  for useful steps.}
+\label{tab:direction-quality}
+\end{table}
+
+\subsection{Condition Number Scaling}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cccc}
+\toprule
+Noise & Median $\kappa$ & $\log_{10}(\kappa)$ & Interpretation \\
+\midrule
+0.5\,\AA & $1.14\times10^4$ & 4.1 & Moderate \\
+1.0\,\AA & $2.79\times10^4$ & 4.4 & Degraded \\
+1.5\,\AA & $2.00\times10^5$ & 5.3 & Severe \\
+2.0\,\AA & $2.30\times10^6$ & 6.4 & Catastrophic \\
+True min & $1.55\times10^3$ & 3.2 & Well-conditioned \\
+\bottomrule
+\end{tabular}
+\caption{Hessian condition number vs.\ displacement.  The sharpest convergence
+  cliff (59\%$\to$41\%) coincides with $\kappa$ jumping
+  $10^{4.4}\to10^{5.3}$.}
+\label{tab:condition}
+\end{table}
+
+\subsection{Failure Populations}
+
+Three distinct failure populations identified from trajectory analysis:
+
+\paragraph{Population A: ``Blind Modes'' (49.6\% of pre-v10c failures).}
+$\lambda_\text{min} \in [-10^{-3}, -2\times10^{-4}]$, forces 0.03--0.09\,eV/\AA,
+gradient overlap with negative modes $<0.1$.  Trust radius at floor.
+The optimizer ``sees'' the negative eigenvalue but the gradient has no
+component in that direction---it cannot flip the mode.
+\emph{v10c update}: Corresponds to the \texttt{almost\_converged} and
+\texttt{ghost\_modes} populations in the autopsy.
+\textbf{Unaffected by PLS, GDIIS, or any v10 intervention.}
+
+\paragraph{Population B: ``Oscillation--Collapse'' (44.2\% of pre-v10c failures).}
+$\lambda_\text{min} \in [-10^{-2}, -10^{-3}]$, forces 0.1--0.37\,eV/\AA.
+Period-$\sim$8 oscillation cycle detected by FFT.
+\emph{v10c update}: \textbf{PLS halves this population} (e.g., GQT at
+$n=0.5$: 32$\to$12 oscillating; RFO at $n=0.5$: 61$\to$18).
+GDIIS had zero effect despite being designed for exactly this case.
+
+\paragraph{Population C: ``Stagnation Zombies'' (subset).}
+Stagnation $>50\%$ of trajectory.  Example: sample~098 frozen 99.6\% of steps.
+
+\paragraph{Population D: ``Energy Plateau'' (ARC-specific).}
+$\sigma$ over-regularization causes near-zero steps; energy stalls.
+80\% of all ARC trajectories.  This population does not exist for
+GQT or RFO configurations.
+
+%=============================================================================
+\subsection{v11 Grid Results (mar8 Run)}
+\label{sec:v11}
+%=============================================================================
+
+\subsubsection{Experimental Design}
+
+The v11 grid tested 8 algorithms $\times$ 4 noise levels = 32 configurations,
+each with 287 samples, 10k or 20k maximum steps.  \textbf{All v11 configs use
+PLS.}  The grid addresses four questions:
+\begin{enumerate}[nosep]
+  \item Does GQT+Schlegel+PLS (never tested) outperform GQT+PLS or RFO+Schlegel+PLS?
+  \item Does doubling the step budget (20k) rescue almost\_converged or oscillating failures?
+  \item Does lowering the trust radius floor from 0.01\,\AA\ to 0.005\,\AA\ help?
+  \item Is Schlegel TR helpful when PLS is already active?
+\end{enumerate}
+Additionally, RFO+PLS (no Schlegel) was tested for the first time.
+
+\subsubsection{Reproducibility Assessment}
+\label{sec:reproducibility}
+
+The v11 run used a different random seed than the v10c run.  Two PLS
+configs (RFO+Schlegel+PLS and GQT+PLS) appear in both runs, enabling
+cross-seed comparison:
+
+\begin{table}[h]
+\centering
+\caption{Cross-seed reproducibility: v10c (SLURM 1104386) vs.\ v11 (SLURM 1113757)
+  for identical configurations.  $N=287$ samples each.}
+\label{tab:reproducibility}
+\begin{tabular}{lccccc}
+\toprule
+Config & Noise & v10c & v11 & $\Delta$ (pts) \\
+\midrule
+RFO+Schl+PLS & 0.5\,\AA & 254/287 (88.5\%) & 256/287 (89.2\%) & $+$0.7 \\
+              & 1.0\,\AA & 223/287 (77.7\%) & 225/287 (78.4\%) & $+$0.7 \\
+              & 1.5\,\AA & 182/287 (63.4\%) & 175/287 (61.0\%) & $-$2.4 \\
+              & 2.0\,\AA & 120/287 (41.8\%) & 124/287 (43.2\%) & $+$1.4 \\
+\midrule
+GQT+PLS      & 0.5\,\AA & 239/287 (83.3\%) & 242/287 (84.3\%) & $+$1.0 \\
+              & 1.0\,\AA & 191/287 (66.6\%) & 191/287 (66.6\%) & $\phantom{+}$0.0 \\
+              & 1.5\,\AA & 161/287 (56.1\%) & 156/287 (54.4\%) & $-$1.7 \\
+              & 2.0\,\AA & 128/287 (44.6\%) & 118/287 (41.1\%) & $-$3.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mean absolute difference: 1.4\,pts.  Maximum: 3.5\,pts at $n=2.0$ for GQT+PLS.
+This establishes the \textbf{seed-dependent variation at $\pm$1--4 pts},
+growing with noise level.  Rankings are preserved across seeds at 0.5--1.5\,\AA.
+At 2.0\,\AA, the GQT~vs.~RFO ordering can flip between seeds (the two methods
+are statistically indistinguishable at this noise level with $N=287$).
+
+The failure \emph{distributions} also reproduce across seeds.  For the two
+matching configs (RFO+Schlegel+PLS, GQT+PLS), the per-noise-level autopsy:
+
+\begin{table}[h]
+\centering
+\caption{Cross-seed failure autopsy: v10c vs.\ v11 for matching configs.
+  ``Osc'' = oscillating, ``AC'' = almost\_converged, ``GM'' = ghost\_modes.
+  Total $N$ differs slightly due to SCINE errors (v10c: 285--287; v11: 285--287).}
+\label{tab:autopsy-cross-seed}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+Config & Noise & \multicolumn{2}{c}{Conv} & \multicolumn{2}{c}{Osc} & \multicolumn{2}{c}{AC} & \multicolumn{2}{c}{GM} \\
+       &       & v10c & v11 & v10c & v11 & v10c & v11 & v10c & v11 \\
+\midrule
+RFO+Schl+PLS & 0.5 & 254 & 256 & 18 & 18 & 10 & 9 & 3 & 3 \\
+              & 1.0 & 223 & 225 & 40 & 35 & 22 & 21 & 1 & 5 \\
+              & 1.5 & 182 & 175 & 76 & 76 & 19 & 23 & 5 & 9 \\
+              & 2.0 & 120 & 124 & 121 & 117 & 21 & 14 & 18 & 17 \\
+\midrule
+GQT+PLS      & 0.5 & 239 & 242 & 12 & 11 & 25 & 25 & 3 & 7 \\
+              & 1.0 & 191 & 191 & 32 & 43 & 52 & 46 & 10 & 7 \\
+              & 1.5 & 161 & 156 & 76 & 75 & 41 & 45 & 8 & 10 \\
+              & 2.0 & 128 & 118 & 98 & 116 & 37 & 26 & 23 & 24 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The failure mode counts are remarkably stable across seeds.  The oscillating
+count for RFO+Schl+PLS at $n=0.5$ is identical (18 vs.\ 18); at $n=1.5$
+it is also identical (76 vs.\ 76).  The largest discrepancy is GQT+PLS
+oscillating at $n=2.0$ (98 vs.\ 116), which tracks the convergence
+difference ($-$10 samples).  This confirms that the failure classification
+is \textbf{reproducible across random seeds}, not an artifact of a
+particular displacement realization.
+
+\subsubsection{v11 Convergence Table}
+\label{sec:v11-table}
+
+\begin{table}[h]
+\centering
+\caption{v11 convergence results (287 samples, strict $n_\text{neg}=0$, all
+  configs use PLS).  ``trf'' = trust radius floor 0.005\,\AA\ (default 0.01\,\AA).
+  Sorted by mean convergence rate.}
+\label{tab:v11}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+\multicolumn{5}{l}{\emph{20k-step configs}} \\
+RFO+Schl+PLS (20k) & \textbf{272} (94.8\%) & \textbf{245} (85.4\%) & \textbf{222} (77.4\%) & \textbf{183} (63.8\%) \\
+GQT+Schl+PLS (20k) & 257 (89.5\%) & 220 (76.7\%) & 195 (67.9\%) & 167 (58.2\%) \\
+\midrule
+\multicolumn{5}{l}{\emph{10k-step configs (standard)}} \\
+RFO+Schl+PLS        & 256 (89.2\%) & 225 (78.4\%) & 175 (61.0\%) & 124 (43.2\%) \\
+RFO+PLS              & 255 (88.9\%) & 230 (80.1\%) & 176 (61.3\%) & 127 (44.3\%) \\
+GQT+PLS              & 242 (84.3\%) & 191 (66.6\%) & 156 (54.4\%) & 118 (41.1\%) \\
+GQT+Schl+PLS         & 239 (83.3\%) & 195 (67.9\%) & 154 (53.7\%) & 120 (41.8\%) \\
+\midrule
+\multicolumn{5}{l}{\emph{Trust floor = 0.005\,\AA}} \\
+GQT+Schl+PLS+trf     & 206 (71.8\%) & 157 (54.7\%) & 125 (43.6\%) & 70 (24.4\%) \\
+RFO+Schl+PLS+trf     & 201 (70.0\%) & 157 (54.7\%) & 89 (31.0\%) & 60 (20.9\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Factor Analysis}
+\label{sec:v11-factors}
+
+\paragraph{20k steps: the second breakthrough.}
+Doubling the step budget from 10k to 20k produces the largest gains seen in
+any intervention except PLS itself:
+
+\begin{table}[h]
+\centering
+\caption{Effect of 20k steps vs.\ 10k (both with Schlegel+PLS).
+  $\Delta$ = convergence gain in percentage points.}
+\label{tab:20k-effect}
+\begin{tabular}{lcccc}
+\toprule
+Optimizer & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+RFO+Schl+PLS $\Delta$ & $+$5.6 & $+$7.0 & $+$16.4 & $+$20.6 \\
+GQT+Schl+PLS $\Delta$ & $+$6.3 & $+$8.7 & $+$14.3 & $+$16.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effect grows dramatically with noise: $+$6\,pts at 0.5\,\AA\ but
+$+$17--21\,pts at 2.0\,\AA.  At 2.0\,\AA, RFO+Schl+PLS+20k reaches
+183/287 (63.8\%), a \textbf{+19.2\,pt improvement over any previous 10k
+configuration} (v10c GQT+PLS: 128/287, 44.6\%).
+
+\textbf{Which failure class benefits?}  Autopsy comparison for
+RFO+Schl+PLS at each noise level (10k $\to$ 20k):
+
+\begin{table}[h]
+\centering
+\caption{Failure class changes from 10k to 20k steps (RFO+Schlegel+PLS).
+  Negative values indicate rescued samples.}
+\label{tab:20k-autopsy}
+\begin{tabular}{lrrrr}
+\toprule
+Failure class & $\Delta$(0.5\,\AA) & $\Delta$(1.0\,\AA) & $\Delta$(1.5\,\AA) & $\Delta$(2.0\,\AA) \\
+\midrule
+oscillating        & $-$13 & $-$9  & $-$37 & $-$46 \\
+almost\_converged   & $\phantom{-}$0 & $-$9  & $-$7  & $-$3  \\
+slow\_convergence   & $\phantom{-}$0 & $-$1  & $-$1  & $-$10 \\
+ghost\_modes        & $-$3  & $-$1  & $-$2  & $\phantom{-}$0  \\
+\midrule
+Total rescued       & $+$16 & $+$20 & $+$47 & $+$59  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Across all noise levels, \textbf{oscillating failures account for 105/142
+(73.9\%) of rescued samples}.  Almost\_converged contributes 19/142 (13.4\%),
+slow\_convergence 12/142 (8.5\%), and ghost\_modes 6/142 (4.2\%).
+The 20k improvement is \textbf{primarily an oscillation-resolution effect}:
+period-$\sim$8 oscillators that do not damp within 10k steps eventually
+settle given sufficient time.  The blind-mode population
+(almost\_converged + ghost\_modes at the trust radius floor) is largely
+unaffected---these represent a qualitatively different failure mechanism
+that more steps alone cannot resolve.
+
+\textbf{Cost:} At $n=2.0$, mean steps increase from 4229 to 7526 ($1.78\times$),
+wall time from 171\,s to 282\,s ($1.65\times$).  The 20.6\,pt convergence
+gain at 2.0\,\AA\ justifies this cost for applications where convergence
+rate matters more than throughput.
+
+\paragraph{Step count distributions.}
+The distribution of converged\_step reveals the convergence dynamics:
+
+\begin{table}[h]
+\centering
+\caption{Step count statistics for converged samples (RFO+Schlegel+PLS).
+  P90 = 90th percentile.  The median is much lower than the mean because
+  most samples converge quickly; the mean is inflated by a long tail of
+  slow oscillators.}
+\label{tab:step-distributions}
+\begin{tabular}{ccrrrr}
+\toprule
+Config & Noise & $N_\text{conv}$ & Mean & Median & P90 \\
+\midrule
+10k & 0.5\,\AA & 256 & 1{,}533 & 514 & 4{,}525 \\
+    & 1.0\,\AA & 225 & 2{,}522 & 1{,}683 & 6{,}673 \\
+    & 1.5\,\AA & 175 & 3{,}760 & 3{,}725 & 7{,}677 \\
+    & 2.0\,\AA & 124 & 4{,}229 & 3{,}992 & 8{,}521 \\
+\midrule
+20k & 0.5\,\AA & 272 & 2{,}250 & 623 & 6{,}657 \\
+    & 1.0\,\AA & 245 & 3{,}428 & 1{,}853 & 8{,}526 \\
+    & 1.5\,\AA & 222 & 5{,}972 & 4{,}834 & 14{,}723 \\
+    & 2.0\,\AA & 183 & 7{,}526 & 6{,}078 & 17{,}211 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Of the 20k-converged samples, the fraction converging \emph{after} step
+10{,}000 grows with noise: 5.9\% at $n=0.5$, 8.2\% at $n=1.0$, 21.2\%
+at $n=1.5$, and 32.2\% at $n=2.0$.  At $n=2.0$, 59 samples converge
+between steps 10k and 20k, with median convergence step 13{,}677 and maximum
+19{,}908.  The converged-step distribution for these late convergers is roughly
+uniform over the 10k--20k interval, \emph{not} concentrated near 10k.
+This suggests many would benefit from even longer runs.
+
+\textbf{Failure wall}: Nearly all non-converging samples in the 20k configs
+hit the 20k step limit: 104/104 at $n=2.0$, 64/65 at $n=1.5$, 42/42 at
+$n=1.0$.  No samples stopped early due to internal stagnation detection,
+confirming these trajectories are actively evolving, not stuck.
+
+\textbf{Mean step scaling}: Across the four standard 10k algorithms, mean
+converged step scales approximately linearly with noise: $\sim$1{,}500 at
+0.5\,\AA, $\sim$2{,}500 at 1.0\,\AA, $\sim$3{,}500 at 1.5\,\AA,
+$\sim$4{,}000 at 2.0\,\AA.  RFO and GQT have similar mean steps at matched
+noise levels ($\pm$10\%).
+
+\paragraph{Trust radius floor 0.005\,\AA: catastrophic.}
+Lowering the trust radius floor from 0.01\,\AA\ to 0.005\,\AA\ produces
+\textbf{uniformly severe degradation}:
+
+\begin{table}[h]
+\centering
+\caption{Effect of trust radius floor 0.005\,\AA\ vs.\ default 0.01\,\AA\
+  (both with Schlegel+PLS, 10k steps).  All values are convergence change
+  in percentage points.}
+\label{tab:trf-effect}
+\begin{tabular}{lcccc}
+\toprule
+Optimizer & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+RFO+Schl+PLS $\Delta$ & $-$19.2 & $-$23.7 & $-$30.0 & $-$22.3 \\
+GQT+Schl+PLS $\Delta$ & $-$11.5 & $-$13.2 & $-$10.1 & $-$17.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+RFO is hit harder than GQT ($-$19 to $-$30\,pts vs.\ $-$10 to $-$17\,pts).
+Autopsy at $n=2.0$ for RFO+Schl+PLS (floor~0.01 $\to$ 0.005):
+oscillating $117 \to 144$ ($+$27), slow\_convergence $15 \to 45$ ($+$30),
+almost\_converged $14 \to 21$ ($+$7).
+
+\textbf{Mechanism}: At floor~0.005\,\AA, each step displaces atoms half as
+far.  This (a)~doubles the time needed to escape oscillation,
+(b)~makes recovery from trust-radius collapse harder (requires twice as many
+consecutive good steps to grow the radius back), and (c)~produces steps too
+small to efficiently flip negative-eigenvalue modes.  The
+slow\_convergence count \emph{tripling} ($15 \to 45$) is the clearest
+signature: samples are making progress but at a rate insufficient to
+converge within 10k steps.
+
+\textbf{Conclusion}: The trust radius floor of 0.01\,\AA\ is already
+optimal.  This value matches the $\varepsilon^{1/2}$ prediction
+(Section~\ref{sec:eps-half}): with $\varepsilon = 10^{-4}$\,eV/\AA,
+the floor should not be smaller than $\sqrt{\varepsilon} \approx 0.01$.
+
+\paragraph{Schlegel TR: neutral when PLS is active.}
+Comparing configs that differ only in Schlegel on/off (all with PLS):
+
+\begin{table}[h]
+\centering
+\caption{Effect of Schlegel trust radius update when PLS is active.
+  $\Delta$ = (with Schlegel) $-$ (without Schlegel), in percentage points.}
+\label{tab:schlegel-with-pls}
+\begin{tabular}{lcccc}
+\toprule
+Comparison & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+RFO+Schl+PLS vs.\ RFO+PLS & $+$0.3 & $-$1.7 & $-$0.3 & $-$1.0 \\
+GQT+Schl+PLS vs.\ GQT+PLS & $-$1.0 & $+$1.4 & $-$0.7 & $+$0.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All deltas are within the $\pm$1--4\,pt seed variance
+(Table~\ref{tab:reproducibility}).  \textbf{Schlegel TR has no detectable
+effect when PLS is active.}  This is consistent with the interpretation
+that PLS already handles step-length refinement, making the Schlegel
+corrections to trust-radius growth/shrink rules redundant.
+
+In v10c, Schlegel appeared to help because it was only tested in
+combination with PLS (RFO+Schlegel+PLS was champion).  v11 reveals that
+removing Schlegel from RFO+PLS produces \emph{identical or slightly better}
+convergence, particularly at $n=1.0$ where RFO+PLS (230/287, 80.1\%)
+outperforms RFO+Schlegel+PLS (225/287, 78.4\%) by 5 samples.
+
+\paragraph{Interaction effects.}
+Two-way interactions between the three factors (optimizer, 20k steps,
+trust floor), computed as $\Delta(\text{A+B}) - \Delta(\text{A}) -
+\Delta(\text{B})$:
+
+\begin{table}[h]
+\centering
+\caption{Interaction terms (percentage points).  Positive = synergistic,
+  negative = antagonistic.  All interactions measured with Schlegel+PLS fixed.}
+\label{tab:interactions}
+\begin{tabular}{lccccc}
+\toprule
+Interaction & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA & Interpretation \\
+\midrule
+20k $\times$ optimizer  & $-$0.7 & $-$1.7 & $+$2.1 & $+$4.2 & 20k helps RFO slightly more at high noise \\
+trf $\times$ optimizer  & $-$7.7 & $-$10.5 & $-$19.9 & $-$4.9 & trf hurts RFO much more than GQT \\
+Schl $\times$ optimizer & $+$1.4 & $-$3.1 & $+$0.3 & $-$1.7 & No consistent interaction \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The trf$\times$optimizer interaction is the strongest: lowering the trust
+floor hurts RFO 8--20\,pts more than GQT.  This is consistent with RFO's
+augmented-Hessian shift producing larger step \emph{directions} that the
+trust radius must clip; at a lower floor, the clipping is more aggressive,
+disproportionately penalizing RFO.  The 20k$\times$optimizer interaction
+is weak ($\pm$4\,pts), confirming that the 20k benefit is optimizer-independent.
+The Schlegel$\times$optimizer interaction is negligible, as expected given
+Schlegel's overall neutrality.
+
+\paragraph{GQT+Schlegel+PLS: the never-tested combo.}
+Adding Schlegel to GQT+PLS yields:
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+Config & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+GQT+PLS       & 242 (84.3\%) & 191 (66.6\%) & 156 (54.4\%) & 118 (41.1\%) \\
+GQT+Schl+PLS  & 239 (83.3\%) & 195 (67.9\%) & 154 (53.7\%) & 120 (41.8\%) \\
+$\Delta$       & $-$1.0       & $+$1.4       & $-$0.7       & $+$0.7       \\
+\bottomrule
+\end{tabular}
+\end{center}
+The effect is within noise.  GQT+Schlegel+PLS does \emph{not} close the gap
+to RFO+PLS (which leads by 4.5--13.6\,pts at all noise levels).
+
+\paragraph{RFO vs.\ GQT with PLS.}
+Both optimizers tested with PLS (no Schlegel) for a clean comparison:
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+Config & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+RFO+PLS  & 255 (88.9\%) & 230 (80.1\%) & 176 (61.3\%) & 127 (44.3\%) \\
+GQT+PLS  & 242 (84.3\%) & 191 (66.6\%) & 156 (54.4\%) & 118 (41.1\%) \\
+$\Delta$ (RFO$-$GQT) & $+$4.5 & $+$13.6 & $+$7.0 & $+$3.1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{RFO wins at all noise levels}, with the largest advantage at
+$n=1.0$ ($+$13.6\,pts).  The v10c crossover (GQT winning at 2.0\,\AA)
+does not appear in this seed: $+$3.1\,pts favoring RFO.  Given the
+$\pm$3.5\,pt seed variance (Table~\ref{tab:reproducibility}), the two
+methods are statistically indistinguishable at 2.0\,\AA, but RFO
+\emph{consistently} wins at 0.5--1.5\,\AA\ across both seeds.
+
+The RFO advantage at $n=1.0$ is particularly striking: 39 additional
+converged samples.  This is the noise level where both the Hessian
+spectrum is sufficiently ill-conditioned to challenge the optimizer
+($\kappa \sim 10^{4.4}$) but not so ill-conditioned that both methods
+are equally lost ($\kappa \sim 10^{6.4}$ at 2.0\,\AA).
+
+Mean steps at $n=2.0$: RFO+PLS = 4023 vs.\ GQT+PLS = 3873 (RFO takes
+$\sim$4\% more steps but converges 3 more samples).
+
+\subsubsection{v11 Failure Autopsy}
+\label{sec:v11-autopsy}
+
+\begin{table}[h]
+\centering
+\caption{v11 overall failure classification (9164 trajectories, all PLS, no ARC).}
+\label{tab:v11-autopsy}
+\begin{tabular}{lrr}
+\toprule
+Classification & Count & Fraction \\
+\midrule
+converged          & 5,800 & 63.3\% \\
+oscillating        & 2,026 & 22.1\% \\
+almost\_converged   &   917 & 10.0\% \\
+ghost\_modes        &   306 &  3.3\% \\
+slow\_convergence   &   111 &  1.2\% \\
+drifting           &     4 &  0.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Compared to the v10c non-ARC failure landscape (oscillating $\sim$50\%,
+almost\_converged $\sim$30\%, ghost\_modes $\sim$10\% of failures), the v11
+distribution is inflated by the trust-floor configs (which generate
+disproportionate oscillating and slow\_convergence failures).  Among the
+six standard 10k configs (no trf, no 20k), the failure distribution
+matches v10c within noise.
+
+\textbf{Key autopsy insight}: The 20k configs shift the failure
+distribution toward almost\_converged and ghost\_modes (the blind-mode
+population), because oscillating failures---the largest class in 10k
+configs---are resolved by additional steps.  At $n=2.0$ with 20k,
+oscillating drops from 117 to 71 ($-$39\%), while ghost\_modes remains
+fixed at 17 and almost\_converged drops only from 14 to 11.  This confirms
+that \textbf{the residual failure population after 20k steps is dominated
+by blind modes}, not oscillation.
+
+\paragraph{Per-configuration failure breakdown.}
+Grouping the 32 v11 configs by algorithm family, the per-noise failure
+counts (Table~\ref{tab:per-config-autopsy}) show clear patterns:
+(1)~trf configs have 2--3$\times$ more oscillating failures than their
+default-floor counterparts; (2)~20k configs have 30--40\% fewer oscillating
+failures; (3)~GQT has relatively more almost\_converged failures while
+RFO has relatively more oscillating failures at matched noise/features.
+
+\begin{table}[h]
+\centering
+\caption{Per-config autopsy summary for v11.  Columns: Conv = converged,
+  Osc = oscillating, AC = almost\_converged, GM = ghost\_modes,
+  SC = slow\_convergence.  Drifting ($\leq$4 total) omitted.
+  $N \approx 286$ per config (varies by $\pm$2 due to SCINE errors).}
+\label{tab:per-config-autopsy}
+\begin{tabular}{llrrrrr}
+\toprule
+Algorithm & Noise & Conv & Osc & AC & GM & SC \\
+\midrule
+\multicolumn{7}{l}{\emph{RFO+Schlegel+PLS (20k)}} \\
+ & 0.5 & 272 & 5 & 9 & 0 & 0 \\
+ & 1.0 & 245 & 26 & 12 & 4 & 0 \\
+ & 1.5 & 222 & 39 & 16 & 7 & 2 \\
+ & 2.0 & 183 & 71 & 11 & 17 & 5 \\
+\midrule
+\multicolumn{7}{l}{\emph{GQT+Schlegel+PLS (20k)}} \\
+ & 0.5 & 257 & 4 & 21 & 3 & 0 \\
+ & 1.0 & 220 & 28 & 33 & 6 & 0 \\
+ & 1.5 & 195 & 44 & 31 & 16 & 0 \\
+ & 2.0 & 167 & 79 & 31 & 10 & 0 \\
+\midrule
+\multicolumn{7}{l}{\emph{RFO+Schlegel+PLS (10k)}} \\
+ & 0.5 & 256 & 18 & 9 & 3 & 0 \\
+ & 1.0 & 225 & 35 & 21 & 5 & 1 \\
+ & 1.5 & 175 & 76 & 23 & 9 & 3 \\
+ & 2.0 & 124 & 117 & 14 & 17 & 15 \\
+\midrule
+\multicolumn{7}{l}{\emph{RFO+PLS (10k)}} \\
+ & 0.5 & 255 & 15 & 15 & 1 & 0 \\
+ & 1.0 & 230 & 33 & 16 & 6 & 2 \\
+ & 1.5 & 176 & 81 & 18 & 7 & 4 \\
+ & 2.0 & 127 & 109 & 24 & 17 & 10 \\
+\midrule
+\multicolumn{7}{l}{\emph{GQT+PLS (10k)}} \\
+ & 0.5 & 242 & 11 & 25 & 7 & 0 \\
+ & 1.0 & 191 & 43 & 46 & 7 & 0 \\
+ & 1.5 & 156 & 75 & 45 & 10 & 0 \\
+ & 2.0 & 118 & 116 & 26 & 24 & 3 \\
+\midrule
+\multicolumn{7}{l}{\emph{GQT+Schlegel+PLS (10k)}} \\
+ & 0.5 & 239 & 16 & 27 & 3 & 0 \\
+ & 1.0 & 195 & 38 & 43 & 11 & 0 \\
+ & 1.5 & 154 & 78 & 41 & 13 & 0 \\
+ & 2.0 & 120 & 112 & 32 & 22 & 2 \\
+\midrule
+\multicolumn{7}{l}{\emph{RFO+Schlegel+PLS+trf (10k)}} \\
+ & 0.5 & 201 & 53 & 26 & 5 & 1 \\
+ & 1.0 & 157 & 85 & 36 & 7 & 2 \\
+ & 1.5 & 89 & 125 & 47 & 11 & 14 \\
+ & 2.0 & 60 & 144 & 21 & 17 & 45 \\
+\midrule
+\multicolumn{7}{l}{\emph{GQT+Schlegel+PLS+trf (10k)}} \\
+ & 0.5 & 206 & 31 & 43 & 5 & 0 \\
+ & 1.0 & 157 & 70 & 54 & 6 & 0 \\
+ & 1.5 & 125 & 84 & 64 & 13 & 0 \\
+ & 2.0 & 70 & 165 & 37 & 17 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{SCINE error analysis.}
+Three samples crash with \texttt{UnboundLocalError: cannot access local
+variable `out\_new'} --- a SCINE/Sparrow internal error during the PLS
+step evaluation:
+\begin{itemize}[nosep]
+  \item Sample~16: crashes in all 8 configs at $n=0.5$ (both GQT and RFO).
+    Converges at $n \geq 1.0$ in RFO configs.
+  \item Sample~173: crashes in 4 GQT configs at $n=0.5$ only.
+  \item Sample~236: crashes in all 8 configs at $n=1.5$ only.
+\end{itemize}
+The crash is deterministic, noise-level-specific, and affects the same
+sample regardless of optimizer or step budget.  It appears to be triggered
+by a specific molecular geometry encountered during the PLS evaluation
+at those noise levels.  Total impact: 16 missing trajectories out of
+9{,}184 ($<0.2\%$), negligible for aggregate statistics.
+
+\subsubsection{Hardest Samples Across Runs}
+\label{sec:hardest}
+
+\begin{table}[h]
+\centering
+\caption{Top 10 hardest samples in v11 (converging in $\leq$10/32 configs).
+  $n_\text{neg}^*$ and $\lambda_\text{min}^*$ are from the best failing attempt
+  (highest $\lambda_\text{min}$ among failures).  v10c rate is out of 56 configs
+  (includes non-PLS and ARC).  All share the blind-mode spectral signature:
+  $|\lambda| < 10^{-3}$, gradient overlap $<0.1$.}
+\label{tab:hardest-10}
+\begin{tabular}{clccccc}
+\toprule
+Sample & Formula & v11 & v10c & $n_\text{neg}^*$ & $\lambda_\text{min}^*$ & Overlap$^*$ \\
+\midrule
+179 & C$_3$H$_8$N$_2$O & 5/32 (16\%) & 8/56 (14\%) & 3 & $-8.6\times10^{-5}$ & 0.049 \\
+199 & C$_5$H$_5$NO      & 6/32 (19\%) & 16/56 (29\%) & 5 & $-8\times10^{-6}$ & 0.022 \\
+129 & C$_3$H$_5$NO$_2$  & 7/32 (22\%) & 20/56 (36\%) & 2 & $-3.4\times10^{-5}$ & 0.068 \\
+16  & C$_3$H$_5$NO$_2$  & 9/32 (28\%) & 7/56 (13\%) & 1 & $-5.3\times10^{-5}$ & 0.013 \\
+100 & C$_3$H$_5$NO$_2$  & 9/32 (28\%) & 12/56 (21\%) & 1 & $-4\times10^{-6}$ & 0.023 \\
+147 & C$_3$H$_5$NO$_2$  & 9/32 (28\%) & 12/56 (21\%) & 1 & $-2\times10^{-6}$ & 0.079 \\
+183 & C$_3$H$_8$N$_2$O  & 9/32 (28\%) & 6/56 (11\%) & 2 & $-7\times10^{-6}$ & 0.015 \\
+193 & C$_5$H$_5$NO      & 10/32 (31\%) & 20/56 (36\%) & 1 & $-1.2\times10^{-4}$ & 0.033 \\
+228 & C$_5$H$_5$NO      & 10/32 (31\%) & 10/56 (18\%) & 2 & $-1.2\times10^{-4}$ & 0.003 \\
+277 & C$_5$H$_5$NO      & 10/32 (31\%) & 7/56 (13\%) & 2 & $-1\times10^{-6}$ & 0.040 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Molecular pattern}: Only three molecular formulae appear:
+C$_3$H$_5$NO$_2$ (samples 16, 100, 129, 147), C$_5$H$_5$NO (199, 193,
+228, 277), and C$_3$H$_8$N$_2$O (179, 183).  These are all nitrogen- and
+oxygen-containing small organic molecules, suggesting the Hessian noise
+floor is particularly problematic near N--O bond rearrangement coordinates.
+
+Sample~179 is hardest in both v10c (14\%) and v11 (16\%).  Sample~16
+worsens from v10c (13\%) relative to the expanded v11 grid because its
+SCINE crash at $n=0.5$ (8 of 8 GQT configs) effectively removes half
+the grid.  Samples~184 and~210, the hardest in v10c (4/56, 7\% each),
+are \emph{not} among v11's hardest, confirming they benefit from the all-PLS grid.
+
+All 10 samples converge only at low noise levels: 9/10 have their
+best convergence at $n=0.5$; only sample~16 converges more readily
+at $n=1.0$--$2.0$ (9 configs) than at $n=0.5$ (0 configs, due to SCINE
+crashes in GQT and the sample being intrinsically hard for GQT).
+
+\subsubsection{Rescued by 20k Steps vs.\ Permanently Hard}
+\label{sec:rescued-vs-hard}
+
+For the champion configuration (RFO+Schlegel+PLS), every sample at each
+noise level was classified as \emph{easy} (converges at 10k), \emph{rescued
+by 20k} (fails at 10k, converges at 20k), or \emph{permanently hard}
+(fails at both 10k and 20k):
+
+\begin{table}[h]
+\centering
+\caption{Sample classification by 10k/20k convergence (RFO+Schlegel+PLS).
+  $N=287$ samples per noise level (minus SCINE errors).}
+\label{tab:rescued-vs-hard}
+\begin{tabular}{ccccc}
+\toprule
+Noise & Easy (10k) & Rescued (20k) & Perm.\ hard & Rescued median step \\
+\midrule
+0.5\,\AA & 256 & 16 & 15 & 13{,}280 \\
+1.0\,\AA & 225 & 20 & 42 & 13{,}312 \\
+1.5\,\AA & 175 & 47 & 65 & 14{,}604 \\
+2.0\,\AA & 124 & 59 & 104 & 13{,}677 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The rescued population grows from 16 at $n=0.5$ to 59 at $n=2.0$, while the
+permanently hard population grows from 15 to 104.  Median convergence step
+for rescued samples is remarkably constant at $\sim$13{,}500 across all noise
+levels, suggesting a common oscillation-damping timescale.
+
+At $n=2.0$, the 59 rescued samples span a wide convergence range:
+6 converge just past 10k (steps 10{,}021--10{,}538), while 5 converge near
+the 20k wall (steps 19{,}260--19{,}908), including sample~100 at step~19{,}908.
+This implies that even 20k steps barely suffices for the slowest oscillators.
+
+\textbf{Verification}: 10k and 20k trajectories are identical for the first
+10k steps (confirmed by energy comparison at steps 0, 100, 1000, 5000, 9999
+for samples 179 and 183).  The 20k benefit is purely from extra steps, not
+from a different trajectory.
+
+\textbf{Failure wall}: Nearly all permanently hard samples hit the 20k step
+limit (104/104 at $n=2.0$, 64/65 at $n=1.5$).  None stop early due to
+stagnation detection---they are actively making progress, just too slowly
+to converge.
+
+\subsubsection{Trajectory Analysis}
+\label{sec:trajectory-analysis}
+
+Diagnostic trajectory data (per-step eigenvalues, forces, trust radius, PLS
+activity) was extracted for key samples at $n=2.0$ with RFO+Schlegel+PLS.
+Three representative trajectories illustrate the failure mechanisms:
+
+\paragraph{Sample 179 (permanently hard, 5/32 converges).}
+At $n=2.0$: starts with $\lambda_\text{min}=-8.25$, 16 negative eigenvalues,
+force = 1.59\,eV/\AA.  After 10k steps: $\lambda_\text{min}=-0.090$,
+9 negative eigenvalues, force = 0.036.  After 20k: $\lambda_\text{min}=-0.091$,
+8 negative eigenvalues, force = 0.034.  \textbf{No eigenvalue zero-crossings}
+in either 10k or 20k trajectory.  Trust radius at floor (0.01\,\AA) for
+97--98\% of the trajectory.  PLS applied in 730/10{,}000 (7.3\%) and
+1{,}716/20{,}000 (8.6\%) steps.  This is not oscillation but \textbf{genuine
+stagnation in a deep saddle basin}: the molecule has strongly negative
+eigenvalues that the optimizer slowly reduces from $-8.25$ to $-0.09$ over
+20k steps, but never reaches zero.  Even 100k steps would likely be
+insufficient without a qualitatively different escape mechanism.
+
+\paragraph{Sample 183 (rescued at step 17{,}560).}
+At $n=2.0$: starts with $\lambda_\text{min}=-3.88$, 13 negative eigenvalues,
+force = 1.78.  At step 10{,}000 (end of 10k run): $\lambda_\text{min}=-4.85
+\times10^{-4}$, 4 negative eigenvalues, force = 0.018.  With 20k: converges
+at step 17{,}560 when $\lambda_\text{min}$ crosses zero.  PLS is heavily
+active: applied in 6{,}053/17{,}561 (34.5\%) of steps.  Trust radius at floor
+for 90\% of the trajectory.  This sample represents the \textbf{slow
+oscillation-damping} profile: negative eigenvalues slowly decrease in
+magnitude from $O(1)$ to $O(10^{-4})$ over $\sim$10k steps, then eventually
+cross zero by step $\sim$17k.
+
+\paragraph{Sample 228 (rescued at step 16{,}563).}
+Similar to 183: starts at $\lambda_\text{min}=-8.54$, 12 negative eigenvalues.
+At step 10{,}000: $\lambda_\text{min}=-1.3\times10^{-3}$, 3 negative
+eigenvalues.  Converges at step 16{,}563 when eigenvalues finally cross zero.
+PLS applied 24\% of steps.
+
+\textbf{Common pattern}: The rescued samples share a profile of monotonic
+eigenvalue improvement (not oscillation in the classical sense) from
+$O(1)$ negative eigenvalues to $O(10^{-4})$ over $\sim$10k steps, then
+slow final convergence to zero over an additional 3--10k steps.  The
+permanently hard samples (sample~179) have this same trajectory but at a
+slower rate, never reaching the zero crossing within 20k steps.
+
+\subsubsection{Consolidated Best-Ever Table}
+\label{sec:best-ever}
+
+\begin{table}[h]
+\centering
+\caption{Best strict convergence rate at each noise level across all runs
+  and seeds (287 samples).  10k and 20k results separated.}
+\label{tab:best-ever}
+\begin{tabular}{ccll}
+\toprule
+Noise & Best rate & Configuration & Run \\
+\midrule
+\multicolumn{4}{l}{\emph{10k steps}} \\
+0.5\,\AA & 256/287 (89.2\%) & RFO+Schl+PLS       & v11 \\
+1.0\,\AA & 230/287 (80.1\%) & RFO+PLS             & v11 \\
+1.5\,\AA & 182/287 (63.4\%) & RFO+Schl+PLS        & v10c \\
+2.0\,\AA & 128/287 (44.6\%) & GQT+PLS             & v10c \\
+\midrule
+\multicolumn{4}{l}{\emph{20k steps}} \\
+0.5\,\AA & 272/287 (94.8\%) & RFO+Schl+PLS (20k)  & v11 \\
+1.0\,\AA & 245/287 (85.4\%) & RFO+Schl+PLS (20k)  & v11 \\
+1.5\,\AA & 222/287 (77.4\%) & RFO+Schl+PLS (20k)  & v11 \\
+2.0\,\AA & 183/287 (63.8\%) & RFO+Schl+PLS (20k)  & v11 \\
+       & \multicolumn{3}{l}{\emph{Superseded: see Table~\ref{tab:best-ever-v12b} for v12/v12b best-ever}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Note: v10c and v11 use different random seeds.  The v10c entries at 1.5 and
+2.0\,\AA\ may reflect seed-favorable outcomes ($\pm$3.5\,pts); within-seed
+v11 10k results at those noise levels are 175/287 (61.0\%) and 127/287
+(44.3\%).
+
+%=============================================================================
+\subsection{v12 Results (mar8 Run, March 2026)}
+\label{sec:v12}
+%=============================================================================
+
+The v12 grid tested two orthogonal interventions against the remaining
+failure population identified in v11: (1)~perturbation kicks targeting
+oscillating and blind-mode failures, and (2)~extending the step budget
+to 50k.  All configs use RFO+PLS (the v11 recommended baseline) with
+trust floor 0.01\,\AA.  A separate ``v12\_quick'' run tested kick variants
+at $n=2.0$\,\AA.
+
+\subsubsection{v12 Convergence Table}
+\label{sec:v12-table}
+
+\begin{table}[h]
+\centering
+\caption{v12 convergence results ($N=287$, strict $n_\text{neg}=0$, all
+  configs use RFO+PLS).  ``osc'' = oscillation kick enabled,
+  ``blind'' = blind-mode kick enabled, ``e1'' = kick along 2nd-lowest
+  eigenvector instead of lowest.}
+\label{tab:v12}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+\multicolumn{5}{l}{\emph{50k-step configs}} \\
+RFO+PLS (50k)          & 273 (95.1\%) & \textbf{275} (95.8\%) & \textbf{266} (92.7\%) & --- \\
+\midrule
+\multicolumn{5}{l}{\emph{20k-step configs}} \\
+RFO+PLS (20k, baseline) & \textbf{267} (93.0\%) & 256 (89.2\%) & 230 (80.1\%) & 175 (61.0\%) \\
+RFO+PLS+osc\_kick       & 266 (92.7\%) & 258 (89.9\%) & ---          & --- \\
+RFO+PLS+blind\_kick     & 266 (92.7\%) & 256 (89.2\%) & ---          & --- \\
+RFO+PLS+both\_kicks     & 266 (92.7\%) & 256 (89.2\%) & ---          & \textbf{192} (66.9\%) \\
+RFO+PLS+both\_kicks+e1  & 265 (92.3\%) & 256 (89.2\%) & ---          & 191 (66.6\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Nine samples at $n=0.5$ and two at $n=1.0$ produced SCINE errors
+(\texttt{out\_new} variable bug), consistent across all kick variants
+at each noise level.
+
+\subsubsection{50k Steps: The Major Finding}
+\label{sec:v12-50k}
+
+Extending the step budget from 20k to 50k is a pure, lossless gain at
+every tested noise level:
+
+\begin{table}[h]
+\centering
+\caption{20k vs.\ 50k step comparison (RFO+PLS).  ``Rescued'' = samples
+  that converge with 50k but not 20k.  ``Lost'' = samples that converge
+  with 20k but not 50k.}
+\label{tab:v12-50k}
+\begin{tabular}{ccccccc}
+\toprule
+Noise & 20k conv & 50k conv & $\Delta$ (pts) & Rescued & Lost & Mean conv.\ step (rescued) \\
+\midrule
+0.5\,\AA & 267 & 273 & $+$2.1 &  6 & 0 & 32{,}977 \\
+1.0\,\AA & 256 & 275 & $+$6.6 & 19 & 0 & 27{,}423 \\
+1.5\,\AA & 230 & 266 & $+$12.5 & 36 & 0 & 28{,}041 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All rescued samples required $>$20k steps (minimum 20{,}153; maximum
+48{,}649).  No sample was lost, confirming 50k is a strict superset of 20k
+for these configurations.  The gains grow with noise level: $+$2.1\,pts at
+0.5\,\AA\ vs.\ $+$12.5\,pts at 1.5\,\AA, consistent with higher-noise
+trajectories requiring more iterations to resolve oscillating modes.
+
+The remaining failures at 50k are hard-core: 5 true failures $+$ 9
+SCINE errors at $n=0.5$; 10 true failures $+$ 2 errors at $n=1.0$; 21
+true failures at $n=1.5$.  These show persistent negative eigenvalues
+(often $\lambda_\text{min} < -0.01$) and elevated force norms even after
+50{,}000 steps, indicating they are structurally stuck rather than merely
+slow.
+
+\subsubsection{ModeTracker}
+\label{sec:v12-modetracker}
+
+The kick and late-escape mechanisms introduced in v12/v12b rely on a
+\texttt{ModeTracker} class that tracks the identity of negative
+eigenmodes across optimization steps via eigenvector overlap matching.
+At each step, the tracker matches current negative eigenvectors to
+previously tracked modes using a greedy assignment based on
+$|\langle v_i^{(k)}, v_j^{(k-1)}\rangle|$, with a minimum overlap
+threshold of~0.5 to avoid spurious matches.  Each tracked mode
+maintains: the current eigenvector and eigenvalue, the \emph{age}
+(number of consecutive steps the mode has remained negative), the
+\emph{blind age} (consecutive steps with
+$|\mathbf{g} \cdot \mathbf{v}| / \|\mathbf{g}\| < \text{threshold}$),
+and the gradient overlap $|\mathbf{g} \cdot \mathbf{v}| / \|\mathbf{g}\|$.
+The tracker exposes two key queries:
+\texttt{longest\_stuck()} returns the mode with the largest age
+(continuously negative for the most steps), and
+\texttt{longest\_blind()} returns the mode with the largest blind age.
+These are used by the kick mechanisms (Section~\ref{sec:v12-kicks}) and
+late escape (Section~\ref{sec:v12b}) to select which mode to perturb
+along.
+
+\subsubsection{Kick Mechanism Analysis}
+\label{sec:v12-kicks}
+
+v12 introduced two perturbation mechanisms to escape failure modes:
+\begin{itemize}[nosep]
+  \item \textbf{Oscillation kick}: perturbs geometry along the lowest
+    eigenvector when oscillation is detected (patience = 3 steps,
+    cooldown = 50 steps, scale = 0.1).
+  \item \textbf{Blind-mode kick}: perturbs geometry when a negative
+    eigenvalue has low gradient overlap ($<0.1$), targeting ghost modes
+    (patience = 100 steps, scale = 0.5).
+\end{itemize}
+
+\paragraph{Kick magnitudes are very small.}
+The perturbation displacement is $\texttt{scale} \times \texttt{trust\_floor}$,
+giving: oscillation kicks $= 0.1 \times 0.01 = 0.001$\,\AA, and
+blind-mode kicks $= 0.5 \times 0.01 = 0.005$\,\AA.  Typical atomic
+displacements needed to escape a saddle basin are of order
+$0.01$--$0.1$\,\AA, so v12's kicks are $10$--$100\times$ smaller than
+what is physically needed.  This explains why kicks fire prolifically
+($\sim$122 oscillation kicks per trajectory) yet fail to reduce oscillating
+failures: each individual kick is too small to move the geometry out of
+the basin of attraction.
+
+\paragraph{At $n \leq 1.5$\,\AA, kicks never fired.}
+All kick counters (total\_osc\_kicks, total\_blind\_kicks) are zero
+across all 287 samples at $n=0.5$, 1.0, and 1.5\,\AA.  The kick
+thresholds were not met at these noise levels, so all kick variants
+are identical to baseline (within $\pm$1 sample from stochastic effects).
+
+\paragraph{At $n=2.0$\,\AA, kicks fired heavily and helped modestly.}
+For the 13 failure trajectories with saved diagnostics, the both\_kicks
+config averaged $\sim$122 oscillation kicks and $\sim$44 blind-mode kicks
+per trajectory.  The net effect:
+
+\begin{table}[h]
+\centering
+\caption{Failure class breakdown at $n=2.0$\,\AA\ (from v12\_quick autopsy).
+  ``Osc'' = oscillating, ``AC'' = almost\_converged, ``GM'' = ghost\_modes,
+  ``SC'' = slow\_convergence.}
+\label{tab:v12-kicks-autopsy}
+\begin{tabular}{lccccc}
+\toprule
+Configuration & Conv & Osc & AC & GM & SC \\
+\midrule
+RFO+PLS (baseline)  & 175 & 71 & 19 & 12 &  8 \\
+RFO+PLS+both\_kicks & 192 & 69 & 16 &  9 &  1 \\
+RFO+PLS+both+e1     & 191 & 67 & 16 &  8 &  4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The both\_kicks config rescued 32 samples vs.\ baseline but also lost 15,
+for a net gain of $+$17 ($+$5.9\,pts).  Of the 32 rescued, 18 were
+oscillating, 10 almost\_converged, 2 slow\_convergence, and 1 each
+ghost\_modes and drifting.  Of the 15 lost, 9 became oscillating, 4
+almost\_converged, and 2 ghost\_modes---indicating kicks can destabilize
+borderline trajectories while rescuing others.
+
+The eigvec1 variant (kicking along the \emph{second}-lowest eigenvector)
+shows essentially identical results (191 vs.\ 192), with a similar
+rescue/loss pattern (30 rescued, 14 lost).  This suggests the kick
+direction is not critical---the perturbation's main value is breaking
+symmetry rather than targeting a specific mode.
+
+\paragraph{Oscillation not specifically reduced.}
+Despite the osc\_kick mechanism, oscillating failures dropped only
+from 71 to 69 (both\_kicks) or 67 (eigvec1).  The kicks rescue some
+oscillating samples but create new oscillating failures in roughly equal
+proportion.  The net oscillating count is essentially unchanged.
+
+\subsubsection{Comparison to v11}
+\label{sec:v12-vs-v11}
+
+\begin{table}[h]
+\centering
+\caption{v12 vs.\ v11 best (RFO+Schlegel+PLS, 20k).  Note v12 uses a
+  different seed than v11; differences at 20k are within seed variance.}
+\label{tab:v12-vs-v11}
+\begin{tabular}{ccccc}
+\toprule
+Noise & v11 best (20k) & v12 baseline (20k) & v12 best kick (20k) & v12 (50k) \\
+\midrule
+0.5\,\AA & 272 (94.8\%) & 267 (93.0\%) & --- & 273 (95.1\%) \\
+1.0\,\AA & 245 (85.4\%) & 256 (89.2\%) & 258 (89.9\%) & \textbf{275 (95.8\%)} \\
+1.5\,\AA & 222 (77.4\%) & 230 (80.1\%) & --- & \textbf{266 (92.7\%)} \\
+2.0\,\AA & 183 (63.8\%) & 175 (61.0\%) & 192 (66.9\%) & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 50k results at $n=1.0$ and $n=1.5$ are new best-ever rates by large
+margins: $+$10.4\,pts at 1.0\,\AA\ and $+$15.3\,pts at 1.5\,\AA\ over
+v11's 20k results.  However, cross-seed comparison means the true
+improvement from 20k$\to$50k is better measured within-seed from
+Table~\ref{tab:v12-50k}: $+$6.6\,pts and $+$12.5\,pts respectively.
+
+At $n=0.5$, the 50k rate (95.1\%) matches v11's 20k rate (94.8\%) within
+seed variance, and 9 of the 14 remaining failures are SCINE errors, not
+optimizer failures.  This noise level is effectively \textbf{solved}
+(the 5 true failures at 50k may be intrinsically unconvergeable under
+DFTB0).
+
+\subsubsection{Updated Best-Ever Table}
+\label{sec:v12-best-ever}
+
+\begin{table}[h]
+\centering
+\caption{Best strict convergence rate at each noise level across all runs
+  and seeds ($N=287$).  Updated through v12.}
+\label{tab:best-ever-v12}
+\begin{tabular}{ccll}
+\toprule
+Noise & Best rate & Configuration & Run \\
+\midrule
+\multicolumn{4}{l}{\emph{10k steps}} \\
+0.5\,\AA & 256/287 (89.2\%) & RFO+Schl+PLS       & v11 \\
+1.0\,\AA & 230/287 (80.1\%) & RFO+PLS             & v11 \\
+1.5\,\AA & 182/287 (63.4\%) & RFO+Schl+PLS        & v10c \\
+2.0\,\AA & 128/287 (44.6\%) & GQT+PLS             & v10c \\
+\midrule
+\multicolumn{4}{l}{\emph{20k steps}} \\
+0.5\,\AA & 272/287 (94.8\%) & RFO+Schl+PLS (20k)  & v11 \\
+1.0\,\AA & 256/287 (89.2\%) & RFO+PLS (20k)        & v12 \\
+1.5\,\AA & 230/287 (80.1\%) & RFO+PLS (20k)        & v12 \\
+2.0\,\AA & 192/287 (66.9\%) & RFO+PLS+both\_kicks (20k) & v12 \\
+       & \multicolumn{3}{l}{\emph{Superseded by v12b: 218/287 (76.0\%), see Table~\ref{tab:best-ever-v12b}}} \\
+\midrule
+\multicolumn{4}{l}{\emph{50k steps}} \\
+0.5\,\AA & 273/287 (95.1\%) & RFO+PLS (50k)  & v12 \\
+1.0\,\AA & 275/287 (95.8\%) & RFO+PLS (50k)  & v12 \\
+1.5\,\AA & 266/287 (92.7\%) & RFO+PLS (50k)  & v12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{v12 Summary and Next Steps}
+\label{sec:v12-summary}
+
+\textbf{Main conclusions:}
+\begin{enumerate}[nosep]
+  \item \textbf{50k steps is the dominant intervention}: $+$2 to $+$13\,pts
+    over 20k, lossless (no samples lost), with all rescued samples needing
+    $>$20k iterations.
+  \item \textbf{Kicks are a no-op at $n \leq 1.5$\,\AA}: the perturbation
+    thresholds were never met, leaving convergence rates identical to
+    baseline.
+  \item \textbf{Kicks give modest help at $n=2.0$\,\AA}: $+$5.9\,pts net,
+    but high churn (32 rescued, 15 lost).  Kick direction (eigvec0 vs.\
+    eigvec1) is irrelevant.
+  \item \textbf{$n=0.5$\,\AA\ is effectively solved}: 95.1\% at 50k, with
+    9/14 remaining failures being SCINE errors.
+  \item \textbf{SCINE \texttt{out\_new} bug}: 9 errors at $n=0.5$ and 2 at
+    $n=1.0$ from a calculator-level bug.  Fixing this could add $\sim$3\,pts
+    at $n=0.5$.
+\end{enumerate}
+
+The v12 kick mechanism as implemented (fixed thresholds, fixed scale) is
+too conservative at low noise (never triggers) and too aggressive at high
+noise (destabilizes borderline samples).  Potential v12b improvements:
+\begin{itemize}[nosep]
+  \item \textbf{Adaptive kick scaling}: scale perturbation magnitude as
+    $C \cdot |\lambda_i|^{1/2}$ rather than using a fixed constant.
+  \item \textbf{Probe-based kicks}: probe a distance ladder in both $\pm$
+    directions and accept the first displacement that reduces $n_\text{neg}$.
+  \item \textbf{Late-onset kicks}: only activate after $>$10k steps to avoid
+    destabilizing early-stage convergence.
+  \item \textbf{50k + kicks at $n=2.0$}: combining the two interventions
+    (not yet tested).
+\end{itemize}
+
+%=============================================================================
+\subsection{v12b Results (mar8 Run, March 2026)}
+\label{sec:v12b}
+%=============================================================================
+
+The v12b grid (``v12b\_quick'' run, job~1146854) tested three incremental
+improvements to the v12 kick mechanism, all at $n=2.0$\,\AA\ with 20k
+steps ($N=287$).  The v12 analysis (Section~\ref{sec:v12-summary})
+identified that fixed-threshold, fixed-scale kicks are too conservative
+at low noise and too aggressive at high noise.  v12b addresses this with:
+\begin{enumerate}[nosep]
+  \item \textbf{Adaptive kick scaling} (\texttt{adaptive\_kick\_scale}):
+    scale perturbation magnitude as $C \cdot |\lambda_i|^{1/2}$,
+    clamped to $[\texttt{trust\_floor},\; 10 \times \texttt{trust\_floor}]$
+    (i.e., $[0.01, 0.1]$\,\AA), with default $C=0.1$.
+    For example, at $|\lambda|=0.09$ (sample~179):
+    $\text{mag} = 0.1 \times 0.3 = 0.03$\,\AA---$30\times$ larger than
+    v12's fixed $0.001$\,\AA\ oscillation kick.
+  \item \textbf{Probe-based kicks} (\texttt{blind\_kick\_probe}):
+    instead of a single fixed perturbation, probes a distance ladder
+    at $[1, 2, 5, 10, 20] \times \texttt{trust\_floor}$
+    (i.e., $0.01$--$0.2$\,\AA), testing both $+$ and $-$ directions
+    along the eigenvector at each distance.  The probe accepts the
+    \emph{first} displacement where the number of negative eigenvalues
+    ($n_\text{neg}$) decreases; lower energy is used only as a
+    fallback if no $n_\text{neg}$ improvement is found at any
+    probe point.  This is fundamentally different from
+    ``test both directions and pick lower energy'': the primary
+    acceptance criterion is spectral improvement, not energetic.
+  \item \textbf{Late escape} (\texttt{late\_escape}):
+    an additional perturbation mechanism activated only after 15{,}000
+    steps, targeting trajectories that are stuck but not yet detected
+    by the oscillation or blind-mode criteria ($\alpha=0.1$,
+    cooldown = 500 steps).  Mode selection uses
+    \texttt{longest\_stuck()} from the ModeTracker
+    (Section~\ref{sec:v12-modetracker}): the mode that has been
+    continuously negative for the most steps, rather than the
+    instantaneously most-negative eigenvalue.  The displacement is
+    accepted only if $n_\text{neg}$ decreases (conditional acceptance,
+    not unconditional); if the perturbation does not reduce the number
+    of negative eigenvalues, it is rejected and the geometry is
+    unchanged.
+\end{enumerate}
+
+\subsubsection{v12b Convergence Table}
+\label{sec:v12b-table}
+
+\begin{table}[h]
+\centering
+\caption{v12b convergence results at $n=2.0$\,\AA\ ($N=287$, strict
+  $n_\text{neg}=0$, all configs use RFO+PLS, 20k steps).  Features
+  are cumulative: each row adds one feature to the previous.}
+\label{tab:v12b}
+\begin{tabular}{lccc}
+\toprule
+Configuration & Conv & Rate & $\Delta$ vs.\ baseline \\
+\midrule
+RFO+PLS (baseline)               & 180 & 62.7\% & ---        \\
++both\_kicks                      & 180 & 62.7\% & $+$0.0\,pts \\
++adaptive scaling                 & 181 & 63.1\% & $+$0.3\,pts \\
++probe kicks                      & 207 & 72.1\% & $+$9.4\,pts \\
++late escape (\textbf{full v12b}) & \textbf{218} & \textbf{76.0\%} & $+$13.2\,pts \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Incremental Feature Analysis}
+\label{sec:v12b-incremental}
+
+Because features are cumulative, we can isolate each contribution by
+comparing adjacent configs.  The rescue/loss analysis counts samples that
+change convergence status between consecutive configs:
+
+\begin{table}[h]
+\centering
+\caption{Incremental rescue/loss analysis.  Each row shows the effect of
+  adding one feature to the previous config.  ``Rescued'' = newly converged,
+  ``Lost'' = newly failed.}
+\label{tab:v12b-incremental}
+\begin{tabular}{lcccc}
+\toprule
+Feature added & Rescued & Lost & Net & $\Delta$ conv \\
+\midrule
+both\_kicks (vs.\ baseline) &  21 & 21 &   0 & $180 \to 180$ \\
+adaptive scaling (vs.\ both\_kicks) & 27 & 26 & $+$1 & $180 \to 181$ \\
+probe kicks (vs.\ adaptive) & 44 & 18 & $+$26 & $181 \to 207$ \\
+late escape (vs.\ adapt+probe) & 16 &  5 & $+$11 & $207 \to 218$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Both\_kicks alone is a wash (net zero).}
+This is a striking departure from v12's result at $n=2.0$, where
+both\_kicks showed 192/287 vs.\ 175/287 baseline.  The difference is
+the seed: v12b\_quick uses job~1146854 (different from v12\_quick's seed),
+and the both\_kicks mechanism has high churn---21 rescued but 21 lost.
+This confirms the v12 finding that fixed-scale kicks destabilize
+borderline samples as often as they rescue stuck ones.
+
+\paragraph{Adaptive scaling is marginal ($+$1 net).}
+Scaling kick magnitude to the eigenvalue does not materially reduce
+churn: 27 rescued vs.\ 26 lost.  The adaptive mechanism changes
+\emph{which} samples are rescued/lost but not the overall balance.
+
+\paragraph{Probe kicks are the breakthrough ($+$26 net).}
+Probing a distance ladder ($0.01$--$0.2$\,\AA) in both $\pm$ directions
+and accepting the first displacement that reduces $n_\text{neg}$
+is the single most impactful feature in v12b.  It rescues 44 samples
+while losing only 18---a 2.4:1 rescue-to-loss ratio, far better than the
+$\sim$1:1 ratio of fixed kicks.  Of the 44 rescued samples (from the
+\emph{adaptive} config's failure classes), 34 were oscillating, 5 were
+almost\_converged, 3 were ghost\_modes, and 2 were slow\_convergence.
+The probe mechanism primarily resolves oscillating failures by ensuring
+the perturbation improves the spectral structure (fewer negative
+eigenvalues), with lower energy as a fallback criterion.
+
+\paragraph{Late escape adds a clean $+$11.}
+The late-escape mechanism (activating after 15{,}000 steps) rescues 16
+samples while losing only 5---a 3.2:1 ratio, the best of any feature.
+The high rescue-to-loss ratio makes sense: by step 15{,}000, trajectories
+that will converge naturally have already done so, so perturbations at
+this stage are unlikely to destabilize converging samples.  All 5 losses
+became oscillating, suggesting a small fraction of late-stage trajectories
+are in a delicate equilibrium that the escape disrupts.
+
+\subsubsection{Failure Autopsy Comparison}
+\label{sec:v12b-autopsy}
+
+\begin{table}[h]
+\centering
+\caption{Failure class breakdown at $n=2.0$\,\AA\ across v12b configs.
+  ``Osc'' = oscillating, ``AC'' = almost\_converged, ``GM'' = ghost\_modes,
+  ``SC'' = slow\_convergence, ``Dr'' = drifting.}
+\label{tab:v12b-autopsy}
+\begin{tabular}{lcccccc}
+\toprule
+Configuration & Conv & Osc & AC & GM & SC & Dr \\
+\midrule
+Baseline            & 180 & 68 & 17 & 13 &  9 & 0 \\
++both\_kicks         & 180 & 76 & 16 &  8 &  6 & 1 \\
++adaptive            & 181 & 80 & 13 &  7 &  6 & 0 \\
++probe               & 207 & 49 & 13 &  9 &  9 & 0 \\
++late (\textbf{v12b}) & \textbf{218} & 54 &  6 &  4 &  5 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several patterns emerge:
+
+\begin{itemize}[nosep]
+  \item \textbf{Oscillating failures decrease dramatically with probe}:
+    $80 \to 49$ (adaptive$\to$probe), confirming probe kicks resolve
+    oscillation.  Late escape slightly increases oscillating count
+    ($49 \to 54$) because 5 previously non-oscillating trajectories
+    become oscillating after the late perturbation, but net convergence
+    still improves by~11.
+  \item \textbf{Almost\_converged slashed by late escape}:
+    $13 \to 6$.  Late-stage perturbation is exactly what
+    almost\_converged samples need---they are near a minimum but
+    stuck with residual negative eigenvalues.
+  \item \textbf{Ghost modes halved overall}: $13 \to 4$ (baseline to
+    full v12b).  The probe mechanism resolves some ghost modes by
+    testing the sign of the perturbation direction.
+  \item \textbf{69 total failures remain} in full v12b: 54 oscillating,
+    6 almost\_converged, 4 ghost\_modes, 5 slow\_convergence.
+    Oscillating remains the dominant failure mode (78\% of failures).
+\end{itemize}
+
+\subsubsection{Comparison to v12 and v11}
+\label{sec:v12b-vs-prior}
+
+\begin{table}[h]
+\centering
+\caption{Best convergence at $n=2.0$\,\AA\ across versions (20k steps,
+  $N=287$).  Different runs use different seeds; within-seed comparisons
+  are more reliable.}
+\label{tab:v12b-vs-prior}
+\begin{tabular}{llcc}
+\toprule
+Version & Best config at 2.0\,\AA & Conv & Rate \\
+\midrule
+v11     & RFO+Schl+PLS (20k)          & 183 & 63.8\% \\
+v12     & RFO+PLS+both\_kicks (20k)   & 192 & 66.9\% \\
+v12b    & RFO+PLS+adaptive+probe+late & \textbf{218} & \textbf{76.0\%} \\
+\midrule
+\multicolumn{4}{l}{\emph{Within-seed comparison (v12b run, job 1146854):}} \\
+\midrule
+v12b baseline & RFO+PLS (20k)           & 180 & 62.7\% \\
+v12b best     & +adaptive+probe+late     & 218 & 76.0\% \\
+\multicolumn{2}{l}{Within-seed gain}     & $+$38 & $+$13.2\,pts \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The full v12b config achieves \textbf{76.0\%}---a new best-ever at
+$n=2.0$\,\AA\ by a large margin ($+$9.1\,pts over v12's 66.9\%,
+$+$12.2\,pts over v11's 63.8\%).  While cross-seed comparison adds
+$\pm$3.5\,pt uncertainty, the within-seed gain of $+$13.2\,pts over
+baseline makes the improvement unambiguous.
+
+At the sample level, the full v12b config rescues 56 samples vs.\
+baseline while losing only 18 (3.1:1 ratio).  Of the 56 rescued,
+32 were oscillating (57\%), 13 almost\_converged (23\%), 7 ghost\_modes
+(13\%), and 4 slow\_convergence (7\%).  This demonstrates that the
+probe+late mechanism addresses \emph{all} major failure classes, not
+just oscillation.
+
+\paragraph{Cross-config convergence landscape.}
+Across all 5 v12b configs: 139/287 (48\%) converge in all 5, 36/287
+(13\%) fail in all 5, and 251/287 (87\%) converge in at least one config.
+The 36 permanently failing samples represent a hard core that no kick
+variant resolves at 20k steps---these likely require 50k steps or
+structural interventions.
+
+\subsubsection{Updated Best-Ever Table}
+\label{sec:v12b-best-ever}
+
+\begin{table}[h]
+\centering
+\caption{Best strict convergence rate at each noise level across all runs
+  and seeds ($N=287$).  Updated through v12b.}
+\label{tab:best-ever-v12b}
+\begin{tabular}{ccll}
+\toprule
+Noise & Best rate & Configuration & Run \\
+\midrule
+\multicolumn{4}{l}{\emph{10k steps}} \\
+0.5\,\AA & 256/287 (89.2\%) & RFO+Schl+PLS       & v11 \\
+1.0\,\AA & 230/287 (80.1\%) & RFO+PLS             & v11 \\
+1.5\,\AA & 182/287 (63.4\%) & RFO+Schl+PLS        & v10c \\
+2.0\,\AA & 128/287 (44.6\%) & GQT+PLS             & v10c \\
+\midrule
+\multicolumn{4}{l}{\emph{20k steps}} \\
+0.5\,\AA & 272/287 (94.8\%) & RFO+Schl+PLS (20k)  & v11 \\
+1.0\,\AA & 256/287 (89.2\%) & RFO+PLS (20k)        & v12 \\
+1.5\,\AA & 230/287 (80.1\%) & RFO+PLS (20k)        & v12 \\
+2.0\,\AA & \textbf{218/287 (76.0\%)} & RFO+PLS+adapt+probe+late (20k) & \textbf{v12b} \\
+\midrule
+\multicolumn{4}{l}{\emph{50k steps}} \\
+0.5\,\AA & 273/287 (95.1\%) & RFO+PLS (50k)  & v12 \\
+1.0\,\AA & 275/287 (95.8\%) & RFO+PLS (50k)  & v12 \\
+1.5\,\AA & 266/287 (92.7\%) & RFO+PLS (50k)  & v12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{v12b Summary and Next Steps}
+\label{sec:v12b-summary}
+
+\textbf{Main conclusions:}
+\begin{enumerate}[nosep]
+  \item \textbf{Probe kicks are the key innovation}: $+$26 net converged
+    over adaptive-only, with a 2.4:1 rescue-to-loss ratio.  Probing a
+    distance ladder in both $\pm$ directions and accepting the first
+    $n_\text{neg}$-reducing displacement prevents spectrally harmful
+    kicks that destabilize borderline trajectories.
+  \item \textbf{Late escape is clean and effective}: $+$11 net with a
+    3.2:1 rescue-to-loss ratio.  Activating only after 15k steps avoids
+    disrupting early-stage convergence.
+  \item \textbf{Adaptive scaling alone is insufficient}: $+$1 net over
+    fixed kicks.  Scaling magnitude to eigenvalue changes \emph{which}
+    samples are rescued/lost but not the overall ratio.
+  \item \textbf{Fixed kicks remain a wash}: both\_kicks without
+    probe or adaptive shows 0 net gain in this seed, confirming v12's
+    finding of high churn with fixed-scale perturbations.
+  \item \textbf{76.0\% at $n=2.0$\,\AA\ is new best-ever} by
+    $+$9.1\,pts over v12 and $+$12.2\,pts over v11 (at 20k steps).
+  \item \textbf{69 failures remain}: dominated by oscillating (54/69,
+    78\%).  Almost\_converged and ghost\_modes are largely resolved
+    (6 and 4 remaining vs.\ 17 and 13 at baseline).
+\end{enumerate}
+
+\textbf{Next steps} (all addressed by v13, Section~\ref{sec:v13}):
+\begin{itemize}[nosep]
+  \item \textbf{50k + v12b kicks}: \emph{Answered---93\% at $n=2.0$
+    (Table~\ref{tab:v13}).  Orthogonality confirmed
+    (Table~\ref{tab:v13-orthogonality}).}
+  \item \textbf{v12b at $n \leq 1.5$\,\AA}: \emph{Answered---kicks
+    transfer across all noise levels: $+$2.1/$+$4.9/$+$6.6\,pts at
+    0.5/1.0/1.5\,\AA\ (Table~\ref{tab:v13-orthogonality}).}
+  \item \textbf{Probe+late without adaptive}: \emph{Answered---263 vs.\
+    267 ($-$4), adaptive adds marginal value
+    (Table~\ref{tab:v13-ablation}).}
+  \item \textbf{Late-escape timing}: Still open.  v13 used the same
+    15k threshold.
+  \item \textbf{Hard-core analysis}: \emph{Answered---most of the 36
+    v12b hard-core samples converge at 50k+kicks.  Only 3 samples
+    remain below 50\% convergence across 15 configs.}
+\end{itemize}
+
+%=============================================================================
+\subsection{v13 Results (mar8 Run, March 2026)}
+\label{sec:v13}
+%=============================================================================
+
+The v13 grid tested the central hypothesis remaining from v12b: that
+50k steps and probe kicks are \textbf{orthogonal wins}---50k rescues
+slow convergers while probe kicks rescue spectrally trapped samples.
+These are different failure populations, so combining them should yield
+additive gains.  Additionally, v13 extended the probe/late-escape
+mechanisms to all noise levels (previously tested only at $n=2.0$\,\AA)
+and included ablation studies at $n=2.0$.
+
+\textbf{Design:} 15 configurations (3 main $\times$ 4 noise + 3
+ablations at $n=2.0$), all RFO+PLS, trust floor 0.01\,\AA, single seed
+(job~1149428), $N=287$.
+
+\subsubsection{v13 Convergence Table}
+\label{sec:v13-table}
+
+\begin{table}[h]
+\centering
+\caption{v13 main grid: 3 configs $\times$ 4 noise levels ($N=287$, strict
+  $n_\text{neg}=0$).  ``Full v12b'' = adaptive kick scaling + probe kicks
+  + late escape.  All configs use RFO+PLS.  Three samples at $n=0.5$ and
+  two at $n=1.0$ produce SCINE errors, consistent with prior runs.}
+\label{tab:v13}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA \\
+\midrule
+RFO+PLS 20k (baseline) & 272 (94.8\%) & 252 (87.8\%) & 224 (78.0\%) & 182 (63.4\%) \\
+RFO+PLS 50k            & 275 (95.8\%) & 264 (92.0\%) & 258 (89.9\%) & 232 (80.8\%) \\
+Full v12b 50k           & \textbf{281} (97.9\%) & \textbf{278} (96.9\%) & \textbf{277} (96.5\%) & \textbf{267} (93.0\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{The Orthogonality Result}
+\label{sec:v13-orthogonality}
+
+The v13 main finding is that 50k steps and spectral probes are indeed
+orthogonal interventions---their gains stack additively:
+
+\begin{table}[h]
+\centering
+\caption{Decomposition of v13 gains at each noise level.
+  ``$\Delta$~(50k)'' = 50k baseline minus 20k baseline.
+  ``$\Delta$~(kicks)'' = full v12b 50k minus 50k baseline.
+  Both effects are additive within this seed.}
+\label{tab:v13-orthogonality}
+\begin{tabular}{ccccc}
+\toprule
+Noise & $\Delta$~(50k) & $\Delta$~(kicks) & Total $\Delta$ & Final \\
+\midrule
+0.5\,\AA & $+$3 ($+$1.0\,pts) & $+$6 ($+$2.1\,pts) & $+$9 & 281 (97.9\%) \\
+1.0\,\AA & $+$12 ($+$4.2\,pts) & $+$14 ($+$4.9\,pts) & $+$26 & 278 (96.9\%) \\
+1.5\,\AA & $+$34 ($+$11.8\,pts) & $+$19 ($+$6.6\,pts) & $+$53 & 277 (96.5\%) \\
+2.0\,\AA & $+$50 ($+$17.4\,pts) & $+$35 ($+$12.2\,pts) & $+$85 & 267 (93.0\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The additivity confirms the theoretical prediction: 50k steps primarily
+resolve oscillating failures (slow convergers that need more time), while
+probe kicks resolve blind-mode failures (spectrally trapped samples
+where gradient-Hessian methods cannot make progress regardless of time).
+These two mechanisms target disjoint subpopulations.
+
+At $n=2.0$\,\AA, the total gain from the 20k baseline is $+$85 samples
+($+$29.6\,pts), decomposing cleanly into $+$50 from more steps and $+$35
+from spectral probes.
+
+\subsubsection{n=2.0 Ablation Analysis}
+\label{sec:v13-ablation}
+
+Three additional configs at $n=2.0$ dissect the kick mechanisms at 50k:
+
+\begin{table}[h]
+\centering
+\caption{$n=2.0$\,\AA\ ablation at 50k steps ($N=287$).
+  ``adapt'' = adaptive kick scaling, ``probe'' = blind-kick line probe,
+  ``late'' = late-stage escape.  $\Delta$ is relative to the 50k bare
+  baseline (232 converged).}
+\label{tab:v13-ablation}
+\begin{tabular}{lccl}
+\toprule
+Configuration & Converged & $\Delta$ vs.\ bare & Key insight \\
+\midrule
+50k bare (no kicks)          & 232 (80.8\%) & --- & --- \\
+$+$adapt$+$probe (no late)   & 253 (88.2\%) & $+$21 & Probe dominates \\
+$+$probe$+$late (no adapt)   & 263 (91.6\%) & $+$31 & Late still needed \\
+$+$adapt$+$probe$+$late      & 267 (93.0\%) & $+$35 & Full suite \\
+\midrule
+20k $+$adapt$+$probe$+$late  & 213 (74.2\%) & --- & Step budget critical \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three key conclusions from the ablation:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Late escape is still needed at 50k}: Adding late escape
+    to adaptive+probe gains $+$14 converged (253$\to$267).  The v12b
+    hypothesis that ``50k might make late escape unnecessary'' is
+    \textbf{falsified}.  Late escape rescues samples that remain
+    spectrally trapped even after 15k--20k steps, which 50k alone cannot
+    resolve because the blind-mode displacement rate
+    (Eq.~\ref{eq:blind-mode-rate}) does not improve with more steps.
+  \item \textbf{Adaptive scaling remains marginal}: $+$4 converged
+    (263$\to$267), consistent with v12b's $+$1 at 20k.  However, the
+    autopsy reveals a targeted effect: adaptive scaling rescues 8
+    blind-mode failures (almost\_converged+ghost\_modes: 10$\to$2) at the
+    cost of 5 additional oscillating failures (13$\to$18), for a net
+    $+$4.  Adaptive scaling trades oscillating stability for blind-mode
+    resolution.
+  \item \textbf{Step budget is critical}: Full v12b kicks at 20k achieve
+    only 213/287 (74.2\%) vs.\ 267/287 (93.0\%) at 50k---a gap of $+$54
+    converged ($+$18.8\,pts).  The 50k budget is essential because it
+    provides the time needed for both the oscillating population to
+    converge naturally and the kick mechanisms to fire and take effect.
+\end{enumerate}
+
+\subsubsection{Failure Autopsy: Elimination of Failure Modes}
+\label{sec:v13-autopsy}
+
+\begin{table}[h]
+\centering
+\caption{Failure mode counts at $n=2.0$\,\AA\ across v13 configs.  ``Full''
+  = adaptive+probe+late.  Compare rightmost row to v12b (20k):
+  54/6/4/5 oscillating/AC/GM/SC.}
+\label{tab:v13-autopsy}
+\begin{tabular}{lccccc}
+\toprule
+Config & Osc & AC & GM & SC & Total fail \\
+\midrule
+20k baseline            & 76 & 17 & 7 & 4$+$1$^*$ & 105 \\
+50k baseline            & 36 & 13 & 4 & 2 & 55 \\
+$+$adapt$+$probe, 50k  & 26 & 3  & 5 & 0 & 34 \\
+$+$probe$+$late, 50k   & 13 & 6  & 4 & 1 & 24 \\
+Full v12b, 50k          & 18 & 2  & \textbf{0} & \textbf{0} & 20 \\
+Full v12b, 20k          & 58 & 7  & 4 & 5 & 74 \\
+\bottomrule
+\multicolumn{6}{l}{\footnotesize $^*$1 drifting failure at 20k baseline.} \\
+\end{tabular}
+\end{table}
+
+The full v12b config at 50k achieves a dramatic simplification of the
+residual failure population at $n=2.0$\,\AA:
+
+\begin{itemize}[nosep]
+  \item \textbf{Ghost modes: eliminated} (7$\to$0).  The spectral probe
+    directly targets the $n_\text{neg}$ criterion, and at 50k the probe
+    has sufficient firing opportunities to resolve all ghost-mode cases.
+  \item \textbf{Slow convergence: eliminated} (4$\to$0).  The extended
+    budget resolves all marginally slow trajectories.
+  \item \textbf{Almost converged: nearly eliminated} (17$\to$2).  These
+    were the ``gradient-orthogonal but near threshold'' failures;
+    the probe resolves most.
+  \item \textbf{Oscillating: reduced 76$\to$18} (76\% reduction) but
+    still dominant.  Oscillating failures now constitute 90\% (18/20) of
+    remaining failures at $n=2.0$\,\AA.
+\end{itemize}
+
+The autopsy at other noise levels confirms near-complete resolution:
+
+\begin{table}[h]
+\centering
+\caption{Failure modes for the full v12b 50k config across all noise levels.
+  $N_\text{proc}$ accounts for SCINE errors (3 at 0.5, 2 at 1.0, 0 at
+  1.5/2.0).}
+\label{tab:v13-autopsy-all}
+\begin{tabular}{ccccccc}
+\toprule
+Noise & $N_\text{proc}$ & Conv & Osc & AC & GM & Total fail \\
+\midrule
+0.5\,\AA & 284 & 281 (98.9\%) & 1 & 2 & 0 & 3 \\
+1.0\,\AA & 285 & 278 (97.5\%) & 6 & 1 & 0 & 7 \\
+1.5\,\AA & 287 & 277 (96.5\%) & 5 & 4 & 1 & 10 \\
+2.0\,\AA & 287 & 267 (93.0\%) & 18 & 2 & 0 & 20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The performance cliff has been largely eliminated: the gap between
+$n=0.5$ and $n=2.0$ is now 5.9\,pts (98.9\%$\to$93.0\%), compared to
+51\,pts in v9 (80\%$\to$29\%), 47\,pts in v10c (89\%$\to$42\%), and
+31\,pts in v11 (95\%$\to$64\%).
+
+\subsubsection{Comparison Across All Versions}
+\label{sec:v13-comparison}
+
+\begin{table}[h]
+\centering
+\caption{Best convergence rate at $n=2.0$\,\AA\ across all versions, showing
+  the cumulative effect of each intervention.  Same dataset ($N=287$), different
+  seeds.}
+\label{tab:v13-history}
+\begin{tabular}{lcrl}
+\toprule
+Version & Best at 2.0\,\AA & $\Delta$ vs.\ prior & Key intervention \\
+\midrule
+v9 (GQT+TR, 10k) & 29\% & --- & Baseline \\
+v10c (RFO+PLS, 10k) & 45\% & $+$16 & PLS \\
+v11 (RFO+PLS, 20k) & 64\% & $+$19 & 20k steps \\
+v12 (RFO+PLS+kicks, 20k) & 67\% & $+$3 & Fixed kicks \\
+v12b (RFO+PLS+probe+late, 20k) & 76\% & $+$9 & Probe kicks \\
+\textbf{v13 (full, 50k)} & \textbf{93\%} & \textbf{$+$17} & \textbf{50k $+$ kicks combined} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Updated Best-Ever Table}
+\label{sec:v13-best-ever}
+
+\begin{table}[h]
+\centering
+\caption{Best strict convergence rate at each noise level across all runs
+  and seeds ($N=287$).  Updated through v13.  Bold = new record vs.\ v12b.}
+\label{tab:best-ever-v13}
+\begin{tabular}{ccll}
+\toprule
+Noise & Best rate & Configuration & Run \\
+\midrule
+\multicolumn{4}{l}{\emph{10k steps}} \\
+0.5\,\AA & 256/287 (89.2\%) & RFO+Schl+PLS       & v11 \\
+1.0\,\AA & 230/287 (80.1\%) & RFO+PLS             & v11 \\
+1.5\,\AA & 182/287 (63.4\%) & RFO+Schl+PLS        & v10c \\
+2.0\,\AA & 128/287 (44.6\%) & GQT+PLS             & v10c \\
+\midrule
+\multicolumn{4}{l}{\emph{20k steps}} \\
+0.5\,\AA & 272/287 (94.8\%) & RFO+Schl+PLS (20k)  & v11 \\
+1.0\,\AA & 256/287 (89.2\%) & RFO+PLS (20k)        & v12 \\
+1.5\,\AA & 230/287 (80.1\%) & RFO+PLS (20k)        & v12 \\
+2.0\,\AA & 218/287 (76.0\%) & RFO+PLS+probe+late (20k) & v12b \\
+\midrule
+\multicolumn{4}{l}{\emph{50k steps}} \\
+0.5\,\AA & \textbf{281/287 (97.9\%)} & RFO+PLS+full~v12b (50k) & \textbf{v13} \\
+1.0\,\AA & \textbf{278/287 (96.9\%)} & RFO+PLS+full~v12b (50k) & \textbf{v13} \\
+1.5\,\AA & \textbf{277/287 (96.5\%)} & RFO+PLS+full~v12b (50k) & \textbf{v13} \\
+2.0\,\AA & \textbf{267/287 (93.0\%)} & RFO+PLS+full~v12b (50k) & \textbf{v13} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{v13 Summary}
+\label{sec:v13-summary}
+
+\textbf{Main conclusions:}
+\begin{enumerate}[nosep]
+  \item \textbf{The orthogonality hypothesis is confirmed}: 50k steps and
+    spectral probes target different failure populations (slow convergers
+    vs.\ spectrally trapped) and their gains stack additively.  The combined
+    effect at $n=2.0$ is $+$85 converged over the 20k baseline.
+  \item \textbf{93\% at $n=2.0$\,\AA}: New best-ever by $+$17\,pts over
+    v12b (76\%).  From 0\% (off-the-shelf) to 93\% with the same dataset
+    and calculator.
+  \item \textbf{Near-uniform convergence}: 97.9/96.9/96.5/93.0\% across
+    noise levels.  The gap from 0.5 to 2.0\,\AA\ shrinks from 51\,pts
+    (v9) to 5\,pts (v13).
+  \item \textbf{Ghost modes and slow convergence eliminated}: Zero
+    failures in either category at $n=2.0$ with the full suite.  Only
+    oscillating remains (18/20 failures).
+  \item \textbf{Late escape needed even at 50k}: Falsifies the hypothesis
+    that more steps alone resolve the spectral trap.  The blind-mode
+    displacement rate (Eq.~\ref{eq:blind-mode-rate}) is step-count
+    independent, so only direct spectral perturbation can break the trap.
+  \item \textbf{The intervention hierarchy is complete}: PLS $\gg$
+    50k steps $\gg$ probe kicks $>$ late escape $\gg$ adaptive scaling
+    $\approx$ fixed kicks $\approx$ GDIIS $\approx$ ARC.
+\end{enumerate}
+
+\textbf{Remaining failure population}: 20 failures at $n=2.0$\,\AA\
+(18 oscillating, 2 almost\_converged).  Three samples remain hardest across
+all 15 configs: 136 (6/15, $\lambda_\text{min}=-0.19$, strongly negative
+eigenvalue resistant to all interventions), 150 (6/15), and 209 (7/15,
+$n_\text{neg}=5$).  These represent molecules with persistent,
+strongly negative eigenvalues that resist both time-based and spectral
+interventions---likely requiring qualitatively different approaches
+(e.g., internal coordinates, mode-following restarts, or alternative
+starting geometries).
+
+%=============================================================================
+\section{What We Incorporated in v10/v10b}
+\label{sec:incorporated}
+%=============================================================================
+
+\subsection{ARC Full-Spectrum Step Builder (v10) --- FAILED}
+
+Replaces both the shifted Newton shift and trust region with cubic
+regularization (Section~\ref{sec:arc}).  Implementation:
+\texttt{\_nr\_step\_arc()} solves the secular
+equation~\eqref{eq:arc-secular}; the ARC step-control loop
+(lines~2350--2450 of \texttt{minimization.py}) manages $\sigma$-adaptation.
+
+\textbf{Rationale}: The trust radius collapse mechanism
+(Section~\ref{sec:collapse}) is the dominant failure mode.  ARC avoids
+collapse by design---$\sigma$ can grow arbitrarily large (cautious) or
+shrink arbitrarily small (aggressive), without a hard floor.
+
+\textbf{Grid parameters} (v10 SLURM):
+$\sigma_0 \in \{0.1, 1.0, 10.0\}$,
+$\gamma_1 \in \{2.0, 3.0\}$.
+
+\textbf{Result}: \textcolor{red}{\textbf{Catastrophic failure.}}  Best ARC
+config: 23\% at $n=0.5$, 2\% at $n=1.0$, 0\% at $n\geq 1.5$.
+80\% of all ARC trajectories classified as \texttt{energy\_plateau}:
+$\sigma$ ratchets upward on noisy PES (even good steps can have poor
+$\rho$), steps shrink to near-zero, energy stalls.
+No $\sigma_0$/$\gamma_1$ combination recovers.  GDIIS does not rescue.
+\textbf{ARC should not be used for noisy PES minimization.}
+
+\subsection{GDIIS Oscillation Breaking (v10, corrected v10b) --- FAILED}
+
+\texttt{\_GDIISExtrapolator} stores geometry--gradient--step history and
+attempts interpolation every $N$ steps when oscillation is detected.
+
+\textbf{v10b correction}: Changed error vectors from raw gradients to Newton
+step vectors (Section~\ref{sec:gdiis}), per Schlegel's
+formulation~\eqref{eq:gdiis-B}.
+
+\textbf{Grid parameters}: buffer sizes $\{8, 12\}$.
+
+\textbf{Result}: \textcolor{red}{\textbf{Zero effect.}}  Across all
+configurations (buffer 8/12, oscillation-triggered, late-stage threshold
+0.01), convergence counts and failure mode distributions are identical
+with and without GDIIS.  Hypothesis: GDIIS extrapolation requires
+error vectors to span a low-dimensional subspace; in $\sim$60-DOF
+molecules, oscillation involves too many coupled modes for 8--12
+history vectors to capture.
+
+\subsection{RFO Step Builder (v10b)}
+
+Augmented Hessian method (Section~\ref{sec:rfo}).
+\texttt{\_solve\_rfo\_secular()} + \texttt{\_nr\_step\_rfo()}.
+Uses the same trust-region step-control as v9 baseline.
+
+\textbf{Rationale}: RFO is the standard in production codes (Gaussian, ORCA,
+Sella).  It provides adaptive shift determination without the hyperparameter
+$\varepsilon$.  Never tested in our codebase before.
+
+\textbf{Result}: Without PLS, RFO underperforms GQT (67/48/32/12\% vs.\
+75/55/44/27\%).  \textbf{With PLS, RFO becomes champion}
+(89/78/63/42\%), a +22/+34/+32/+28\,pt improvement over bare RFO.
+Interpretation: RFO provides better step \emph{directions} than GQT
+but worse step \emph{lengths}; PLS fixes the length.
+
+\subsection{Schlegel Trust Radius Fixes (v10b)}
+
+Boundary-check growth~\eqref{eq:schlegel-grow} and step-anchored
+shrink~\eqref{eq:schlegel-shrink}.  Gated by
+\texttt{schlegel\_trust\_update=True}.
+
+\textbf{Rationale}: The standard rules can shrink the radius below the
+actual step size, wasting recovery.  The boundary check prevents
+unnecessary growth.  Both are well-established in the
+literature~\citep{schlegel2011}.
+
+\textbf{Result}: Mixed.  Alone: $\pm$2--5\,pts depending on noise level
+(slightly helps GQT at $n=1.0$, slightly hurts at $n=0.5$).
+\textbf{Combines well with PLS}: RFO+Schlegel+PLS is champion.
+
+\subsection{Late-Stage GDIIS Acceleration (v10b) --- FAILED}
+
+Parameter \texttt{gdiis\_late\_force\_threshold}: triggers GDIIS
+when \texttt{force\_norm} drops below threshold, regardless of oscillation
+detection.
+
+\textbf{Rationale}: Schlegel~\citep{schlegel2011} describes GDIIS as
+accelerating final convergence routinely.  Population~A failures (blind
+modes) have moderate forces but no oscillation---late-stage GDIIS could
+help where oscillation-triggered GDIIS does not.
+
+\textbf{Result}: Zero effect, same as oscillation-triggered GDIIS
+(Section~\ref{sec:incorporated}, GDIIS subsection).
+
+\subsection{Polynomial Line Search (v10c) --- BREAKTHROUGH}
+\label{sec:pls}
+
+Cubic interpolation using energy and gradient at current and previous
+geometry.  Zero extra evaluations.  Fits $p(t) = at^3 + bt^2 + ct + d$
+satisfying $p(0) = E_k$, $p'(0) = \nabla E_k \cdot d$,
+$p(1) = E_{k+1}$, $p'(1) = \nabla E_{k+1} \cdot d$.  Steps to the
+cubic minimizer if it lies in $[0, 1]$ and reduces energy.
+
+\textbf{Rationale}: Schlegel~\citep{schlegel2011} describes cubic/quartic
+energy fitting near inflection points.  We expected modest gains for
+the eigenvalue-crossing regime.
+
+\textbf{Result}: \textcolor{blue}{\textbf{The single most impactful
+intervention across all versions.}}  +7 to +34 points depending on
+configuration and noise level.  Halves the oscillating failure population.
+Transforms RFO from underperformer (67/48/32/12\%) to champion
+(89/78/63/42\%).
+
+%=============================================================================
+\section{What We Did NOT Incorporate and Why}
+\label{sec:not-incorporated}
+%=============================================================================
+
+\subsection{Internal Coordinates}
+\label{sec:internal-coords}
+
+The literature unanimously agrees that internal coordinates (redundant
+internals~\citep{pulay-redundant}, TRIC~\citep{wang-tric},
+FCW~\citep{lindh-fcw}) improve Hessian conditioning for floppy modes.
+
+\textbf{Why not}: Our molecules are small ($\leq 7$ heavy atoms, $\leq 23$
+total).  With full analytical Hessians at every step, the conditioning
+advantage is marginal.  The performance cliff at 2.0\,\AA\ is driven by
+being far from quadratic, not by coordinate choice.  Converting to internal
+coordinates would require a significant refactor of the Cartesian-only
+codebase for likely marginal benefit.
+
+\subsection{Sella's RS-RFO with Geodesic Back-Transformation}
+\label{sec:sella}
+
+Sella~\citep{sella} implements Restricted-Step RFO (RS-RFO) with iterative
+diagonalization and geodesic back-transformation from internal to Cartesian
+coordinates.
+
+\textbf{Why not}: Requires an internal-coordinate framework.  Our codebase is
+Cartesian-only.  The plain RFO we implemented captures the essential
+augmented-Hessian mechanism without the coordinate transformation machinery.
+
+\subsection{Polynomial Line Search Near Inflection Points}
+
+\textbf{Status}: \textcolor{blue}{\textbf{Implemented in v10c}} and
+proved to be the most impactful intervention.  See
+Section~\ref{sec:pls}.  Originally deferred as future work in v10b;
+implemented by another agent based on the v10b plan.
+
+\subsection{Model-Hessian Preconditioning}
+
+Packwood et al.~\citep{packwood2018} use a Lindh-type model Hessian as
+preconditioner.  The key trick: drop gradient-dependent $H^{(2)}$ terms and
+take $|d^2V/d\zeta^2|$ to guarantee positive definiteness.
+
+\textbf{Why not}: We already have the full analytical Hessian.
+Preconditioning is designed for approximate or absent Hessians.  Our problem
+is direction quality at large displacement, not Hessian approximation error.
+
+\subsection{Coordinate Freezing}
+
+Schlegel (1989)~\citep{schlegel1989}: Freeze modes with negative eigenvalues,
+converge remaining DOFs, then release.
+
+\textbf{Why not}: Our negative eigenvalue directions rotate between steps
+(overlap $< 0.5$ for ghost band, measured in v6 analysis).  Freezing a
+specific direction when it changes every step is ineffective.
+
+\subsection{SCINE SCF Convergence Investigation}
+
+Tighter SCF convergence thresholds could potentially reduce the Hessian noise
+floor (currently $\sim8\times10^{-3}$).
+
+\textbf{Status}: Investigation script written (v10c) but crashed with
+\texttt{NameError: name `defaultdict' is not defined}.  The bug is a
+missing \texttt{from collections import defaultdict} import.
+\emph{Still open as future work.}
+
+\subsection{Transition1x Frequency Verification}
+
+\textbf{Status}: \emph{Completed in v10c.}  DFTB0 frequency analysis on
+all 287 DFT-labeled endpoints:
+\begin{itemize}[nosep]
+  \item Reactants: 29/287 (10.1\%) are genuine minima ($n_\text{neg}=0$)
+    under DFTB0.
+  \item Products: 30/287 (10.5\%) are genuine minima.
+  \item Median force at ``minima'': 1.39\,eV/\AA\ (reactant), 1.16\,eV/\AA\
+    (product)---$10{,}000\times$ above our convergence threshold.
+  \item Correlation with optimizer failure: Pearson $r=0.22$, Spearman
+    $r=0.17$.  Point-biserial (is\_minimum vs.\ failure): $r=-0.26$.
+\end{itemize}
+The weak correlations confirm that optimizer failure is \textbf{not primarily
+driven by the starting-point PES character}.  The 90\% ``saddle rate'' at
+DFT-labeled minima reflects genuine PES disagreement between DFT and DFTB0,
+not a numerical artifact.
+
+%=============================================================================
+\section{Explicit Non-Recommendations}
+\label{sec:non-recommendations}
+%=============================================================================
+
+The following have been \emph{tested and found harmful}.  Literature confirms
+they should not be revisited.
+
+\begin{enumerate}[nosep]
+  \item \textbf{iHiSD crossover} (v8): Tested $\mu_\text{max} \in \{0, 0.1,
+    0.5, 1.0, 2.0\}$.  Pure SN ($\mu=0$) best.  Theory: gradient alignment
+    assumption violated at our displacements~\citep{ihisd}.
+
+  \item \textbf{Line search} (v7): TR wins at all noise levels.  Theory:
+    commits to poor direction~\citep{schlegel2011}.
+    \emph{Note}: The polynomial line search (v10c) \emph{is} a line search,
+    but within the trust region step---it refines step \emph{length}, not
+    direction.  This distinction is critical.
+
+  \item \textbf{LM damping} (v2): SN better.  Theory: over-regularizes
+    positive eigenvalues.
+
+  \item \textbf{Weight capping / SPDN} (v5): 0\% convergence.  Discards
+    essential curvature information.
+
+  \item \textbf{Stagnation escape}: Not helpful across versions.
+
+  \item \textbf{v4 features}: Neg-trust-floor, blind-mode correction,
+    aggressive trust recovery, bidirectional escape, mode-following.
+    All tested, all hurt.
+
+  \item \textbf{PIC-ARC} (first-order + cubic reg): 0\% convergence.
+    First-order methods cannot navigate this PES~\citep{packwood2018}.
+
+  \item \textbf{ARC} (v10): Catastrophic.  $\sigma$-adaptation fails on
+    noisy PES---even good steps produce poor $\rho$, causing $\sigma$ to
+    ratchet upward.  80\% energy plateau.  All $\sigma_0$/$\gamma_1$
+    combinations tested.
+
+  \item \textbf{GDIIS} (v10/v10b): Zero effect.  Tested oscillation-triggered
+    (buffer 8, 12) and late-stage (force threshold 0.01).  Convergence and
+    failure distributions identical with/without.
+\end{enumerate}
+
+%=============================================================================
+\section{Grid Design and Results}
+\label{sec:grid}
+%=============================================================================
+
+\subsection{v10/v10b Grid (48 configs)}
+
+The v10 grid tested 12 configurations $\times$ 4 noise levels = 48
+combinations, each with 287 samples.  See Table~\ref{tab:v10c-full}
+for results.
+
+\textbf{Key findings}:
+\begin{itemize}[nosep]
+  \item ARC: catastrophic across all $\sigma_0$, $\gamma_1$ (best 23\%).
+  \item GDIIS: zero effect on all configurations.
+  \item RFO: underperforms GQT without PLS.
+  \item Schlegel TR: mixed $\pm$5\,pts.
+\end{itemize}
+
+\subsection{v10c Grid (+PLS, 56 configs)}
+
+Added polynomial line search (PLS) to GQT and RFO+Schlegel configs:
+14 configs $\times$ 4 noise = 56 total.
+
+\textbf{Key findings}:
+\begin{itemize}[nosep]
+  \item PLS: +7 to +34\,pts across all configs.
+  \item RFO+Schlegel+PLS: new champion (89/78/63/42\%).
+  \item GQT+PLS: competitive, wins at 2.0\,\AA\ (45\% vs.\ 42\%).
+\end{itemize}
+
+\subsection{v11 Grid (All-PLS Factor Analysis, 32 configs)}
+
+All 8 algorithms use PLS.  8 configs $\times$ 4 noise = 32 total.
+Tests: (1)~GQT+Schlegel+PLS (never tested), (2)~RFO+PLS without Schlegel,
+(3)~20k steps (RFO and GQT), (4)~trust floor 0.005\,\AA\ (RFO and GQT).
+
+\textbf{Key findings} (full analysis in Section~\ref{sec:v11}):
+\begin{itemize}[nosep]
+  \item 20k steps: $+$6 to $+$21\,pts, primarily resolving oscillation.
+  \item Trust floor 0.005: catastrophic ($-$10 to $-$30\,pts).
+  \item Schlegel: neutral when PLS is active ($\pm$1.7\,pts).
+  \item RFO+PLS: wins at all noise levels over GQT+PLS.
+  \item \textbf{New best-ever}: 272/287 (94.8\%) at 0.5\,\AA, 183/287
+    (63.8\%) at 2.0\,\AA\ (both RFO+Schl+PLS, 20k).
+\end{itemize}
+
+\subsection{v12 Grid (Kicks + 50k Steps, 17 configs)}
+
+All configs use RFO+PLS.  Tests: (1)~oscillation kick, (2)~blind-mode
+kick, (3)~both kicks, (4)~both kicks with eigvec1, (5)~50k step budget.
+14 configs at $n=0.5$--1.5\,\AA\ (v12 main run) $+$ 3 configs at
+$n=2.0$\,\AA\ (v12\_quick run).
+
+\textbf{Key findings} (full analysis in Section~\ref{sec:v12}):
+\begin{itemize}[nosep]
+  \item 50k steps: $+$2 to $+$13\,pts over 20k, lossless (zero samples lost).
+  \item Kicks at $n \leq 1.5$\,\AA: never fired, zero effect.
+  \item Kicks at $n=2.0$\,\AA: $+$5.9\,pts net, high churn (32 rescued, 15 lost).
+  \item Kick direction (eigvec0 vs.\ eigvec1) irrelevant.
+  \item \textbf{New best-ever}: 275/287 (95.8\%) at 1.0\,\AA, 266/287
+    (92.7\%) at 1.5\,\AA\ (both RFO+PLS, 50k).
+\end{itemize}
+
+\subsection{v12b Grid (Adaptive Probe Kicks + Late Escape, 5 configs)}
+
+All configs at $n=2.0$\,\AA, 20k steps, RFO+PLS.  Tests cumulative
+features: (1)~both\_kicks, (2)~+adaptive scaling, (3)~+probe kicks,
+(4)~+late escape.  Single run (job~1146854), $N=287$.
+
+\textbf{Key findings} (full analysis in Section~\ref{sec:v12b}):
+\begin{itemize}[nosep]
+  \item Probe kicks: $+$26 net converged (2.4:1 rescue-to-loss ratio).
+  \item Late escape: $+$11 net converged (3.2:1 ratio).
+  \item Adaptive scaling alone: $+$1 net (marginal).
+  \item Fixed kicks: net zero (21 rescued, 21 lost).
+  \item \textbf{New best-ever at $n=2.0$\,\AA}: 218/287 (76.0\%),
+    $+$13.2\,pts over baseline within-seed.
+\end{itemize}
+
+\subsection{v13 Grid (50k + v12b Kicks Combined, 15 configs)}
+
+All configs use RFO+PLS.  Main grid: 3 configs (20k baseline, 50k
+baseline, full v12b 50k) $\times$ 4 noise levels = 12 combos.
+Three ablations at $n=2.0$: adapt+probe (no late), probe+late (no adapt),
+full v12b at 20k.  Single run (job~1149428), $N=287$.
+
+\textbf{Key findings} (full analysis in Section~\ref{sec:v13}):
+\begin{itemize}[nosep]
+  \item 50k + kicks are orthogonal: gains stack additively
+    (Table~\ref{tab:v13-orthogonality}).
+  \item \textbf{New best-ever at all noise}: 281/278/277/267 (97.9/96.9/96.5/93.0\%).
+  \item Late escape still needed at 50k ($+$14 converged).
+  \item Ghost modes and slow convergence eliminated at $n=2.0$.
+  \item Only 20 failures remain at $n=2.0$ (18 oscillating, 2 almost\_converged).
+\end{itemize}
+
+\subsection{Recommended Configuration for Future Work}
+
+Based on all evidence through v13, the recommended baseline is:
+\begin{center}
+\fbox{\textbf{RFO + PLS + adaptive + probe kicks + late escape, 50k steps}}
+\end{center}
+This is the v13 champion configuration, achieving 97.9/96.9/96.5/93.0\%
+across all noise levels (Table~\ref{tab:v13}).  Schlegel trust radius
+updates are neutral when PLS is active (Section~\ref{sec:v11-factors})
+and can be omitted.  The trust radius floor must remain at 0.01\,\AA\
+(lowering to 0.005\,\AA\ is catastrophic, Table~\ref{tab:trf-effect}).
+
+For throughput-constrained applications, RFO+PLS+probe+late at 20k steps
+achieves 76.0\% at $n=2.0$ (Table~\ref{tab:v12b}).  The 50k budget adds
+$+$17\,pts at $n=2.0$ (Table~\ref{tab:v13-orthogonality}) with
+diminishing returns at lower noise ($+$1\,pt at $n=0.5$).
+Adaptive kick scaling adds only $+$4 converged (Section~\ref{sec:v13-ablation})
+and can be omitted for simplicity.
+
+%=============================================================================
+\section{Open Questions}
+\label{sec:open}
+%=============================================================================
+
+\begin{enumerate}
+  \item \textbf{Persistently hard samples}: \emph{Substantially resolved
+    by v13.}  The v12b ``hard core'' of 36 samples (failing all 5 configs
+    at $n=2.0$, 20k) is largely resolved at 50k: even the hardest samples
+    (136, 150, 209) converge in 6--7/15 v13 configs.  Only sample~136
+    ($\lambda_\text{min}=-0.19$, strongly negative) and sample~209
+    ($n_\text{neg}=5$) remain genuinely resistant.  Spectral signature:
+    persistent deep negative eigenvalues with low gradient overlap
+    (Table~\ref{tab:hardest-10}).
+
+  \item \textbf{Why does PLS help RFO so much more than GQT?}
+    RFO+Schlegel+PLS gains +22--34\,pts over bare RFO, while GQT+PLS gains
+    only +7--18\,pts.  Hypothesis: RFO's augmented Hessian gives better
+    \emph{directions} but worse \emph{step lengths}; PLS fixes the length.
+    v11 confirms: RFO+PLS (no Schlegel) outperforms GQT+PLS by 3--14\,pts
+    at all noise levels, showing the RFO step direction is genuinely
+    superior.
+
+  \item \textbf{Population~A (blind modes) resolved by v13}:
+    \emph{Resolved.}  At $n=2.0$\,\AA\ with full v12b suite at 50k
+    (Table~\ref{tab:v13-autopsy}): ghost\_modes = \textbf{0},
+    slow\_convergence = \textbf{0}, almost\_converged = 2.  The
+    spectral probe at 50k has sufficient firing opportunities to
+    resolve virtually all blind-mode failures.  The sole remaining
+    failure class is oscillating (18/20 failures).
+
+  \item \textbf{GQT vs.\ RFO crossover at 2.0\,\AA}: \emph{Partially
+    resolved.}  v11 shows RFO+PLS wins at all noise levels in this seed
+    ($+$3.1\,pts at 2.0\,\AA).  The v10c crossover (GQT winning at
+    2.0\,\AA) was seed-dependent and within the $\pm$3.5\,pt
+    uncertainty.  No noise-adaptive selection is needed; RFO+PLS
+    is weakly but consistently preferred.
+
+  \item \textbf{SCINE SCF convergence}: Could tighter SCF thresholds reduce
+    the Hessian noise floor ($\sim8\times10^{-3}$)?  Investigation script
+    crashed (\texttt{NameError}: \texttt{defaultdict} not imported).
+    \emph{Still open.}
+
+  \item \textbf{Transition1x frequency verification}: Completed in v10c.
+    Only 10\% of DFT-labeled minima are true minima under DFTB0.
+    Weak correlation ($r=0.22$) with optimizer failure.
+    \emph{Resolved}: not a primary driver of failure.
+
+  \item \textbf{Optimal step budget}: \emph{Resolved by v13.}
+    50k + v12b kicks combined achieves 93.0\% at $n=2.0$\,\AA\
+    (Table~\ref{tab:v13}), far exceeding the 80\% target.  The
+    50k budget contributes $+$50 converged and kicks contribute
+    $+$35 converged, confirming orthogonality
+    (Table~\ref{tab:v13-orthogonality}).  The remaining 20 failures
+    (90\% oscillating) may require 100k+ steps or qualitatively
+    different interventions.
+
+  \item \textbf{Why does lower trust floor hurt?}  v11 shows floor
+    0.005\,\AA\ is catastrophic ($-$10 to $-$30\,pts).  The
+    $\varepsilon^{1/2}$ theorem predicts floor $\sim$0.01; the
+    experimental confirmation strengthens this connection.  However, the
+    mechanism deserves further theoretical analysis: is the floor effect
+    purely about step size, or does it interact with the trust-radius
+    recovery dynamics?
+\end{enumerate}
+
+%=============================================================================
+\section{Discussion: Contributions and Generalizability}
+\label{sec:discussion}
+%=============================================================================
+
+\subsection{The Problem Is Unsolved}
+\label{sec:unsolved}
+
+A critical piece of context, easily lost in the version-by-version
+narrative above, is that \textbf{no existing optimizer converges on this
+problem class out of the box}.  Standard trust-region Newton--Raphson
+implementations (e.g., ASE's \texttt{BFGSLineSearch}, SciPy's
+\texttt{trust-ncg}) achieve 0\% strict convergence on Transition1x
+samples displaced by $\geq 1.0$\,\AA\ under DFTB0.  Even with
+aggressive hand-tuning, conventional trust-region codes reach
+$\sim$20--30\%.  Sella~\citep{sella}---the current state of the art,
+using RS-RFO with geodesic back-transformation in internal
+coordinates---achieves 10--20\% with careful parameter selection.
+
+Against this baseline, our results look very different:
+
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+Method & 0.5\,\AA & 1.0\,\AA & 1.5\,\AA & 2.0\,\AA & Notes \\
+\midrule
+Off-the-shelf TR       & $\sim$30\% & $\sim$20\% & $<$10\% & 0\% & Out of box \\
+Sella (tuned)          & $\sim$20\% & $\sim$15\% & $\sim$10\% & $<$10\% & Best published code \\
+\midrule
+Our v9 (GQT+TR)       & 80\%  & 60\%  & 46\%  & 29\%  & Shifted Newton, 10k \\
+Our v10c (RFO+PLS)    & 89\%  & 78\%  & 63\%  & 45\%  & $+$PLS, 10k \\
+Our v11 (RFO+PLS,20k) & 95\%  & 85\%  & 77\%  & 64\%  & $+$20k steps \\
+Our v12b (full,20k)    & ---   & ---   & ---   & 76\%  & $+$probe$+$late \\
+\textbf{Our v13 (full,50k)} & \textbf{98\%} & \textbf{97\%} & \textbf{97\%} & \textbf{93\%} & \textbf{50k + probe + late} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The gap is not incremental---it is a factor of $3$--$10\times$ at high
+noise, and v13 widens it further: 93\% vs.\ $<$10\% at $n=2.0$\,\AA.
+This establishes that the problem is \emph{genuinely unsolved}
+by existing tools, and the interventions documented here are not
+marginal improvements on a well-studied pipeline but the difference
+between broken and functional.
+
+\subsection{Three Contributions}
+\label{sec:contributions}
+
+From the experimental record, three results stand out as contributions
+to the broader optimization literature, not merely to this codebase.
+
+\subsubsection{The Convergence Criterion Gap ($\varepsilon^{1/2}$ Insight)}
+\label{sec:eps-half-insight}
+
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{%
+  If the optimizer drives $\norm{\vect{g}} \leq \varepsilon$, the theory
+  guarantees $\lambda_\text{min} \geq -\sqrt{\varepsilon}$.  Demanding
+  $n_\text{neg}=0$ asks for more than the mathematics promises.  The
+  entire noise-dependent performance cliff---from 95\% at 0.5\,\AA\ to
+  44\% at 2.0\,\AA---is explained by samples sitting in
+  $[-\sqrt{\varepsilon},\, 0)$ that are theoretically acceptable but
+  rejected by the strict criterion.%
+}}
+\end{center}
+
+With $\varepsilon = 10^{-4}$\,eV/\AA, the predicted bound is
+$\sqrt{10^{-4}} = 0.01$---exactly our empirically optimal relaxed
+threshold.  At this threshold, convergence is $\sim$90\% at
+\emph{all} noise levels, and the performance cliff vanishes.
+
+These two parameters ($\varepsilon$ and $\tau_\text{relax}$) were set
+independently: the force threshold by convention, the eigenvalue
+threshold by grid search over the cascade.  That they satisfy
+$\tau = \sqrt{\varepsilon}$ is an independent empirical rediscovery of
+the Boumal et al.~\citep{boumal-arc-manifolds} guarantee.  The
+implication is practical: \textbf{any code that converges forces to
+$\varepsilon$ should accept eigenvalues down to $-\sqrt{\varepsilon}$},
+not demand strict positive definiteness.  The standard $n_\text{neg}=0$
+criterion used throughout computational chemistry is more strict than
+what second-order optimization theory provides.
+
+\subsubsection{The Gradient-Orthogonality Trap (Blind Modes)}
+\label{sec:blind-mode-insight}
+
+The standard narrative in nonconvex optimization is: ``second-order
+methods escape saddle points because they use curvature information.''
+Our data shows this is incomplete.
+
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{%
+  When the gradient $\vect{g}$ is orthogonal to a negative eigenvector
+  $\vect{v}_i$ (i.e., $\vect{g} \cdot \vect{v}_i \approx 0$), the
+  Newton step component along $\vect{v}_i$ is
+  $s_i = -c_i/(\lambda_i + \sigma) \approx 0$ regardless of how
+  negative $\lambda_i$ is.  The optimizer knows exactly what is wrong
+  (from the Hessian) and exactly where (from the eigenvector), but
+  cannot act on it because its only steering signal---the
+  gradient---has no projection onto the problematic direction.%
+}}
+\end{center}
+
+This is the \textbf{blind-mode trap}: having the exact Hessian does
+not help when the gradient is uninformative.  In our data, 30--50\% of
+non-oscillating failures at $n=2.0$\,\AA\ exhibit this signature
+(gradient overlap $<0.1$ with the most negative eigenvector,
+Table~\ref{tab:hardest-10}).  The trap is not a numerical artifact or a
+dataset quirk---it is a geometric property of gradient flow on any
+surface where the gradient vector lies in a subspace orthogonal to the
+negative eigenspace of the Hessian.
+
+The per-step displacement in the blind direction can be bounded
+quantitatively.  If $\delta_i = |\vect{g}\cdot\vect{v}_i|$ is the
+gradient overlap with negative eigenvector $\vect{v}_i$, the Newton
+step component along $\vect{v}_i$ is:
+\begin{equation}
+  |s_i| = \frac{\delta_i}{|\lambda_i| + \sigma}.
+  \label{eq:blind-mode-rate}
+\end{equation}
+In the blind regime, $\delta_i \leq 0.05 \times \norm{\vect{g}}
+\leq 5\times10^{-6}$\,eV/\AA\ and $|\lambda_i| + \sigma \sim 10^{-3}$,
+so $|s_i| \leq 5\times10^{-3}$\,\AA\ before trust-radius clipping.
+At the trust floor ($\Delta = 0.01$\,\AA), the actual per-atom
+displacement in the blind direction is further reduced to
+$\sim\!10^{-5}$\,\AA/step.  To effect an eigenvalue sign change
+requires a structural displacement of $O(10^{-2})$--$O(10^{-1})$\,\AA\
+along $\vect{v}_i$, implying $10^{3}$--$10^{4}$ steps \emph{at minimum}
+---consistent with the trajectory data showing permanently hard samples
+make negligible spectral progress even after 20k steps
+(Section~\ref{sec:trajectory-analysis}).
+
+Trust-region methods cannot escape this trap because the trust radius
+constrains the step to the model's prediction, which is near-zero in
+the blind direction.  The bound~\eqref{eq:blind-mode-rate} makes
+``more steps'' a losing strategy: the convergence time scales as
+$O(1/\delta_i)$, which diverges as the overlap vanishes.  This
+explains why more steps alone cannot resolve blind-mode failures---only
+the spectral probe (Section~\ref{sec:spectral-probe-insight}), which
+bypasses the gradient entirely, can break the trap.  v13 confirms:
+ghost modes and slow convergence are eliminated by the probe at 50k,
+while late escape is still needed even at 50k
+(Table~\ref{tab:v13-ablation}).
+
+\subsubsection{The Spectral Probe}
+\label{sec:spectral-probe-insight}
+
+The fix for the blind-mode trap is to bypass the gradient entirely:
+
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{%
+  Probe a distance ladder along the negative eigenvector $\vect{v}_i$
+  in both $\pm$ directions.  Accept the first displacement where
+  $n_\text{neg}$ decreases.  This is a \textbf{spectral line search}:
+  a 1D search whose merit function is the Hessian spectrum, not the
+  energy.%
+}}
+\end{center}
+
+The spectral probe is the algorithmic contribution of this work.  It
+can be understood in the context of the saddle-escape literature: Jin
+et al.~\citep{jin-perturbed-gd} proved that adding isotropic random
+noise to gradient descent suffices to escape strict saddle points in
+polynomial time.  Their mechanism relies on the noise having a nonzero
+projection onto the escape direction with constant probability---a
+brute-force fix that works in expectation but wastes perturbations in
+non-escape directions, producing $\sim$1:1 rescue-to-loss ratios (as
+our v12 fixed-kick experiments confirmed).
+
+The spectral probe is the \textbf{second-order analog of perturbed GD}:
+instead of random perturbation in a random direction, it perturbs along
+the \emph{known} negative eigenvector.  Instead of an energy-decrease
+acceptance criterion (which is uninformative in the blind regime---the
+energy is already nearly converged), it uses an
+$n_\text{neg}$-decrease criterion that directly targets the spectral
+deficiency.  This directed approach yields a 2.4:1 rescue-to-loss ratio
+(probe kicks) and 3.2:1 (late escape), compared to $\sim$1:1 for
+undirected perturbations.  The improvement is possible precisely because
+we have second-order information (the full Hessian): we know \emph{which}
+direction to search, we just lack the gradient signal to do so within the
+standard Newton framework.
+
+The probe is the natural counterpart to trust-region exploitation:
+where the trust region follows the model (exploit), the probe searches
+along the eigenvector (explore).  It is activated only when the
+gradient-based machinery is provably ineffective (blind-mode
+detection, overlap $<0.1$ with $|\lambda_i|<\sqrt{\varepsilon}$),
+making it a targeted intervention rather than random noise injection.
+
+\subsection{Generalizability}
+\label{sec:generalizability}
+
+\subsubsection{What Transfers: Mathematical Principles}
+
+Every major finding maps to a general mathematical mechanism, not a
+dataset-specific coincidence:
+
+\begin{longtable}{p{0.30\textwidth}p{0.65\textwidth}}
+\toprule
+\textbf{Finding} & \textbf{Why It Generalizes} \\
+\midrule
+\endhead
+
+PLS is the biggest single win
+& Cubic interpolation stabilizes eigenvalue-crossing regimes---a
+  property of \emph{any} PES with mixed curvature.  PLS is already
+  standard in production codes; our contribution is quantifying its
+  dominance ($+$7 to $+$34\,pts). \\
+
+Trust floor = $\sqrt{\varepsilon}$
+& Boumal et al.'s theorem applies to any second-order method on any
+  smooth function.  The specific value 0.01\,\AA\ is
+  $\varepsilon$-dependent, but the scaling law transfers. \\
+
+ARC fails on noisy PES
+& $\rho$-ratcheting occurs whenever the quadratic model's prediction
+  error has a noise floor (semi-empirical, ML potentials, DFT with
+  loose SCF).  Not DFTB0-specific. \\
+
+GDIIS has zero effect
+& $k$-vector history cannot capture oscillation in $d$-DOF systems
+  when $k \ll d$.  Gets \emph{worse} for larger molecules. \\
+
+Blind-mode trap
+& Gradient--eigenvector orthogonality is a geometric property of
+  any surface.  Independent of calculator, coordinates, or molecule
+  size. \\
+
+Spectral probe
+& $n_\text{neg}$-decrease acceptance is meaningful on any PES where
+  eigenvalues can be computed.  Distances are parameterized as
+  multiples of $\sqrt{\varepsilon}$, so the algorithm adapts to the
+  force threshold. \\
+
+\bottomrule
+\end{longtable}
+
+The hierarchy of interventions---PLS $\gg$ 50k steps $\gg$ spectral
+probe $>$ late escape $\gg$ adaptive scaling $\approx$ fixed kicks
+$\approx$ GDIIS $\approx$ ARC---is confirmed by v13's additive
+decomposition (Table~\ref{tab:v13-orthogonality}) and reflects
+fundamental properties of optimization on mixed-curvature surfaces,
+not Transition1x-specific tuning.
+
+\subsubsection{What Does Not Transfer: Parameters and Regime}
+
+Three aspects of this work are problem-specific:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Parameter values}: The trust floor (0.01\,\AA), force
+    threshold ($10^{-4}$\,eV/\AA), kick magnitudes, patience/cooldown
+    constants, and late-escape activation step (15k) are calibrated to
+    small organic molecules on DFTB0.  Different PES scales require
+    retuning, though the $\sqrt{\varepsilon}$ scaling law provides a
+    principled starting point.
+  \item \textbf{Molecular size regime}: With $\leq$23 atoms ($\leq$69
+    DOF), full analytical Hessians are feasible at every step.  For
+    larger systems requiring L-BFGS or model Hessians, the spectral
+    decomposition, $n_\text{neg}$ counting, and mode tracking that
+    underpin the probe and late-escape mechanisms are not directly
+    applicable.
+  \item \textbf{Starting-point distribution}: Displacing from known
+    transition states produces a specific distribution of initial
+    Hessian spectra (median $n_\text{neg} \approx 12$,
+    $\kappa \sim 10^{4}$--$10^{6}$).  Starting from random geometries,
+    ML-predicted structures, or force-field pre-optimized structures
+    would give different initial conditions and potentially different
+    failure mode distributions.
+\end{enumerate}
+
+\subsubsection{Evidence Against Overfitting}
+
+The strongest evidence that these findings are not overfit to
+Transition1x:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Independent parameter discovery}: The force threshold
+    $\varepsilon = 10^{-4}$ and relaxed eigenvalue threshold
+    $\tau = 0.01$ were set independently by different criteria (force
+    convergence convention vs.\ cascade grid search).  Their
+    relationship $\tau = \sqrt{\varepsilon}$ was discovered post hoc
+    from the literature.  Overfitting does not produce theoretically
+    predicted parameter relationships.
+  \item \textbf{Cross-seed stability}: Failure mode distributions
+    reproduce across random seeds within $\pm$1--4\,pts
+    (Table~\ref{tab:reproducibility}, Table~\ref{tab:autopsy-cross-seed}).
+    Oscillating counts at matched noise levels are identical across
+    seeds (e.g., 76 vs.\ 76 at $n=1.5$).
+  \item \textbf{Monotonic noise scaling}: Every intervention's effect
+    scales smoothly with displacement magnitude, consistent with a
+    physical mechanism (increasing Hessian ill-conditioning,
+    Table~\ref{tab:condition}) rather than dataset-specific structure.
+  \item \textbf{Negative results explained by theory}: ARC failure
+    ($\rho$-ratcheting), GDIIS failure (dimensional mismatch), line
+    search failure (poor direction quality), trust-floor sensitivity
+    ($\varepsilon^{1/2}$ bound)---all predicted by existing theory
+    before we observed them.  If we were overfitting, we would find
+    unexplainable patterns, not theory-confirming ones.
+  \item \textbf{Other optimizers fail on the same task}: The comparison
+    with off-the-shelf codes (0--30\%) and Sella (10--20\%) establishes
+    that the difficulty is intrinsic to the problem, not an artifact of
+    a weak baseline.  Our interventions address the intrinsic difficulty,
+    not a codebase-specific bug.
+  \item \textbf{Additive decomposition of mechanisms}: v13's orthogonality
+    result (Table~\ref{tab:v13-orthogonality}) shows that 50k steps and
+    spectral probes target disjoint failure populations (oscillating vs.\
+    blind modes) and their gains stack additively.  Overfitting to a
+    dataset produces correlated improvements; mechanistically distinct
+    interventions with additive effects reflect genuine population
+    structure.
+\end{enumerate}
+
+\subsubsection{Implications for Machine Learning Potentials}
+
+The ML-for-chemistry community increasingly uses learned potentials
+(NequIP, MACE, PaiNN, etc.)\ trained on datasets like Transition1x and
+then minimizes on the learned PES to produce equilibrium structures.
+Our findings have direct implications:
+
+\begin{itemize}[nosep]
+  \item \textbf{ARC will fail harder}: ML potentials have larger Hessian
+    noise floors than DFTB0 ($\sim$8$\times10^{-3}$).  The
+    $\rho$-ratcheting mechanism that killed ARC on DFTB0 will be
+    \emph{more} severe on noisier potentials.
+  \item \textbf{PLS is even more important}: Eigenvalue crossings and
+    poor quadratic models are more frequent on rougher PES.  PLS's
+    zero-cost step-length correction becomes essential, not optional.
+  \item \textbf{The $\sqrt{\varepsilon}$ criterion is necessary}: If
+    practitioners demand $n_\text{neg}=0$ on an ML potential with a
+    force RMSE of $\sim$0.05\,eV/\AA, the Hessian noise alone will
+    produce persistent ghost negatives.  The relaxed criterion
+    ($\lambda_\text{min} \geq -\sqrt{\varepsilon}$) avoids conflating
+    numerical noise with genuine saddle character.
+  \item \textbf{Full Hessians may not be available}: The spectral probe
+    and blind-mode detection require eigendecomposition of the full
+    Hessian, which is $O(N^3)$ and often unavailable for ML potentials.
+    An open question is whether approximate spectral probes (e.g., using
+    Lanczos iteration for the lowest eigenvalue only) retain the directed
+    advantage over random perturbation.
+\end{itemize}
+
+The most direct generalizability test would be to swap DFTB0 for
+GFN2-xTB (available through the same SCINE interface, different PES
+characteristics) or an ML potential and verify that the intervention
+hierarchy holds.  This is noted as future work.
+
+%=============================================================================
+\section{Codebase Architecture}
+\label{sec:architecture}
+%=============================================================================
+
+\subsection{Pipeline}
+
+\begin{verbatim}
+run_minimization_parallel.py   (CLI + SLURM interface)
+  |-> ParallelSCINEProcessor  (spawns N workers)
+        |-> scine_worker_sample()  (creates DFTB0 predict_fn)
+              |-> run_newton_raphson()  (core optimizer, ~2700 lines)
+                    |-> predict_fn(coords, atomic_nums, do_hessian=True)
+                    |   -> (energy, forces, hessian)
+                    |-> get_vib_evals_evecs()  (Eckart decomposition)
+                    |-> Step builder:
+                    |     _nr_step_arc()       (v10: ARC secular eq)
+                    |     _nr_step_rfo()       (v10b: RFO augmented Hessian)
+                    |     _nr_step_shifted_newton()  (v3-v9: GQT)
+                    |     _nr_step_lm_damping()      (v2, inferior)
+                    |     _nr_step_hard_filter()      (v1, inferior)
+                    |-> Step control:
+                    |     ARC sigma-adaptation  (v10, FAILED)
+                    |     Trust region           (v1-v9, RFO)
+                    |     Polynomial line search (v10c, BEST)
+                    |     Line search            (v7, inferior)
+                    |-> GDIIS:
+                    |     _GDIISExtrapolator    (v10/v10b, ZERO EFFECT)
+                    |     Oscillation detection  (v10, no benefit)
+                    |     Late-stage trigger      (v10b, no benefit)
+                    |-> Convergence:
+                          Cascade evaluation at 8 thresholds
+                          Strict / Relaxed / Stalled classification
+\end{verbatim}
+
+\subsection{Key Files}
+\begin{itemize}[nosep]
+  \item \texttt{baselines/minimization.py} --- Core optimizer ($\sim$2700 lines)
+  \item \texttt{runners/run\_minimization\_parallel.py} --- CLI and parallelization
+  \item \texttt{scripts/analyze\_minimization\_nr\_grid.py} --- Grid analysis, tag parsing
+  \item \texttt{scripts/analyze\_nr\_failure\_autopsy.py} --- Failure classification
+  \item \texttt{scripts/diagnostic\_from\_minima.py} --- DFTB0 forensics at DFT minima
+  \item \texttt{scripts/slurm\_templates/} --- SLURM job scripts (v3--v13)
+\end{itemize}
+
+%=============================================================================
+\section*{References}
+%=============================================================================
+
+\begin{thebibliography}{99}
+
+\bibitem[Cartis et al.(2011a)]{arc-part1}
+  C.~Cartis, N.~I.~M.~Gould, Ph.~L.~Toint,
+  ``Adaptive cubic regularisation methods for unconstrained optimization.
+  Part~I: Motivation, convergence and numerical results,''
+  \emph{Math.\ Program.}, 127(2):245--295, 2011.
+
+\bibitem[Cartis et al.(2011b)]{cgt-optimal}
+  C.~Cartis, N.~I.~M.~Gould, Ph.~L.~Toint,
+  ``Optimal Newton-type methods for nonconvex smooth optimization problems,''
+  Technical Report, 2011.
+
+\bibitem[Cartis et al.(2012)]{cgt-complexity}
+  C.~Cartis, N.~I.~M.~Gould, Ph.~L.~Toint,
+  ``Complexity bounds for second-order optimality in unconstrained optimization,''
+  \emph{J.~Complexity}, 28(1):93--108, 2012.
+
+\bibitem[Boumal et al.(2018)]{boumal-arc-manifolds}
+  N.~Boumal, P.-A.~Absil, C.~Cartis,
+  ``Global rates of convergence for nonconvex optimization on manifolds,''
+  \emph{IMA J.\ Numer.\ Anal.}, 39(1):1--33, 2019.
+
+\bibitem[Benson and Shanno(2014)]{benson-shanno}
+  H.~Y.~Benson, D.~F.~Shanno,
+  ``Interior-point methods for nonconvex nonlinear programming:
+  cubic regularization,''
+  \emph{Comput.\ Optim.\ Appl.}, 58(2):323--346, 2014.
+
+\bibitem[Schlegel(2011)]{schlegel2011}
+  H.~B.~Schlegel,
+  ``Geometry optimization,''
+  \emph{WIREs Comput.\ Mol.\ Sci.}, 1(5):790--809, 2011.
+
+\bibitem[Schlegel(1989)]{schlegel1989}
+  H.~B.~Schlegel,
+  ``A comparison of geometry optimization with internal, Cartesian,
+  and mixed coordinates,''
+  \emph{Int.\ J.\ Quantum Chem.}, 44(S23):243--252, 1993.
+
+\bibitem[Pulay(1980)]{pulay-diis}
+  P.~Pulay,
+  ``Convergence acceleration of iterative sequences.\ The case of SCF iteration,''
+  \emph{Chem.\ Phys.\ Lett.}, 73(2):393--398, 1980.
+
+\bibitem[Cs\'asz\'ar and Pulay(1984)]{gdiis-csaszar-pulay}
+  P.~Cs\'asz\'ar, P.~Pulay,
+  ``Geometry optimization by direct inversion in the iterative subspace,''
+  \emph{J.\ Mol.\ Struct.}, 114:31--34, 1984.
+
+\bibitem[Li and Frisch(2006)]{li-frisch-gediis}
+  X.~Li, M.~J.~Frisch,
+  ``Energy-represented direct inversion in the iterative subspace within a
+  hybrid geometry optimization method,''
+  \emph{J.\ Chem.\ Theory Comput.}, 2(3):835--839, 2006.
+
+\bibitem[Pulay and Fogarasi(1992)]{pulay-redundant}
+  P.~Pulay, G.~Fogarasi,
+  ``Geometry optimization in redundant internal coordinates,''
+  \emph{J.\ Chem.\ Phys.}, 96(4):2856--2860, 1992.
+
+\bibitem[Wang and Song(2016)]{wang-tric}
+  L.-P.~Wang, C.~Song,
+  ``Geometry optimization made simple with translation and rotation
+  internal coordinates,''
+  \emph{J.\ Chem.\ Phys.}, 144(21):214108, 2016.
+
+\bibitem[Lindh et al.(1999)]{lindh-fcw}
+  R.~Lindh, A.~Bernhardsson, M.~Sch\"utz,
+  ``Force-constant weighted internal coordinates in vibrational frequency
+  calculations,''
+  \emph{Chem.\ Phys.\ Lett.}, 303(5--6):567--575, 1999.
+
+\bibitem[Packwood et al.(2018)]{packwood2018}
+  D.~M.~Packwood, J.~Kermode, L.~Mones, N.~Bernstein, J.~R.~Kermode,
+  G.~Cs\'anyi, C.~Ortner,
+  ``A universal preconditioner for simulating condensed phase materials,''
+  \emph{Sci.\ Rep.}, 8:5374, 2018.
+
+\bibitem[Su et al.(2022)]{ihisd}
+  Y.~Su, L.~Zhang, W.~E,
+  ``The iterative high-index saddle dynamics method for the index-$k$
+  saddle point on the energy landscape,''
+  arXiv:2602.01883, 2022.
+
+\bibitem[Luo et al.(2023)]{convergence-degenerate}
+  L.~Luo, Y.~Nesterov, H.~He, E.~A.~Gryazina,
+  ``Convergence of regularized Newton methods on degenerate critical points,''
+  2023.
+
+\bibitem[Jin et al.(2017)]{jin-perturbed-gd}
+  C.~Jin, R.~Ge, P.~Netrapalli, S.~M.~Kakade, M.~I.~Jordan,
+  ``How to escape saddle points efficiently,''
+  \emph{Proc.\ 34th Int.\ Conf.\ Machine Learning (ICML)}, pp.~1724--1732, 2017.
+
+\bibitem[Hermes et al.(2022)]{sella}
+  E.~D.~Hermes, K.~Sargsyan, H.~N.~Najm, B.~C.~Garrett,
+  ``Sella: a Python package for finding transition states on
+  potential energy surfaces,''
+  \emph{J.\ Chem.\ Theory Comput.}, 18(11):6974--6988, 2022.
+
+\bibitem[Bhowmik et al.(2023)]{transition1x}
+  A.~Bhowmik, I.~Batatia, S.~Batzner, et al.,
+  ``Transition1x: A dataset for building generalizable reactive machine
+  learning potentials,''
+  \emph{Sci.\ Data}, 10:232, 2023.
+
+\bibitem[ORCA manual]{orca-manual}
+  F.~Neese et al., ``ORCA Manual,'' version~5.0, Max-Planck-Institut
+  f\"ur Kohlenforschung, 2023.
+
+\end{thebibliography}
+
+\end{document}

@@ -26,6 +26,7 @@ from gadplus.core.convergence import is_ts_converged, force_mean
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
 from gadplus.projection import vib_eig
 from gadplus.projection import gad_dynamics_projected
+from gadplus.projection import preconditioned_gad_dynamics_projected
 from gadplus.projection import atomic_nums_to_symbols
 from gadplus.logging.trajectory import TrajectoryLogger
 
@@ -46,6 +47,11 @@ class GADSearchConfig:
     min_interatomic_dist: float = 0.4
     force_threshold: float = 0.01
     purify_hessian: bool = False
+    use_preconditioning: bool = False
+    eig_floor: float = 0.01
+    # Lambda2-blended preconditioning: w = sigmoid(k * lambda_2)
+    # 0 = no blend (standard GAD/precond GAD), >0 = blended
+    blend_sharpness: float = 0.0
 
 
 @dataclass
@@ -178,9 +184,25 @@ def run_gad_search(
             )
             v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
 
-            gad_vec, v_proj, _info = gad_dynamics_projected(
-                coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
-            )
+            if cfg.use_preconditioning:
+                # Compute blend weight: w = sigmoid(k * lambda_2) if blending
+                if cfg.blend_sharpness > 0:
+                    blend_w = torch.sigmoid(torch.tensor(
+                        cfg.blend_sharpness * eig1,
+                        dtype=torch.float64,
+                    ))
+                else:
+                    blend_w = 1.0  # standard GAD (full v1 ascent)
+
+                gad_vec, v_proj, _info = preconditioned_gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                    evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
+                    eig_floor=cfg.eig_floor, gad_blend_weight=blend_w,
+                )
+            else:
+                gad_vec, v_proj, _info = gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                )
             v_prev = v_proj.detach().clone().reshape(-1)
         else:
             # Raw GAD on unprojected Hessian

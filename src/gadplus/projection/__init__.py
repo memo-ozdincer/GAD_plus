@@ -8,6 +8,7 @@ from gadplus.projection.projection import (
     purify_hessian,
     vib_eig,
     gad_dynamics_projected,
+    preconditioned_gad_dynamics_projected,
     project_vector_to_vibrational,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "purify_hessian",
     "vib_eig",
     "gad_dynamics_projected",
+    "preconditioned_gad_dynamics_projected",
     "project_vector_to_vibrational",
 ]

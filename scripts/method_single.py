@@ -19,13 +19,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 METHOD_CONFIGS = {
+    # === Round 1 methods ===
     "gad_projected": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.35),
     "gad_small_dt": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35),
     "gad_adaptive_dt": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.35),
     "gad_tight_clamp": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.1),
     "gad_adaptive_tight": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.1),
     "nr_gad_pingpong": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=False, max_disp=0.35,
-                            nr_damping=1.0, nr_max_step_norm=0.3),  # original (undamped)
+                            nr_damping=1.0, nr_max_step_norm=0.3),
     "nr_gad_pp_adaptive": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=True, max_disp=0.35,
                                nr_damping=1.0, nr_max_step_norm=0.3),
     # Damped NR-GAD variants
@@ -35,6 +36,44 @@ METHOD_CONFIGS = {
                              nr_damping=0.1, nr_max_step_norm=0.05),
     "nr_gad_damped_03": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
                              nr_damping=0.3, nr_max_step_norm=0.15),
+    # Preconditioned GAD
+    "precond_gad_001": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                            preconditioned=True, eig_floor=0.01),
+    "precond_gad_005": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                            preconditioned=True, eig_floor=0.05),
+    "precond_gad_01": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                           preconditioned=True, eig_floor=0.1),
+    "precond_gad_dt01": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.35,
+                             preconditioned=True, eig_floor=0.01),
+
+    # === Round 2: A — Pure GAD improvements ===
+    # A1: Corrected adaptive dt (Multi-Mode GAD parameters)
+    "adaptive_mm": dict(runner="gad", dt=0.002, k_track=0, adaptive=True, max_disp=0.35,
+                        dt_min=1e-5, dt_max=0.08),
+    "adaptive_mm2": dict(runner="gad", dt=0.001, k_track=0, adaptive=True, max_disp=0.35,
+                         dt_min=1e-5, dt_max=0.05),
+    # A2: Smaller fixed dt
+    "gad_dt003": dict(runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35),
+    # A3: Clamping extremes
+    "gad_no_clamp": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=999.0),
+    # A4: Adaptive dt with floor fix
+    "adaptive_floor": dict(runner="gad", dt=0.005, k_track=0, adaptive=True, max_disp=0.35,
+                           dt_min=1e-3, dt_max=0.05),
+
+    # === Round 2: B — Preconditioned descent diagnostic (hard switch, NOT diffusion-compat) ===
+    # Preconditioned descent when n_neg>=2, preconditioned GAD when n_neg<2
+    # Tests: Is GAD's v₁ ascent helpful at n_neg>=2?
+    "precond_descent": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                            nr_damping=1.0, nr_max_step_norm=0.3, descent_mode="preconditioned",
+                            nr_eig_floor=0.01),
+
+    # === Round 2: C — Blended preconditioned GAD (diffusion-compatible) ===
+    # F_blend = F + 2·sigmoid(k·λ₂)·(F·v₁)v₁, then Δx = dt · |H|⁻¹ · F_blend
+    # One scalar w controls ascend-v₁-or-not. Everything else is preconditioned descent.
+    "blend_k50": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                      preconditioned=True, eig_floor=0.01, blend_sharpness=50.0),
+    "blend_k100": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                       preconditioned=True, eig_floor=0.01, blend_sharpness=100.0),
 }
 
 
@@ -95,30 +134,63 @@ def main():
     print(f"Loaded {len(dataset)} samples (split={args.split})")
 
     # ---- Build config ----
-    from gadplus.search.gad_search import GADSearchConfig, run_gad_search
-    from gadplus.search.nr_gad_pingpong import NRGADPingPongConfig, run_nr_gad_pingpong
     from gadplus.logging.trajectory import TrajectoryLogger
 
-    if mcfg["runner"] == "gad":
+    runner = mcfg["runner"]
+
+    # Lazy imports per runner to avoid import errors from unused modules
+    if runner == "gad":
+        from gadplus.search.gad_search import GADSearchConfig, run_gad_search
+    elif runner == "pingpong":
+        from gadplus.search.nr_gad_pingpong import NRGADPingPongConfig, run_nr_gad_pingpong
+    elif runner == "blended":
+        from gadplus.search.blended_gad import BlendedGADConfig, run_blended_gad
+    elif runner == "rfo_gad":
+        from gadplus.search.rfo_gad import RFOGADConfig, run_rfo_gad
+
+    if runner == "gad":
         cfg = GADSearchConfig(
             n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
             use_projection=True,
-            use_adaptive_dt=mcfg["adaptive"],
-            dt_min=1e-4, dt_max=0.05, dt_adaptation="eigenvalue_clamped",
+            use_adaptive_dt=mcfg.get("adaptive", False),
+            dt_min=mcfg.get("dt_min", 1e-4),
+            dt_max=mcfg.get("dt_max", 0.05),
+            dt_adaptation="eigenvalue_clamped",
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            use_preconditioning=mcfg.get("preconditioned", False),
+            eig_floor=mcfg.get("eig_floor", 0.01),
+            blend_sharpness=mcfg.get("blend_sharpness", 0.0),
         )
-    else:
+    elif runner == "pingpong":
         cfg = NRGADPingPongConfig(
             max_steps=args.n_steps, gad_dt=mcfg["dt"], k_track=mcfg["k_track"],
-            use_adaptive_dt=mcfg["adaptive"],
-            dt_min=1e-4, dt_max=0.05,
-            nr_max_step=0.3, nr_eig_floor=1e-6,
+            use_adaptive_dt=mcfg.get("adaptive", False),
+            dt_min=mcfg.get("dt_min", 1e-4),
+            dt_max=mcfg.get("dt_max", 0.05),
+            nr_max_step=0.3,
+            nr_eig_floor=mcfg.get("nr_eig_floor", 1e-6),
             nr_damping=mcfg.get("nr_damping", 0.2),
             nr_max_step_norm=mcfg.get("nr_max_step_norm", 0.1),
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            descent_mode=mcfg.get("descent_mode", "newton"),
         )
+    elif runner == "blended":
+        cfg = BlendedGADConfig(
+            n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
+            blend_sharpness=mcfg.get("blend_sharpness", 50.0),
+            max_atom_disp=mcfg["max_disp"],
+            force_threshold=0.01,
+        )
+    elif runner == "rfo_gad":
+        cfg = RFOGADConfig(
+            n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
+            max_atom_disp=mcfg["max_disp"],
+            force_threshold=0.01,
+        )
+    else:
+        sys.exit(f"Unknown runner: {runner}")
 
     # ---- Sample range (supports random offset into full dataset) ----
     offset = args.random_offset
@@ -152,12 +224,18 @@ def main():
         )
 
         t0 = time.time()
-        if mcfg["runner"] == "gad":
+        if runner == "gad":
             result = run_gad_search(predict_fn, coords_start, z, cfg,
                                     logger=logger, known_ts_coords=coords_ts)
-        else:
+        elif runner == "pingpong":
             result = run_nr_gad_pingpong(predict_fn, coords_start, z, cfg,
                                          logger=logger, known_ts_coords=coords_ts)
+        elif runner == "blended":
+            result = run_blended_gad(predict_fn, coords_start, z, cfg,
+                                     logger=logger, known_ts_coords=coords_ts)
+        elif runner == "rfo_gad":
+            result = run_rfo_gad(predict_fn, coords_start, z, cfg,
+                                  logger=logger, known_ts_coords=coords_ts)
         wall = time.time() - t0
         logger.flush()
 

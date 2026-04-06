@@ -210,6 +210,94 @@ def gad_dynamics_projected(
     return gad_vec, v_proj.to(v.dtype), info
 
 
+def preconditioned_gad_dynamics_projected(
+    coords: torch.Tensor,
+    forces: torch.Tensor,
+    v: torch.Tensor,
+    atomsymbols: list[str],
+    evals_vib: torch.Tensor,
+    evecs_vib_3N: torch.Tensor,
+    eig_floor: float = 0.01,
+    gad_blend_weight: float = 1.0,
+    eps: float = 1e-10,
+) -> tuple[torch.Tensor, torch.Tensor, dict]:
+    """Preconditioned GAD: Δx = dt · |H|⁻¹ F_blend.
+
+    F_blend = F + 2·w·(F·v₁)v₁, then preconditioned by |H|⁻¹.
+
+    When gad_blend_weight=1.0 (default): standard preconditioned GAD.
+    When gad_blend_weight=0.0: pure preconditioned descent (no v₁ ascent).
+    When gad_blend_weight=sigmoid(k·λ₂): smooth λ₂-blended dynamics.
+
+    Mode-by-mode effect:
+        v₁ (lowest): step ∝ (F·v₁·(2w-1)) / |λ₁|.
+            w=1 → ascend (GAD). w=0 → descend. w=0.5 → zero force on v₁.
+        vᵢ (i>1):   step ∝ (F·vᵢ) / |λᵢ|.
+            Always descent, always curvature-scaled. Unaffected by blend.
+
+    Args:
+        coords: (N, 3) atomic coordinates.
+        forces: (N, 3) atomic forces.
+        v: (3N,) guide eigenvector for GAD.
+        atomsymbols: Element symbols.
+        evals_vib: (3N-k,) vibrational eigenvalues from vib_eig.
+        evecs_vib_3N: (3N, 3N-k) vibrational eigenvectors in 3N MW space.
+        eig_floor: Clamp |λᵢ| from below to avoid blowup near zero.
+        gad_blend_weight: Blend weight w in F + 2w(F·v₁)v₁.
+            1.0 = full GAD, 0.0 = pure descent. Use sigmoid(k·λ₂) for smooth blend.
+        eps: Numerical stability for projector.
+
+    Returns:
+        gad_vec: (N, 3) preconditioned direction in Cartesian space.
+        v_proj: (3N,) projected guide vector for tracking.
+        info: Diagnostic dict with preconditioning stats.
+    """
+    device = coords.device
+    coords_3d = coords.reshape(-1, 3).to(torch.float64)
+    f_flat = forces.reshape(-1).to(torch.float64)
+    v_flat = v.reshape(-1).to(torch.float64)
+    num_atoms = coords_3d.shape[0]
+
+    masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
+    P = _eckart_projector(coords_3d, masses, eps=eps)
+
+    # Blended GAD direction in MW vibrational space
+    # F_blend = -grad + 2·w·(grad·v)·v  →  dq = P @ (-grad + 2w·(grad·v)·v)
+    grad_mw = P @ (-sqrt_m_inv * f_flat)
+    v_proj = P @ v_flat
+    v_proj = v_proj / (v_proj.norm() + 1e-12)
+
+    v_dot_grad = torch.dot(v_proj, grad_mw)
+    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
+    dq = P @ (-grad_mw + 2.0 * w * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
+
+    # Precondition: decompose dq into eigenvector components, scale by 1/|λᵢ|
+    evecs = evecs_vib_3N.to(torch.float64)
+    evals = evals_vib.to(torch.float64)
+
+    coeffs = evecs.T @ dq  # (3N-k,)
+    inv_abs_evals = 1.0 / torch.clamp(evals.abs(), min=eig_floor)
+    scaled_coeffs = coeffs * inv_abs_evals
+
+    dq_precond = evecs @ scaled_coeffs
+
+    # Back to Cartesian
+    gad_vec = (sqrt_m * dq_precond).reshape(num_atoms, 3).to(forces.dtype)
+
+    # Diagnostics
+    scale_range = float(inv_abs_evals.max().item()) / max(float(inv_abs_evals.min().item()), 1e-12)
+    info = {
+        "v_dot_grad": float(v_dot_grad.item()),
+        "grad_norm_mw": float(grad_mw.norm().item()),
+        "precond_scale_min": float(inv_abs_evals.min().item()),
+        "precond_scale_max": float(inv_abs_evals.max().item()),
+        "precond_scale_range": scale_range,
+        "n_clamped": int((evals.abs() < eig_floor).sum().item()),
+        "gad_blend_weight": float(w) if isinstance(w, (int, float)) else float(w.item()),
+    }
+    return gad_vec, v_proj.to(v.dtype), info
+
+
 def project_vector_to_vibrational(
     vec: torch.Tensor,
     cart_coords: torch.Tensor,
