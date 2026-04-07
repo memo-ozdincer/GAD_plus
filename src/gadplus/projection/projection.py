@@ -175,11 +175,17 @@ def gad_dynamics_projected(
     forces: torch.Tensor,
     v: torch.Tensor,
     atomsymbols: list[str],
+    gad_blend_weight: float = 1.0,
     eps: float = 1e-10,
 ) -> tuple[torch.Tensor, torch.Tensor, dict]:
     """GAD direction with consistent Eckart projection.
 
     Projects gradient, guide vector, and output to prevent TR leakage.
+
+    Args:
+        gad_blend_weight: Blend weight w in F + 2w(F·v₁)v₁.
+            1.0 = full GAD (default), 0.0 = pure descent.
+            Use sigmoid(k·λ₂) for smooth λ₂-blended dynamics.
 
     Returns:
         gad_vec: (N, 3) GAD direction in Cartesian space.
@@ -200,12 +206,14 @@ def gad_dynamics_projected(
     v_proj = v_proj / (v_proj.norm() + 1e-12)
 
     v_dot_grad = torch.dot(v_proj, grad_mw)
-    dq = P @ (-grad_mw + 2.0 * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
+    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
+    dq = P @ (-grad_mw + 2.0 * w * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
 
     gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
     info = {
         "v_dot_grad": float(v_dot_grad.item()),
         "grad_norm_mw": float(grad_mw.norm().item()),
+        "gad_blend_weight": float(w) if isinstance(w, (int, float)) else float(w.item()),
     }
     return gad_vec, v_proj.to(v.dtype), info
 

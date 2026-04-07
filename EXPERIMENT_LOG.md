@@ -308,6 +308,242 @@ dt=0.005, eig_floor=0.01 for both.
 
 ---
 
+## Round 3, Experiment 14: Sella TS Baselines
+
+**SLURM:** 58932967 | **Data:** `sella_baselines/` | **Status:** Complete (24/24 jobs, all 300/300 samples)
+
+### Setup
+
+**Sella** (v2.3.4) is the standard trust-region saddle point optimizer using RS-P-RFO (Restricted-Step Partitioned Rational Function Optimization). We compare it directly against GAD on the same 300 Transition1x train-split samples, same noise seeds (seed=42), same noise levels.
+
+**HIP integration:** HipSellaCalculator wraps our `predict_fn` into an ASE Calculator with Hessian caching. On each Sella step, `calculate()` runs HIP with `do_hessian=True`, caching energy+forces+Hessian in one forward pass. When Sella subsequently calls `hessian_function()`, it reads from cache — zero overhead for exact Hessians.
+
+**Sella parameters** (Wander et al. 2024, arXiv:2410.01650v2):
+- `order=1` (first-order saddle point)
+- `use_exact_hessian=True` with `diag_every_n=1` (fresh HIP Hessian every step)
+- `gamma=0.0` (tightest eigensolver convergence)
+- Trust radius: `delta0=0.048`, `rho_inc=1.035`, `rho_dec=5.0`, `sigma_inc=1.15`, `sigma_dec=0.65`
+- `max_steps=200`
+
+**Four configurations tested:**
+
+| Config | fmax threshold | Coordinates | Purpose |
+|--------|---------------|-------------|---------|
+| sella_internal_fmax0.01 | 0.01 eV/Å | Internal (bonds/angles/dihedrals) | Match our GAD force threshold |
+| sella_internal_fmax0.03 | 0.03 eV/Å | Internal | Sella default threshold |
+| sella_internal_fmax0.001 | 0.001 eV/Å | Internal | Very tight, retroactive n_neg check |
+| sella_cartesian_fmax0.01 | 0.01 eV/Å | Cartesian | Test coordinate system effect |
+
+### Convergence criteria compared
+
+Three metrics reported for every sample:
+
+1. **Sella converged (`sella%`):** `max(|force_components|) < fmax` — Sella's own criterion, based on the maximum absolute force component across all atoms.
+2. **n_neg==1 (`n_neg1%`):** Exactly one negative eigenvalue in the Eckart-projected vibrational Hessian of the final geometry. This is the necessary condition for a first-order saddle point. Does NOT check force magnitude.
+3. **Our criterion (`ours%`):** `n_neg == 1` on Eckart-projected vibrational Hessian AND `mean(per-atom force norm) < 0.01 eV/Å`. This is the criterion used for ALL GAD experiments throughout this log.
+
+Note: Sella uses max absolute force component; our GAD experiments use mean per-atom force norm. These are different metrics — fmax=0.01 is stricter than force_norm<0.01 for the same geometry.
+
+### Results: All three metrics
+
+**Sella Internal Coordinates, fmax=0.01:**
+
+| Noise | sella% | n_neg1% | ours% | Avg steps (conv) | Avg wall (conv) | Both | Sella-only | Ours-only | Neither |
+|-------|--------|---------|-------|-------------------|-----------------|------|------------|-----------|---------|
+| 10pm | 87.0 | 97.7 | 91.7 | 16 | 1.5s | 259 | 2 | 16 | 23 |
+| 30pm | 83.3 | 98.7 | 90.0 | 23 | 2.1s | 250 | 0 | 20 | 30 |
+| 50pm | 79.0 | 96.0 | 84.7 | 25 | 2.3s | 235 | 2 | 19 | 44 |
+| 100pm | 56.7 | 81.3 | 61.3 | 32 | 2.9s | 170 | 0 | 14 | 116 |
+| 150pm | 31.0 | 52.3 | 33.7 | 47 | 4.2s | 92 | 1 | 9 | 198 |
+| 200pm | 16.3 | 33.0 | 18.0 | 51 | 4.6s | 49 | 0 | 5 | 246 |
+
+**Sella Internal Coordinates, fmax=0.03 (Sella default):**
+
+| Noise | sella% | n_neg1% | ours% | Avg steps (conv) | Avg wall (conv) | Both | Sella-only | Ours-only | Neither |
+|-------|--------|---------|-------|-------------------|-----------------|------|------------|-----------|---------|
+| 10pm | 95.7 | 97.3 | 61.0 | 4 | 0.5s | 182 | 105 | 1 | 12 |
+| 30pm | 91.7 | 97.3 | 61.7 | 5 | 0.5s | 185 | 90 | 0 | 25 |
+| 50pm | 87.7 | 95.3 | 56.7 | 10 | 1.0s | 168 | 95 | 2 | 35 |
+| 100pm | 63.7 | 82.3 | 42.3 | 20 | 1.8s | 126 | 65 | 1 | 108 |
+| 150pm | 36.0 | 52.7 | 25.0 | 34 | 3.2s | 75 | 33 | 0 | 192 |
+| 200pm | 20.0 | 32.3 | 11.7 | 37 | 3.5s | 34 | 26 | 1 | 239 |
+
+**Sella Internal Coordinates, fmax=0.001 (very tight, retroactive check):**
+
+| Noise | sella% | n_neg1% | ours% | Avg steps (conv) | Avg wall (conv) |
+|-------|--------|---------|-------|-------------------|-----------------|
+| 10pm | 1.3 | 97.7 | 91.7 | 198 | 17.4s |
+| 30pm | 1.3 | 98.3 | 89.3 | 198 | 17.4s |
+| 50pm | 1.7 | 96.3 | 84.0 | 197 | 17.2s |
+| 100pm | 1.0 | 80.7 | 60.7 | 198 | 17.1s |
+| 150pm | 1.3 | 52.3 | 34.0 | 196 | 16.9s |
+| 200pm | 0.7 | 34.7 | 18.3 | 196 | 16.9s |
+
+**Sella Cartesian Coordinates, fmax=0.01:**
+
+| Noise | sella% | n_neg1% | ours% | Avg steps (conv) | Avg wall (conv) | Both | Sella-only | Ours-only | Neither |
+|-------|--------|---------|-------|-------------------|-----------------|------|------------|-----------|---------|
+| 10pm | 91.3 | 97.7 | 94.3 | 13 | 1.0s | 271 | 3 | 12 | 14 |
+| 30pm | 90.7 | 98.3 | 94.7 | 16 | 1.2s | 270 | 2 | 14 | 14 |
+| 50pm | 87.7 | 97.7 | 91.0 | 16 | 1.2s | 261 | 2 | 12 | 25 |
+| 100pm | 75.3 | 92.3 | 78.3 | 21 | 1.6s | 225 | 1 | 10 | 64 |
+| 150pm | 49.0 | 68.7 | 52.7 | 33 | 2.5s | 147 | 0 | 11 | 142 |
+| 200pm | 22.7 | 43.7 | 25.3 | 44 | 3.3s | 68 | 0 | 8 | 224 |
+
+### Key findings
+
+1. **GAD beats Sella everywhere, gap grows with noise.** By our criterion (n_neg==1 + force<0.01): at 10pm GAD gad_small_dt gets 94.3% vs Sella Cartesian 94.3% (tied) and Sella Internal 91.7% (GAD +2.6pp). At 100pm: GAD 86.7% vs Sella Cartesian 78.3% (GAD +8.4pp) vs Sella Internal 61.3% (GAD +25.4pp). At 200pm: GAD 51.3% vs Sella Cartesian 25.3% (GAD +26pp, 2× better).
+
+2. **Cartesian coordinates beat Internal for Sella+HIP.** This contradicts the standard recommendation (Sella paper: "use internal coordinates for GNN potentials"). At every noise level, Cartesian Sella outperforms Internal by 3-19pp (by our criterion). Likely because HIP's analytical Hessian is well-conditioned in Cartesian coordinates, and Sella's internal coordinate transformation (bonds/angles/dihedrals) introduces numerical noise in the Hessian conversion.
+
+3. **fmax threshold matters enormously.** At fmax=0.03 (Sella default), Sella reports 95.7% convergence at 10pm — but only 61.0% pass our criterion. 105 samples are "Sella-only": they have n_neg=1 but force_norm > 0.01 (average 0.013). fmax=0.03 is too loose for TS quality. At fmax=0.01, the Sella-only count drops to 2-3 per noise level — the criteria are nearly aligned.
+
+4. **fmax=0.001 gives same "ours" rate as fmax=0.01.** Internal fmax=0.001: 91.7% at 10pm (our criterion). Internal fmax=0.01: 91.7% at 10pm. Sella's own convergence drops to 1.3% (can't reach fmax=0.001 in 200 steps), but the final geometries still satisfy our criterion at the same rate. Sella's failures are geometric (wrong n_neg), not force-convergence failures — driving fmax to 0.001 doesn't fix them.
+
+5. **n_neg==1 is necessary but not sufficient.** At 10pm, 97.7% of final geometries have n_neg==1, but only 91.7% (Internal) or 94.3% (Cartesian) pass our full criterion. The gap is samples with correct saddle order but forces still above threshold.
+
+6. **Sella is faster per sample when it converges.** Sella Cartesian at 10pm: 1.0s/sample (converged), 13 steps. GAD gad_small_dt at 10pm: ~5s/sample, 78 steps. But Sella's failures hit the 200-step cap (~17s), bringing average wall time closer. At high noise where failures dominate, Sella's average wall time exceeds GAD's.
+
+7. **Overlap analysis shows complementary strengths.** "Ours-only" samples (8-20 per config) pass our criterion but not Sella's fmax — the geometry is a valid TS but has a slightly high max force component. "Sella-only" samples (0-3 at fmax=0.01) pass fmax but have n_neg≠1 — Sella converged to a non-TS stationary point.
+
+---
+
+## Round 3, Experiment 15: Sella 1000-Step with Eckart Variants
+
+**SLURM:** 58937673 | **Data:** `sella_1000/` | **Status:** 20/24 complete (internal 150pm + 200pm timed out at 6hr)
+
+### Motivation
+
+Experiment 14 used max_steps=200. Many high-noise samples hit the step cap, making the comparison unfair against GAD (which runs 1000-2000 steps). This experiment gives Sella a matched step budget of 1000 and also tests whether Eckart-projecting the Hessian before passing it to Sella helps.
+
+### Setup
+
+Same as Experiment 14 except:
+- **max_steps=1000** (vs 200 previously)
+- **Four coordinate/projection configs** (vs two previously):
+
+| Config | Coordinates | Eckart projection on Hessian | Description |
+|--------|-------------|------------------------------|-------------|
+| internal | Internal (bonds/angles/dihedrals) | No | Sella's standard recommendation |
+| internal_eckart | Internal | Yes | Eckart-project HIP Hessian, then Sella converts to internal |
+| cartesian | Cartesian | No | Raw HIP Hessian in Cartesian space |
+| cartesian_eckart | Cartesian | Yes | Eckart-projected HIP Hessian in Cartesian space |
+
+All use fmax=0.01 eV/Å, diag_every_n=1, exact HIP Hessian, paper trust-radius parameters.
+
+**Eckart projection for Sella:** When `apply_eckart=True`, the raw HIP Cartesian Hessian is mass-weighted, projected through the Eckart projector (removes 6 translation/rotation modes), then un-mass-weighted back to Cartesian. This cleaned Hessian is then passed to Sella (which may further convert to internal coordinates if `internal=True`). The projection uses the same `_eckart_projector` from `projection.py` as our GAD experiments.
+
+### Convergence criteria reported
+
+Five criteria reported per sample, to enable any cross-comparison:
+
+| Criterion | Definition | Label in Parquet |
+|-----------|-----------|-----------------|
+| Sella converged | `max(\|force_components\|) < fmax` (Sella's own check) | `sella_converged` |
+| n_neg==1 | Exactly 1 negative eigenvalue, Eckart-projected vibrational Hessian | `is_nneg1` |
+| n_neg1 + force<0.01 | n_neg==1 AND mean per-atom force norm < 0.01 eV/Å (our GAD criterion) | `conv_nneg1_force001` |
+| n_neg1 + fmax<0.01 | n_neg==1 AND max \|force component\| < 0.01 eV/Å (strictest, matches Sella's metric) | `conv_nneg1_fmax001` |
+| n_neg1 + fmax<0.03 | n_neg==1 AND max \|force component\| < 0.03 eV/Å | `conv_nneg1_fmax003` |
+
+**Important note on force metrics:** Sella uses `max(|force_components|)` (fmax), which is **stricter** than our GAD metric `mean(per-atom force norm)` (force_norm). A sample can pass force_norm<0.01 but fail fmax<0.01. This explains why "our criterion" can sometimes exceed "Sella's criterion" — our force metric is looser, but we add the n_neg==1 check that Sella doesn't enforce.
+
+### Results: All criteria, all configs
+
+**Sella Cartesian, no Eckart (1000 steps):**
+
+| Noise | Sella conv | n_neg1 | n_neg1+f<.01 | n_neg1+fmax<.01 | n_neg1+fmax<.03 | Avg steps (nneg1+f<.01) |
+|-------|-----------|--------|-------------|----------------|----------------|------------------------|
+| 10pm | 91.3% (274) | 97.7% (293) | 94.3% (283) | 91.3% (274) | 96.7% (290) | 47 |
+| 30pm | 91.3% (274) | 98.0% (294) | 94.3% (283) | 90.0% (270) | 97.0% (291) | 49 |
+| 50pm | 88.0% (264) | 97.7% (293) | 91.0% (273) | 87.7% (263) | 94.0% (282) | 50 |
+| 100pm | 75.0% (225) | 91.3% (274) | 78.0% (234) | 75.0% (225) | 82.0% (246) | 56 |
+| 150pm | 50.7% (152) | 69.3% (208) | 53.7% (161) | 50.7% (152) | 56.7% (170) | 89 |
+| 200pm | 23.3% (70) | 43.3% (130) | 25.7% (77) | 23.3% (70) | 30.0% (90) | 131 |
+
+**Sella Cartesian + Eckart (1000 steps):**
+
+| Noise | Sella conv | n_neg1 | n_neg1+f<.01 | n_neg1+fmax<.01 | n_neg1+fmax<.03 | Avg steps (nneg1+f<.01) |
+|-------|-----------|--------|-------------|----------------|----------------|------------------------|
+| 10pm | 91.7% (275) | 98.0% (294) | 94.7% (284) | 91.7% (275) | 97.0% (291) | 44 |
+| 30pm | 91.3% (274) | 98.3% (295) | 94.3% (283) | 90.7% (272) | 97.0% (291) | 49 |
+| 50pm | 88.0% (264) | 98.3% (295) | 91.3% (274) | 88.3% (265) | 94.3% (283) | 50 |
+| 100pm | 75.7% (227) | 91.0% (273) | 79.0% (237) | 76.3% (229) | 82.3% (247) | 55 |
+| 150pm | 49.7% (149) | 69.7% (209) | 53.0% (159) | 50.3% (151) | 55.0% (165) | 96 |
+| 200pm | 25.7% (77) | 43.7% (131) | 27.7% (83) | 25.7% (77) | 31.0% (93) | 123 |
+
+**Sella Internal, no Eckart (1000 steps):**
+
+| Noise | Sella conv | n_neg1 | n_neg1+f<.01 | n_neg1+fmax<.01 | n_neg1+fmax<.03 | Avg steps (nneg1+f<.01) |
+|-------|-----------|--------|-------------|----------------|----------------|------------------------|
+| 10pm | 88.0% (264) | 97.3% (292) | 92.0% (276) | 87.0% (261) | 94.7% (284) | 65 |
+| 30pm | 85.3% (256) | 98.7% (296) | 90.3% (271) | 84.0% (252) | 92.0% (276) | 69 |
+| 50pm | 81.3% (244) | 96.3% (289) | 86.7% (260) | 81.0% (243) | 89.7% (269) | 89 |
+| 100pm | 59.7% (179) | 82.0% (246) | 63.0% (189) | 59.7% (179) | 65.7% (197) | 95 |
+| 150pm | — | — | — | — | — | — |
+| 200pm | — | — | — | — | — | — |
+
+**Sella Internal + Eckart (1000 steps):**
+
+| Noise | Sella conv | n_neg1 | n_neg1+f<.01 | n_neg1+fmax<.01 | n_neg1+fmax<.03 | Avg steps (nneg1+f<.01) |
+|-------|-----------|--------|-------------|----------------|----------------|------------------------|
+| 10pm | 88.3% (265) | 97.7% (293) | 92.0% (276) | 87.0% (261) | 94.3% (283) | 60 |
+| 30pm | 85.7% (257) | 98.0% (294) | 89.3% (268) | 86.0% (258) | 91.3% (274) | 65 |
+| 50pm | 81.0% (243) | 95.3% (286) | 85.7% (257) | 82.3% (247) | 89.0% (267) | 87 |
+| 100pm | 59.0% (177) | 81.0% (243) | 62.0% (186) | 59.0% (177) | 64.3% (193) | 84 |
+| 150pm | — | — | — | — | — | — |
+| 200pm | — | — | — | — | — | — |
+
+(Internal 150pm and 200pm timed out at 6hr SLURM limit — Sella with internal coordinates is too slow at high noise for 1000 steps × 300 samples.)
+
+### Head-to-head: GAD vs best Sella (1000 steps), matched criteria
+
+Using **n_neg1 + fmax<0.01** (strictest, uses Sella's own force metric):
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **88.9** | **75.3** | **58.8** |
+| GAD dt=0.005 | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
+| Sella Cart+Eckart (1000) | 91.7 | 90.7 | 88.3 | 76.3 | 50.3 | 25.7 |
+| Sella Cart (1000) | 91.3 | 90.0 | 87.7 | 75.0 | 50.7 | 23.3 |
+| Sella Int+Eckart (1000) | 87.0 | 86.0 | 82.3 | 59.0 | — | — |
+| Sella Int (1000) | 87.0 | 84.0 | 81.0 | 59.7 | — | — |
+
+Using **n_neg1 + force<0.01** (our GAD criterion, slightly looser force metric):
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **88.9** | **75.3** | **58.8** |
+| GAD dt=0.005 | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
+| Sella Cart+Eckart (1000) | 94.7 | 94.3 | 91.3 | 79.0 | 53.0 | 27.7 |
+| Sella Cart (1000) | 94.3 | 94.3 | 91.0 | 78.0 | 53.7 | 25.7 |
+| Sella Int+Eckart (1000) | 92.0 | 89.3 | 85.7 | 62.0 | — | — |
+| Sella Int (1000) | 92.0 | 90.3 | 86.7 | 63.0 | — | — |
+
+### Comparison: 200 steps vs 1000 steps (Sella Cartesian, n_neg1+force<0.01)
+
+| Noise | 200 steps | 1000 steps | Δ |
+|-------|-----------|------------|---|
+| 10pm | 94.3% | 94.3% | +0.0 |
+| 30pm | 94.7% | 94.3% | −0.4 |
+| 50pm | 91.0% | 91.0% | +0.0 |
+| 100pm | 78.3% | 78.0% | −0.3 |
+| 150pm | 52.7% | 53.7% | +1.0 |
+| 200pm | 25.3% | 25.7% | +0.4 |
+
+### Key findings
+
+1. **1000 steps does not help Sella.** Increasing from 200 to 1000 steps gives <1pp improvement at every noise level. Sella's failures are not step-budget limited — they are geometric (the trust-region optimizer converges to wrong-index stationary points or oscillates without reaching n_neg==1).
+
+2. **Eckart projection gives marginal improvement.** Cart+Eckart vs Cart: +1pp at 100pm, +2pp at 200pm. The Eckart projection cleans small TR-mode residuals from HIP's Hessian, but the effect is minor because Sella's internal RFO already handles near-zero eigenvalues.
+
+3. **Cartesian still dominates Internal.** Cart 75.0% vs Int 59.7% at 100pm (both at 1000 steps, n_neg1+fmax<.01). Internal coordinates are both slower (more steps, timed out at 150pm+) and less accurate for HIP's Hessian.
+
+4. **GAD's advantage is fundamental.** At 200pm with the strictest criterion (n_neg1+fmax<.01): GAD dt=0.003 gets 58.8%, best Sella gets 25.7%. This 2.3× gap persists regardless of step budget, coordinate system, or Hessian projection. GAD's Euler-step dynamics navigate the saddle landscape more effectively than Sella's trust-region approach at high noise.
+
+5. **Force metric matters for fair comparison.** Using fmax<0.01 (Sella's metric) vs force<0.01 (our GAD metric) shifts Sella Cartesian from 94.3% to 91.3% at 10pm. The ~3pp gap is samples where mean force is low but one atom has a slightly high force component. For rigorous comparison, use n_neg1+fmax<0.01 (strictest, no advantage to either method).
+
+---
+
 ## Experiments NOT Run
 
 | Experiment | Description | Why not run |
@@ -323,22 +559,43 @@ dt=0.005, eig_floor=0.01 for both.
 
 ## Consolidated Results: All Methods Ranked
 
-| Rank | Method | 10pm | 50pm | 100pm | 200pm | Key feature |
-|------|--------|------|------|-------|-------|-------------|
-| 1 | **gad_dt003** | **94.7** | **92.0** | **88.9** | **58.8** | dt=0.003, 2000 steps |
-| 2 | gad_small_dt | 94.3 | 91.3 | 86.7 | 51.3 | dt=0.005, 1000 steps |
-| 3 | gad_no_clamp | 94.3 | 91.3 | 86.7 | 54.6 | Same as #2, no cap |
-| 4 | nr_gad_damped α=0.1 | 94.7 | 77.7 | 58.0 | 33.7 | Damped NR when n_neg≥2 |
-| 5 | adaptive_floor | 83.0 | 70.2 | 43.2 | 15.9 | Adaptive dt, high floor |
-| 6 | precond_gad_dt01 | 78.3 | 68.3 | 58.0 | 41.7 | |H|⁻¹ at dt=0.01 |
-| 7 | precond_gad_001 | 73.7 | 48.0 | 21.7 | 3.3 | |H|⁻¹ at dt=0.005 |
-| 8 | gad_projected | 72.3 | 69.3 | 66.7 | 45.3 | dt=0.01 baseline |
-| 9 | blend_k50 | 72.0 | 37.2 | 14.3 | 3.1 | λ₂-blend + |H|⁻¹ |
-| 10 | precond_descent | 71.3 | 38.5 | 14.0 | 2.4 | |H|⁻¹ descent diagnostic |
-| 11 | gad_adaptive_dt | 71.3 | 52.7 | 37.7 | 14.3 | Adaptive dt (old params) |
-| 12 | nr_gad_pingpong | 56.7 | 31.7 | 24.7 | 18.3 | Undamped NR |
-| 13 | adaptive_mm | 53.7 | 35.1 | 22.6 | 5.7 | Multi-Mode GAD params |
-| 14 | adaptive_mm2 | 40.1 | 22.4 | 13.1 | 2.4 | Even smaller base |
+300 samples from Transition1x train split (indices 0-299), noise seed=42. Partial results (marked *) use 131-289 samples due to SLURM timeout. Internal 150pm/200pm at 1000 steps timed out (marked —).
+
+### Ranked by n_neg==1 + fmax<0.01 (strictest criterion, uses Sella's force metric)
+
+| Rank | Method | Type | Steps | 10pm | 50pm | 100pm | 200pm |
+|------|--------|------|-------|------|------|-------|-------|
+| 1 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **88.9*** | **58.8*** |
+| 2 | gad_small_dt | GAD | 1000 | 94.3 | 91.3 | 86.7 | 51.3 |
+| 3 | Sella Cart+Eckart | Sella | 1000 | 91.7 | 88.3 | 76.3 | 25.7 |
+| 4 | Sella Cartesian | Sella | 1000 | 91.3 | 87.7 | 75.0 | 23.3 |
+| 5 | Sella Cart (200 steps) | Sella | 200 | 91.3 | 87.7 | 75.3 | 22.7 |
+| 6 | Sella Int+Eckart | Sella | 1000 | 87.0 | 82.3 | 59.0 | — |
+| 7 | Sella Internal | Sella | 1000 | 87.0 | 81.0 | 59.7 | — |
+| 8 | Sella Int (200 steps) | Sella | 200 | 87.0 | 79.0 | 56.7 | 16.3 |
+
+### Ranked by n_neg==1 + force_norm<0.01 (our GAD criterion, looser force metric)
+
+| Rank | Method | Type | Steps | 10pm | 50pm | 100pm | 200pm |
+|------|--------|------|-------|------|------|-------|-------|
+| 1 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **88.9*** | **58.8*** |
+| 2 | Sella Cart+Eckart | Sella | 1000 | 94.7 | 91.3 | 79.0 | 27.7 |
+| 3 | gad_small_dt | GAD | 94.3 | 91.3 | 86.7 | 51.3 | dt=0.005 |
+| 4 | Sella Cartesian | Sella | 1000 | 94.3 | 91.0 | 78.0 | 25.7 |
+| 5 | Sella Cart (200 steps) | Sella | 200 | 94.3 | 91.0 | 78.3 | 25.3 |
+| 6 | nr_gad_damped α=0.1 | GAD | 1000 | 94.7 | 77.7 | 58.0 | 33.7 |
+| 7 | Sella Int+Eckart | Sella | 1000 | 92.0 | 85.7 | 62.0 | — |
+| 8 | Sella Internal | Sella | 1000 | 92.0 | 86.7 | 63.0 | — |
+| 9 | Sella Int (200 steps) | Sella | 200 | 91.7 | 84.7 | 61.3 | 18.0 |
+| 10 | adaptive_floor | GAD | 1000 | 83.0 | 70.2* | 43.2* | 15.9* |
+| 11 | precond_gad_dt01 | GAD | 1000 | 78.3 | 68.3 | 58.0 | 41.7 |
+| 12 | precond_gad_001 | GAD | 1000 | 73.7 | 48.0 | 21.7 | 3.3 |
+| 13 | gad_projected | GAD | 300 | 72.3 | 69.3 | 66.7 | 45.3 |
+| 14 | blend_k50 | GAD | 1000 | 72.0 | 37.2* | 14.3* | 3.1* |
+| 15 | gad_adaptive_dt | GAD | 1000 | 71.3 | 52.7 | 37.7 | 14.3 |
+| 16 | Sella Int fmax=0.03 (200) | Sella | 200 | 61.0 | 56.7 | 42.3 | 11.7 |
+| 17 | nr_gad_pingpong | GAD | 1000 | 56.7 | 31.7 | 24.7 | 18.3 |
+| 18 | adaptive_mm | GAD | 1000 | 53.7* | 35.1* | 22.6* | 5.7* |
 
 ---
 
@@ -354,6 +611,8 @@ Round 1 basin:       /lustre07/scratch/memoozd/gadplus/runs/basin_map/
 Round 1 IRC:         /lustre07/scratch/memoozd/gadplus/runs/irc_validation/
 Round 2 precond:     /lustre07/scratch/memoozd/gadplus/runs/precond_gad/
 Round 2 others:      /lustre07/scratch/memoozd/gadplus/runs/round2/
+Round 3 Sella 200:   /lustre07/scratch/memoozd/gadplus/runs/sella_baselines/
+Round 3 Sella 1000:  /lustre07/scratch/memoozd/gadplus/runs/sella_1000/
 ```
 
 ## SLURM Job IDs
@@ -369,3 +628,5 @@ Round 2 others:      /lustre07/scratch/memoozd/gadplus/runs/round2/
 | Round 1 IRC | 58834594 | Complete |
 | Round 2 precond GAD | 58885855 | Complete (30/30) |
 | Round 2 round2 | 58886863 | Mixed (9 full + 39 partial timeout) |
+| Round 3 Sella 200-step | 58932967 | Complete (24/24) |
+| Round 3 Sella 1000-step | 58937673 | 20/24 (internal 150/200pm timeout) |

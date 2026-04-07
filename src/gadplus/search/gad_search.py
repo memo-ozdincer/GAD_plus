@@ -184,16 +184,16 @@ def run_gad_search(
             )
             v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
 
-            if cfg.use_preconditioning:
-                # Compute blend weight: w = sigmoid(k * lambda_2) if blending
-                if cfg.blend_sharpness > 0:
-                    blend_w = torch.sigmoid(torch.tensor(
-                        cfg.blend_sharpness * eig1,
-                        dtype=torch.float64,
-                    ))
-                else:
-                    blend_w = 1.0  # standard GAD (full v1 ascent)
+            # Compute blend weight: w = sigmoid(k * lambda_2) if blending
+            if cfg.blend_sharpness > 0:
+                blend_w = torch.sigmoid(torch.tensor(
+                    cfg.blend_sharpness * eig1,
+                    dtype=torch.float64,
+                ))
+            else:
+                blend_w = 1.0  # standard GAD (full v1 ascent)
 
+            if cfg.use_preconditioning:
                 gad_vec, v_proj, _info = preconditioned_gad_dynamics_projected(
                     coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
                     evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
@@ -202,6 +202,7 @@ def run_gad_search(
             else:
                 gad_vec, v_proj, _info = gad_dynamics_projected(
                     coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                    gad_blend_weight=blend_w,
                 )
             v_prev = v_proj.detach().clone().reshape(-1)
         else:

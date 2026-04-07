@@ -74,6 +74,19 @@ METHOD_CONFIGS = {
                       preconditioned=True, eig_floor=0.01, blend_sharpness=50.0),
     "blend_k100": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
                        preconditioned=True, eig_floor=0.01, blend_sharpness=100.0),
+
+    # === Round 3: Blend WITHOUT preconditioning (plain Euler) ===
+    # F_blend = F + 2·sigmoid(k·λ₂)·(F·v₁)v₁, Δx = dt · F_blend
+    # Tests whether smooth λ₂-blend helps on top of the already-good gad_small_dt base.
+    "blend_plain_k50": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                            blend_sharpness=50.0),
+    "blend_plain_k100": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                             blend_sharpness=100.0),
+    "blend_plain_k10": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                            blend_sharpness=10.0),
+
+    # === Round 3: Even smaller fixed dt ===
+    "gad_dt002": dict(runner="gad", dt=0.002, k_track=0, adaptive=False, max_disp=0.35),
 }
 
 
