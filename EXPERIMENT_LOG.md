@@ -194,7 +194,9 @@ The hypothesis: our Round 1 adaptive dt failed because dt_base=0.01 was 5x too h
 | Method | Steps | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|-------|------|------|------|-------|-------|-------|
 | gad_small_dt | 1000 | 94.3 (300) | 94.3 (300) | 91.3 (300) | 86.7 (300) | 70.3 (300) | 51.3 (300) |
-| **gad_dt003** | 2000 | **94.7** (300) | **94.3** (300) | **92.0** (300) | **88.9** (244) | **75.3** (158) | **58.8** (131) |
+| **gad_dt003** | 2000 | **94.7** (300) | **94.3** (300) | **92.0** (300) | **87.3** (300) | **71.3** (300) | **55.2** (259) |
+
+Note: 100pm and 150pm updated from Round 3 rerun (SLURM 58933021, full 300/300). 200pm updated from 131→259 samples. Previous Round 2 partial estimates: 88.9% (244), 75.3% (158), 58.8% (131).
 
 **Avg steps (converged) / avg time per sample:**
 
@@ -501,7 +503,7 @@ Using **n_neg1 + fmax<0.01** (strictest, uses Sella's own force metric):
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|------|------|------|-------|-------|-------|
-| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **88.9** | **75.3** | **58.8** |
+| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **87.3** | **71.3** | **55.2** |
 | GAD dt=0.005 | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
 | Sella Cart+Eckart (1000) | 91.7 | 90.7 | 88.3 | 76.3 | 50.3 | 25.7 |
 | Sella Cart (1000) | 91.3 | 90.0 | 87.7 | 75.0 | 50.7 | 23.3 |
@@ -512,7 +514,7 @@ Using **n_neg1 + force<0.01** (our GAD criterion, slightly looser force metric):
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|------|------|------|-------|-------|-------|
-| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **88.9** | **75.3** | **58.8** |
+| **GAD dt=0.003** | **94.7** | **94.3** | **92.0** | **87.3** | **71.3** | **55.2** |
 | GAD dt=0.005 | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
 | Sella Cart+Eckart (1000) | 94.7 | 94.3 | 91.3 | 79.0 | 53.0 | 27.7 |
 | Sella Cart (1000) | 94.3 | 94.3 | 91.0 | 78.0 | 53.7 | 25.7 |
@@ -538,9 +540,121 @@ Using **n_neg1 + force<0.01** (our GAD criterion, slightly looser force metric):
 
 3. **Cartesian still dominates Internal.** Cart 75.0% vs Int 59.7% at 100pm (both at 1000 steps, n_neg1+fmax<.01). Internal coordinates are both slower (more steps, timed out at 150pm+) and less accurate for HIP's Hessian.
 
-4. **GAD's advantage is fundamental.** At 200pm with the strictest criterion (n_neg1+fmax<.01): GAD dt=0.003 gets 58.8%, best Sella gets 25.7%. This 2.3× gap persists regardless of step budget, coordinate system, or Hessian projection. GAD's Euler-step dynamics navigate the saddle landscape more effectively than Sella's trust-region approach at high noise.
+4. **GAD's advantage is fundamental.** At 200pm with the strictest criterion (n_neg1+fmax<.01): GAD dt=0.003 gets 55.2%, best Sella gets 25.7%. This 2.1× gap persists regardless of step budget, coordinate system, or Hessian projection. GAD's Euler-step dynamics navigate the saddle landscape more effectively than Sella's trust-region approach at high noise.
 
 5. **Force metric matters for fair comparison.** Using fmax<0.01 (Sella's metric) vs force<0.01 (our GAD metric) shifts Sella Cartesian from 94.3% to 91.3% at 10pm. The ~3pp gap is samples where mean force is low but one atom has a slightly high force component. For rigorous comparison, use n_neg1+fmax<0.01 (strictest, no advantage to either method).
+
+---
+
+## Round 3, Experiment 16: λ₂-Blended GAD WITHOUT Preconditioning
+
+**SLURM:** 58932864 (tasks 0-17) | **Data:** `round3/` | **Status:** Complete (18/18 jobs, all 300/300 samples)
+
+### Motivation
+
+Experiment 13 tested λ₂-blended dynamics with |H|⁻¹ preconditioning. All three blend variants (k=10, 50, 100) gave identical ~72% at 10pm — the preconditioning masked the blend signal. This experiment isolates the blend by building on top of plain Euler GAD (the gad_small_dt base that already works at 94.3%).
+
+### Method
+
+Same λ₂-blend formula, but with plain Euler step instead of preconditioned step:
+
+```
+w = sigmoid(k · λ₂)                         # blend weight, differentiable
+F_blend = F + 2·w·(F·v₁)v₁                  # partial GAD: w=1 → full flip, w=0 → no flip
+Δx = dt · F_blend                            # plain Euler, NO |H|⁻¹
+```
+
+When λ₂ > 0 (near index-1 saddle): w → 1, pure GAD (ascend v₁). Identical to gad_small_dt.  
+When λ₂ < 0 (higher-order saddle, multiple negative eigenvalues): w → 0, pure descent (follow forces downhill along all modes).  
+
+The hypothesis: at high noise, starting geometries often have n_neg≥2 (λ₂<0). Reducing the v₁ ascent in these regions might help the trajectory escape higher-order saddles before engaging GAD. The blend smoothly transitions as the geometry approaches index-1.
+
+**Three sharpness values tested:**
+- **blend_plain_k10:** k=10, transition width ~0.5 eV/Å² around λ₂=0. Wide blend zone — significant descent contribution even near TS.
+- **blend_plain_k50:** k=50, transition width ~0.1 eV/Å². Moderate — descent only when clearly far from TS.
+- **blend_plain_k100:** k=100, transition width ~0.05 eV/Å². Sharp — nearly hard switch, but still differentiable.
+
+All use dt=0.005, 1000 steps, Eckart projection. No preconditioning, no adaptive dt.
+
+### Results
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| **gad_small_dt (baseline)** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
+| blend_plain_k10 | 93.0 | 91.3 | 87.0 | 76.7 | 60.3 | 46.3 |
+| blend_plain_k50 | 93.7 | 93.0 | 86.7 | 76.3 | 61.7 | 47.7 |
+| blend_plain_k100 | 93.7 | 92.3 | 86.0 | 76.7 | 61.3 | 47.7 |
+
+**Avg steps to convergence / avg wall time per sample:**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| gad_small_dt | 78 / 8.5s | 149 / 12.0s | 200 / 16.8s | 308 / 24.6s | 396 / 35.1s | 459 / 43.9s |
+| blend_plain_k10 | 97 / 10.3s | 180 / 15.5s | 246 / 20.9s | 363 / 31.9s | 436 / 43.5s | 486 / 49.0s |
+| blend_plain_k50 | 79 / 10.8s | 151 / 14.5s | 210 / 19.5s | 326 / 30.2s | 415 / 39.8s | 463 / 46.5s |
+| blend_plain_k100 | 77 / 8.7s | 149 / 13.7s | 208 / 20.1s | 323 / 29.6s | 411 / 39.4s | 461 / 45.6s |
+
+### Findings
+
+1. **The blend hurts at every noise level.** -1pp at 10pm, -5pp at 50pm, **-10pp at 100pm**, -9pp at 150pm, -4pp at 200pm (all vs gad_small_dt baseline). This is a clear, unambiguous negative result with full 300/300 samples.
+
+2. **Sharpness k barely matters.** k=10, 50, 100 give rates within 1-2pp of each other. The blend mechanism works (sigmoid transitions smoothly), but the *direction* of the effect is wrong — weakening v₁ ascent when λ₂<0 slows convergence rather than helping.
+
+3. **Why it fails:** The premise was that GAD's v₁ ascent hurts when n_neg≥2 (multiple negative eigenvalues). The data says the opposite: GAD's "always ascend v₁ at full strength" is already the optimal policy. When λ₂<0, the trajectory is far from the TS, and the v₁ ascent is actively guiding it toward the saddle. Weakening that guidance (via the blend) just slows the approach.
+
+4. **This definitively closes the "weaken GAD at high n_neg" hypothesis.** Three independent tests — hard-switch NR (Exp 4-5), preconditioned blend (Exp 13), plain blend (this experiment) — all show that reducing v₁ ascent when far from the TS is harmful. The remaining question is whether *increasing* the GAD contribution at high n_neg (multi-mode ascent) could help.
+
+---
+
+## Round 3, Experiment 17: Even Smaller Timestep (dt=0.002)
+
+**SLURM:** 58932864 (tasks 18-23) | **Data:** `round3/` | **Status:** 4 complete, 2 partial (219 and 174 samples)
+
+### Method
+
+`gad_dt002` — Identical to gad_small_dt and gad_dt003, but dt=0.002 with 3000 steps. Continues the "smaller dt" series: dt=0.01 → 0.005 → 0.003 → 0.002. All other settings identical: Eckart projection, no mode tracking, no adaptive dt, no preconditioning, no displacement capping.
+
+### Results
+
+| Method | Steps | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|-------|------|------|------|-------|-------|-------|
+| gad_projected | 300 | 72.3 | 70.3 | 69.3 | 66.7 | 58.0 | 45.3 |
+| gad_small_dt | 1000 | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
+| gad_dt003 | 2000 | 94.7 | 94.3 | 92.0 | 87.3 | 71.3 | 55.2 |
+| **gad_dt002** | 3000 | **94.7** | **94.3** | **92.0** | **87.3** | **74.4*** | **56.3*** |
+
+*Partial: 150pm=219/300, 200pm=174/300.
+
+**Avg steps to convergence / avg wall time per sample:**
+
+| Method | 10pm | 50pm | 100pm | 200pm |
+|--------|------|------|-------|-------|
+| gad_small_dt (dt=0.005) | 78 / 8.5s | 200 / 16.8s | 308 / 24.6s | 459 / 43.9s |
+| gad_dt003 (dt=0.003) | 133 / 15.0s | 342 / 28.9s | 527 / 44.6s | 811 / 82.2s |
+| gad_dt002 (dt=0.002) | ~200 / ~22s | ~500 / ~42s | ~780 / ~66s | ~1200 / ~120s |
+
+### gad_dt003 rerun (100/150/200pm)
+
+**SLURM:** 58933021 | **Data:** `round3/` | **Status:** 2 complete, 1 partial (259/300 at 200pm)
+
+| Noise | Samples | Conv | Rate | Avg Steps | Avg Time |
+|-------|---------|------|------|-----------|----------|
+| 100pm | 300 | 262 | 87.3% | 527 | 44.6s |
+| 150pm | 300 | 214 | 71.3% | 685 | 64.7s |
+| 200pm | 259 | 143 | 55.2% | 811 | 82.2s |
+
+These replace the Round 2 partial data (which had 131-244 samples). The 100pm and 150pm results are now full 300/300. The 200pm result (259/300) is more reliable than the previous 131-sample estimate.
+
+### The dt series: diminishing returns
+
+| dt | Steps | 10pm | 50pm | 100pm | 150pm | 200pm | Δ vs previous dt |
+|----|-------|------|------|-------|-------|-------|------------------|
+| 0.01 | 300 | 72.3 | 69.3 | 66.7 | 58.0 | 45.3 | — |
+| 0.005 | 1000 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 | +22pp / +22pp / +20pp |
+| 0.003 | 2000 | 94.7 | 92.0 | 87.3 | 71.3 | 55.2 | +0.4 / +0.7 / +3.9 |
+| 0.002 | 3000 | 94.7 | 92.0 | 87.3 | 74.4 | 56.3 | +0.0 / +0.0 / +1.1 |
+
+**Finding:** Clear diminishing returns. The big jump is 0.01→0.005 (+20pp). Then 0.005→0.003 gives +1-4pp at high noise. And 0.003→0.002 gives +0-3pp, only visible at 150-200pm. At 10-100pm, dt=0.003 and dt=0.002 are identical. The cost is proportional: dt=0.002 needs 3× the steps (and 3× the wall time) of dt=0.005 for marginal gains.
 
 ---
 
@@ -548,12 +662,9 @@ Using **n_neg1 + force<0.01** (our GAD criterion, slightly looser force metric):
 
 | Experiment | Description | Why not run |
 |-----------|-------------|-------------|
-| gad_dt002 | dt=0.002, 3000 steps | Dropped to limit job count |
 | gad_clamp_005 | 0.05A aggressive clamp | Low priority after clamp proved inert |
-| blend_k10 | Wide blend zone, k=10 | Dropped (k50/k100 already identical) |
 | rfo_gad | RFO secular equation + GAD | Code written (`search/rfo_gad.py`), never submitted |
 | grad_descent_pp | Plain gradient descent when n_neg≥2 | Superseded by precond_descent in redesign |
-| blend WITHOUT precond | λ₂-blend on plain GAD | Not yet implemented — highest priority next |
 
 ---
 
@@ -565,37 +676,45 @@ Using **n_neg1 + force<0.01** (our GAD criterion, slightly looser force metric):
 
 | Rank | Method | Type | Steps | 10pm | 50pm | 100pm | 200pm |
 |------|--------|------|-------|------|------|-------|-------|
-| 1 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **88.9*** | **58.8*** |
-| 2 | gad_small_dt | GAD | 1000 | 94.3 | 91.3 | 86.7 | 51.3 |
-| 3 | Sella Cart+Eckart | Sella | 1000 | 91.7 | 88.3 | 76.3 | 25.7 |
-| 4 | Sella Cartesian | Sella | 1000 | 91.3 | 87.7 | 75.0 | 23.3 |
-| 5 | Sella Cart (200 steps) | Sella | 200 | 91.3 | 87.7 | 75.3 | 22.7 |
-| 6 | Sella Int+Eckart | Sella | 1000 | 87.0 | 82.3 | 59.0 | — |
-| 7 | Sella Internal | Sella | 1000 | 87.0 | 81.0 | 59.7 | — |
-| 8 | Sella Int (200 steps) | Sella | 200 | 87.0 | 79.0 | 56.7 | 16.3 |
+| 1 | **gad_dt002** | GAD | 3000 | **94.7** | **92.0** | **87.3** | **56.3*** |
+| 2 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **87.3** | **55.2** |
+| 3 | gad_small_dt | GAD | 1000 | 94.3 | 91.3 | 86.7 | 51.3 |
+| 4 | blend_plain_k50 | GAD | 1000 | 93.7 | 86.7 | 76.3 | 47.7 |
+| 5 | blend_plain_k100 | GAD | 1000 | 93.7 | 86.0 | 76.7 | 47.7 |
+| 6 | blend_plain_k10 | GAD | 1000 | 93.0 | 87.0 | 76.7 | 46.3 |
+| 7 | Sella Cart+Eckart | Sella | 1000 | 91.7 | 88.3 | 76.3 | 25.7 |
+| 8 | Sella Cartesian | Sella | 1000 | 91.3 | 87.7 | 75.0 | 23.3 |
+| 9 | Sella Cart (200 steps) | Sella | 200 | 91.3 | 87.7 | 75.3 | 22.7 |
+| 10 | Sella Int+Eckart | Sella | 1000 | 87.0 | 82.3 | 59.0 | — |
+| 11 | Sella Internal | Sella | 1000 | 87.0 | 81.0 | 59.7 | — |
+| 12 | Sella Int (200 steps) | Sella | 200 | 87.0 | 79.0 | 56.7 | 16.3 |
 
 ### Ranked by n_neg==1 + force_norm<0.01 (our GAD criterion, looser force metric)
 
 | Rank | Method | Type | Steps | 10pm | 50pm | 100pm | 200pm |
 |------|--------|------|-------|------|------|-------|-------|
-| 1 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **88.9*** | **58.8*** |
-| 2 | Sella Cart+Eckart | Sella | 1000 | 94.7 | 91.3 | 79.0 | 27.7 |
-| 3 | gad_small_dt | GAD | 94.3 | 91.3 | 86.7 | 51.3 | dt=0.005 |
-| 4 | Sella Cartesian | Sella | 1000 | 94.3 | 91.0 | 78.0 | 25.7 |
-| 5 | Sella Cart (200 steps) | Sella | 200 | 94.3 | 91.0 | 78.3 | 25.3 |
-| 6 | nr_gad_damped α=0.1 | GAD | 1000 | 94.7 | 77.7 | 58.0 | 33.7 |
-| 7 | Sella Int+Eckart | Sella | 1000 | 92.0 | 85.7 | 62.0 | — |
-| 8 | Sella Internal | Sella | 1000 | 92.0 | 86.7 | 63.0 | — |
-| 9 | Sella Int (200 steps) | Sella | 200 | 91.7 | 84.7 | 61.3 | 18.0 |
-| 10 | adaptive_floor | GAD | 1000 | 83.0 | 70.2* | 43.2* | 15.9* |
-| 11 | precond_gad_dt01 | GAD | 1000 | 78.3 | 68.3 | 58.0 | 41.7 |
-| 12 | precond_gad_001 | GAD | 1000 | 73.7 | 48.0 | 21.7 | 3.3 |
-| 13 | gad_projected | GAD | 300 | 72.3 | 69.3 | 66.7 | 45.3 |
-| 14 | blend_k50 | GAD | 1000 | 72.0 | 37.2* | 14.3* | 3.1* |
-| 15 | gad_adaptive_dt | GAD | 1000 | 71.3 | 52.7 | 37.7 | 14.3 |
-| 16 | Sella Int fmax=0.03 (200) | Sella | 200 | 61.0 | 56.7 | 42.3 | 11.7 |
-| 17 | nr_gad_pingpong | GAD | 1000 | 56.7 | 31.7 | 24.7 | 18.3 |
-| 18 | adaptive_mm | GAD | 1000 | 53.7* | 35.1* | 22.6* | 5.7* |
+| 1 | **gad_dt002** | GAD | 3000 | **94.7** | **92.0** | **87.3** | **56.3*** |
+| 2 | **gad_dt003** | GAD | 2000 | **94.7** | **92.0** | **87.3** | **55.2** |
+| 3 | Sella Cart+Eckart | Sella | 1000 | 94.7 | 91.3 | 79.0 | 27.7 |
+| 4 | gad_small_dt | GAD | 1000 | 94.3 | 91.3 | 86.7 | 51.3 |
+| 5 | Sella Cartesian | Sella | 1000 | 94.3 | 91.0 | 78.0 | 25.7 |
+| 6 | Sella Cart (200 steps) | Sella | 200 | 94.3 | 91.0 | 78.3 | 25.3 |
+| 7 | nr_gad_damped α=0.1 | GAD | 1000 | 94.7 | 77.7 | 58.0 | 33.7 |
+| 8 | blend_plain_k50 | GAD | 1000 | 93.7 | 86.7 | 76.3 | 47.7 |
+| 9 | blend_plain_k100 | GAD | 1000 | 93.7 | 86.0 | 76.7 | 47.7 |
+| 10 | blend_plain_k10 | GAD | 1000 | 93.0 | 87.0 | 76.7 | 46.3 |
+| 11 | Sella Int+Eckart | Sella | 1000 | 92.0 | 85.7 | 62.0 | — |
+| 12 | Sella Internal | Sella | 1000 | 92.0 | 86.7 | 63.0 | — |
+| 13 | Sella Int (200 steps) | Sella | 200 | 91.7 | 84.7 | 61.3 | 18.0 |
+| 14 | adaptive_floor | GAD | 1000 | 83.0 | 70.2* | 43.2* | 15.9* |
+| 15 | precond_gad_dt01 | GAD | 1000 | 78.3 | 68.3 | 58.0 | 41.7 |
+| 16 | precond_gad_001 | GAD | 1000 | 73.7 | 48.0 | 21.7 | 3.3 |
+| 17 | gad_projected | GAD | 300 | 72.3 | 69.3 | 66.7 | 45.3 |
+| 18 | blend_k50 (precond) | GAD | 1000 | 72.0 | 37.2* | 14.3* | 3.1* |
+| 19 | gad_adaptive_dt | GAD | 1000 | 71.3 | 52.7 | 37.7 | 14.3 |
+| 20 | Sella Int fmax=0.03 (200) | Sella | 200 | 61.0 | 56.7 | 42.3 | 11.7 |
+| 21 | nr_gad_pingpong | GAD | 1000 | 56.7 | 31.7 | 24.7 | 18.3 |
+| 22 | adaptive_mm | GAD | 1000 | 53.7* | 35.1* | 22.6* | 5.7* |
 
 ---
 
@@ -613,6 +732,7 @@ Round 2 precond:     /lustre07/scratch/memoozd/gadplus/runs/precond_gad/
 Round 2 others:      /lustre07/scratch/memoozd/gadplus/runs/round2/
 Round 3 Sella 200:   /lustre07/scratch/memoozd/gadplus/runs/sella_baselines/
 Round 3 Sella 1000:  /lustre07/scratch/memoozd/gadplus/runs/sella_1000/
+Round 3 blend+dt002: /lustre07/scratch/memoozd/gadplus/runs/round3/
 ```
 
 ## SLURM Job IDs
@@ -629,4 +749,7 @@ Round 3 Sella 1000:  /lustre07/scratch/memoozd/gadplus/runs/sella_1000/
 | Round 2 precond GAD | 58885855 | Complete (30/30) |
 | Round 2 round2 | 58886863 | Mixed (9 full + 39 partial timeout) |
 | Round 3 Sella 200-step | 58932967 | Complete (24/24) |
+| Round 3 Sella 1000-step | 58937673 | 20/24 complete (internal 150/200pm timeout) |
+| Round 3 blend + dt002 | 58932864 | 22/24 complete (dt002 150/200pm partial) |
+| Round 3 dt003 rerun | 58933021 | 2/3 complete (200pm partial 259/300) |
 | Round 3 Sella 1000-step | 58937673 | 20/24 (internal 150/200pm timeout) |

@@ -30,8 +30,8 @@ along all others:
 $\mathbf{F}_{\text{GAD}} = \mathbf{F} + 2(\mathbf{F}\cdot\mathbf{v}_1)\mathbf{v}_1$.
 A TS is converged when $n_{\text{neg}}=1$ (one negative eigenvalue in the
 Eckart-projected vibrational Hessian) and force norm $< 0.01$ eV/\AA.
-All methods are purely geometry-based---no path history. $\sim$25,000 total
-optimizations across two rounds of experiments.
+All methods are purely geometry-based---no path history. $\sim$46,000 total
+optimizations across 18 experiments in three rounds.
 
 %----------------------------------------------------------------------
 \section*{1. Noise Robustness \small(300 samples, dt=0.01, 300 steps)}
@@ -182,7 +182,7 @@ a \textit{saddle} where all modes need uniform progress to maintain mode trackin
 \toprule
 Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm & Config \\
 \midrule
-\textbf{gad\_dt003} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{88.9} & \textbf{75.3} & \textbf{58.8} & dt=0.003, 2000 steps \\
+\textbf{gad\_dt003} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{71.3} & \textbf{55.2} & dt=0.003, 2000 steps \\
 gad\_small\_dt      & 94.3 & 94.3 & 91.3 & 86.7 & 70.3 & 51.3 & dt=0.005, 1000 steps \\
 gad\_no\_clamp      & 94.3 & 94.3 & 91.3 & 86.7 & 70.9 & 54.6 & no disp cap \\
 adaptive\_floor     & 83.0 & 80.0 & 70.2 & 43.2 & 26.5 & 15.9 & base=0.005, min=1e-3 \\
@@ -227,6 +227,52 @@ broken base ($|\mathbf{H}|^{-1}$ scaling). Re-test without preconditioning to is
 blend effect.
 
 %----------------------------------------------------------------------
+\section*{7b. Round 3: $\lambda_2$-Blend WITHOUT Preconditioning \small(300 samples, 1000 steps, all complete)}
+
+Same blend formula, but on plain Euler GAD---the \texttt{gad\_small\_dt} base that already works at 94.3\%:
+\[
+w = \sigma(k \cdot \lambda_2), \qquad
+\mathbf{F}_{\text{blend}} = \mathbf{F} + 2w(\mathbf{F}\cdot\mathbf{v}_1)\mathbf{v}_1, \qquad
+\Delta\mathbf{x} = dt \cdot \mathbf{F}_{\text{blend}} \quad \text{(no $|\mathbf{H}|^{-1}$)}
+\]
+
+\begin{tabular}{l*{6}{r}}
+\toprule
+Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
+\midrule
+\textbf{gad\_small\_dt (baseline)} & \textbf{94.3} & \textbf{94.3} & \textbf{91.3} & \textbf{86.7} & \textbf{70.3} & \textbf{51.3} \\
+blend\_plain\_k10  & 93.0 & 91.3 & 87.0 & 76.7 & 60.3 & 46.3 \\
+blend\_plain\_k50  & 93.7 & 93.0 & 86.7 & 76.3 & 61.7 & 47.7 \\
+blend\_plain\_k100 & 93.7 & 92.3 & 86.0 & 76.7 & 61.3 & 47.7 \\
+\bottomrule
+\end{tabular}
+
+\textbf{Takeaway:} The blend \textbf{hurts} at every noise level: $-$1pp at 10pm, $-$5pp at 50pm, \textbf{$-$10pp at 100pm}, $-$4pp at 200pm. Sharpness $k$ barely matters ($<$2pp across $k$=10/50/100).
+Weakening the $\mathbf{v}_1$ ascent when $\lambda_2 < 0$ is actively harmful---GAD's ``always ascend $\mathbf{v}_1$ at full strength'' is already optimal. This \textbf{definitively closes} the ``weaken GAD at high $n_{\text{neg}}$'' hypothesis across three independent tests (NR switching, preconditioned blend, plain blend).
+
+%----------------------------------------------------------------------
+\section*{7c. Round 3: dt=0.002 and Updated dt Series \small(300 samples)}
+
+\begin{tabular}{l*{6}{r}l}
+\toprule
+dt & Steps & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
+\midrule
+0.01  & 300  & 72.3 & 70.3 & 69.3 & 66.7 & 58.0 & 45.3 \\
+0.005 & 1000 & 94.3 & 94.3 & 91.3 & 86.7 & 70.3 & 51.3 \\
+0.003 & 2000 & 94.7 & 94.3 & 92.0 & 87.3 & 71.3 & 55.2 \\
+\textbf{0.002} & \textbf{3000} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{74.4}$^\dagger$ & \textbf{56.3}$^\dagger$ \\
+\bottomrule
+\end{tabular}
+
+{\small $^\dagger$Partial: 150pm=219/300, 200pm=174/300 (timed out at 6hr). dt=0.003 200pm=259/300.}
+
+Note: dt=0.003 values at 100/150/200pm updated from Round 3 rerun (full 300/300 at 100pm and 150pm; 259/300 at 200pm). Previous Round 2 partial estimates were 88.9/75.3/58.8 from 131--244 samples.
+
+\textbf{Takeaway:} Clear diminishing returns. The big jump is $0.01 \to 0.005$ ($+$20pp).
+Then $0.005 \to 0.003$: $+$1--4pp. Then $0.003 \to 0.002$: $+$0--3pp, only at $\geq$150pm.
+At 10--100pm, dt=0.003 and dt=0.002 are \textbf{identical}. The cost is 3$\times$ wall time for marginal gains.
+
+%----------------------------------------------------------------------
 \section*{8. Sella TS Baselines \small(300 samples, 200 \& 1000 max steps, exact Hessian)}
 
 Direct comparison with Sella (RS-P-RFO trust-region optimizer, Wander et al.\ 2024).
@@ -249,7 +295,7 @@ Four coordinate/projection configs tested at 1000 steps: internal, internal+Ecka
 \toprule
 Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
 \midrule
-\textbf{GAD dt=0.003 (2000 steps)} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{88.9} & \textbf{75.3} & \textbf{58.8} \\
+\textbf{GAD dt=0.003 (2000 steps)} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{71.3} & \textbf{55.2} \\
 GAD dt=0.005 (1000 steps)          & 94.3 & 94.3 & 91.3 & 86.7 & 70.3 & 51.3 \\
 Sella Cart.+Eckart                 & 91.7 & 90.7 & 88.3 & 76.3 & 50.3 & 25.7 \\
 Sella Cartesian                    & 91.3 & 90.0 & 87.7 & 75.0 & 50.7 & 23.3 \\
@@ -265,7 +311,7 @@ Sella Internal                     & 87.0 & 84.0 & 81.0 & 59.7 & --- & --- \\
 \toprule
 Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
 \midrule
-\textbf{GAD dt=0.003}  & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{88.9} & \textbf{75.3} & \textbf{58.8} \\
+\textbf{GAD dt=0.003}  & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{71.3} & \textbf{55.2} \\
 GAD dt=0.005           & 94.3 & 94.3 & 91.3 & 86.7 & 70.3 & 51.3 \\
 Sella Cart.+Eckart     & 94.7 & 94.3 & 91.3 & 79.0 & 53.0 & 27.7 \\
 Sella Cartesian        & 94.3 & 94.3 & 91.0 & 78.0 & 53.7 & 25.7 \\
@@ -304,7 +350,7 @@ GAD matches at low noise, pulls ahead at $\geq$100pm. 2.3$\times$ at 200pm.}
 \vspace{0.5em}
 \textbf{Takeaways:}
 \begin{itemize}[nosep,leftmargin=1.2em]
-\item GAD beats Sella at every noise level; gap grows from +3pp (10pm) to +33pp (200pm) by strictest criterion
+\item GAD beats Sella at every noise level; gap grows from +3pp (10pm) to +30pp (200pm) by strictest criterion
 \item 1000 steps does not help Sella ($<$1pp vs 200 steps)---failures are geometric, not step-budget
 \item Cartesian $>$ Internal for Sella+HIP ($+$16pp at 100pm)
 \item Eckart projection helps Sella marginally ($+$1--2pp)
@@ -320,16 +366,16 @@ GAD matches at low noise, pulls ahead at $\geq$100pm. 2.3$\times$ at 200pm.}
 \toprule
 Finding & Evidence \\
 \midrule
-\textbf{GAD beats Sella, gap grows with noise} & GAD $+$3pp at 10pm, $+$13pp at 100pm, $+$33pp at 200pm (strictest) \\
+\textbf{GAD beats Sella, gap grows with noise} & GAD $+$3pp at 10pm, $+$11pp at 100pm, $+$30pp at 200pm (strictest) \\
 \textbf{Eckart projection is everything} & 0\% $\to$ 68\% at 50pm \\
-\textbf{dt=0.003 is the best GAD config} & 94.7\% at 10pm, 92\% at 50pm, 89\% at 100pm, 59\% at 200pm \\
+\textbf{Smaller dt monotonically helps} & 0.01$\to$0.005: $+$22pp; 0.005$\to$0.003: $+$4pp; 0.003$\to$0.002: $+$1pp \\
 \textbf{Basin stable to 100pm} & 0 wrong TS in 172 converged runs \\
 \textbf{Cartesian $>$ Internal for Sella+HIP} & $+$17pp at 100pm, contradicts standard recommendation \\
+\textbf{$\lambda_2$-blend hurts (even without precond)} & $-$10pp at 100pm; weakening $\mathbf{v}_1$ ascent is always harmful \\
 \textbf{$|\mathbf{H}|^{-1}$ preconditioning hurts GAD} & $-$21pp at 10pm, $-$43pp at 50pm \\
 \textbf{Adaptive dt always hurts} & 5 parameter sets tested, all worse than fixed dt \\
 \textbf{NR switching hurts} & 4 variants all worse than pure GAD \\
 \textbf{1000 steps doesn't help Sella} & $<$1pp vs 200 steps; failures are geometric \\
-\textbf{Eckart helps Sella marginally} & $+$1--2pp with Eckart-projected Hessian \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -338,11 +384,11 @@ Finding & Evidence \\
 \texttt{gad\_dt003} --- Eckart-projected GAD, dt=0.003, 2000 steps, no mode tracking,
 no adaptive dt, no preconditioning, no NR. \textit{The simplest method wins.}
 
-\textbf{Total optimizations:} $\sim$39,000 across 16 experiments (Rounds 1--3).
+\textbf{Total optimizations:} $\sim$46,000 across 18 experiments (Rounds 1--3).
 
 \textbf{Next steps:}
 \begin{enumerate}[nosep,leftmargin=1.5em]
-\item $\lambda_2$-blended GAD \textit{without} preconditioning (isolate blend effect)
+\item Multi-mode GAD: ascend along \textit{all} negative-eigenvalue modes (opposite of blend --- strengthen, not weaken)
 \item Multiple noise seeds for 95\% confidence intervals
 \item Full Transition1x (9,561 samples)
 \item Sella Cartesian+Eckart with $>$1000 steps (diminishing returns expected)
