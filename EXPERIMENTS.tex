@@ -30,8 +30,8 @@ along all others:
 $\mathbf{F}_{\text{GAD}} = \mathbf{F} + 2(\mathbf{F}\cdot\mathbf{v}_1)\mathbf{v}_1$.
 A TS is converged when $n_{\text{neg}}=1$ (one negative eigenvalue in the
 Eckart-projected vibrational Hessian) and force norm $< 0.01$ eV/\AA.
-All methods are purely geometry-based---no path history. $\sim$15,000 total
-optimizations across 10 experiments.
+All methods are purely geometry-based---no path history. $\sim$25,000 total
+optimizations across two rounds of experiments.
 
 %----------------------------------------------------------------------
 \section*{1. Noise Robustness \small(300 samples, dt=0.01, 300 steps)}
@@ -97,27 +97,6 @@ Equilibrium geometries are near-useless.
 \end{minipage}
 
 %----------------------------------------------------------------------
-\section*{2b. Geodesic Midpoint \small(204/300 samples$^\dagger$, dt=0.005, 1000 steps)}
-
-Geodesic interpolation in internal coordinates vs linear midpoint.
-
-\begin{tabular}{lrrrr}
-\toprule
-Start & Samples & Conv & Rate & Avg Steps \\
-\midrule
-Linear midpoint (dt=0.01, 300 steps) & 300 & 87 & 29.0\% & 191 \\
-\textbf{Geodesic midpoint} (dt=0.005, 1000 steps) & 204$^\dagger$ & 94 & \textbf{46.1\%} & 459 \\
-\bottomrule
-\end{tabular}
-
-{\small $^\dagger$Job timed out at sample 204/300. Salvaged from trajectory Parquet files.}
-
-\textbf{Takeaway:} Geodesic midpoint reaches 46\% (vs 29\% linear). Part of the gain
-is from better config (dt=0.005, 1000 steps vs dt=0.01, 300 steps), but geodesic
-interpolation places the starting geometry closer to the reaction path.
-Needs rerun with matched configs to isolate the geodesic effect.
-
-%----------------------------------------------------------------------
 \section*{3. Basin of Attraction \small(50 samples, dt=0.01, 300 steps)}
 
 At what noise level does GAD start finding a \textit{different} TS?
@@ -149,9 +128,7 @@ converged runs. GAD is either right or fails. No silent errors.
 \end{minipage}
 
 %----------------------------------------------------------------------
-\section*{4. 7-Method Comparison \small(300 samples, 1000 steps, 12,600 runs)}
-
-Which GAD variant works best? 42 parallel MIG jobs.
+\section*{4. Round 1: 7-Method Comparison \small(300 samples, 1000 steps)}
 
 \begin{center}
 \includegraphics[width=0.85\textwidth]{figures/fig4_method_heatmap.png}
@@ -172,106 +149,82 @@ nr\_gad\_pp\_adaptive     & 53.3 & 25.0 & 13.7 &  5.3 &  5.0 &  2.0 \\
 \bottomrule
 \end{tabular}
 
-\textbf{Takeaways:}
-\begin{itemize}[nosep,leftmargin=1.5em]
-\item \textbf{dt=0.005 beats dt=0.01} by 20+pp at all noise levels. Smaller steps avoid
-      overshooting the narrow saddle region where $n_{\text{neg}}$ transitions 2$\to$1.
-\item \textbf{Adaptive dt hurts.} Eigenvalue-clamped strategy makes steps too small near
-      saddle points where large $|\lambda_1|$ triggers excessive shrinking.
-\item \textbf{NR-GAD ping-pong hurts.} Newton descent when $n_{\text{neg}}\geq 2$ overshoots
-      even with damping. Pure GAD already handles the $n_{\text{neg}}\geq 2 \to 1$ transition.
-\item \textbf{Tight clamping does nothing.} Default 0.35\AA\ cap never triggers.
-\end{itemize}
-
 %----------------------------------------------------------------------
-\section*{5. Damped NR-GAD \small(300 samples, 1000 steps)}
+\section*{5. Round 2: Preconditioned GAD \small(300 samples, 1000 steps)}
 
-Can step damping ($\alpha \cdot \Delta\mathbf{x}$, norm cap) fix NR-GAD?
+\textbf{Idea:} $\Delta\mathbf{x} = dt \cdot |\mathbf{H}|^{-1} \mathbf{F}_{\text{GAD}}$. Scale each vibrational mode by $1/\max(|\lambda_i|, \text{floor})$---Newton-like step sizing. 30 MIG jobs, all 300/300 complete.
 
 \begin{tabular}{l*{6}{r}}
 \toprule
 Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
 \midrule
-\textbf{gad\_small\_dt} & \textbf{94.3} & \textbf{94.3} & \textbf{91.3} & \textbf{86.7} & \textbf{70.3} & \textbf{51.3} \\
-damped $\alpha$=0.1 & 94.7 & 88.0 & 77.7 & 58.0 & 46.0 & 33.7 \\
-damped $\alpha$=0.2 & 93.0 & 88.0 & 78.3 & 60.3 & 47.3 & 36.3 \\
-damped $\alpha$=0.3 & 88.7 & 82.3 & 75.0 & 58.7 & 46.3 & 37.0 \\
+\textbf{gad\_small\_dt (baseline)} & \textbf{94.3} & \textbf{94.3} & \textbf{91.3} & \textbf{86.7} & \textbf{70.3} & \textbf{51.3} \\
+precond\_gad\_001 (dt=0.005) & 73.7 & 61.0 & 48.0 & 21.7 & 7.3 & 3.3 \\
+precond\_gad\_005            & 73.7 & 61.3 & 48.3 & 21.7 & 7.3 & 4.0 \\
+precond\_gad\_01             & 72.7 & 62.7 & 47.0 & 21.0 & 7.3 & 4.3 \\
+precond\_gad\_dt01 (dt=0.01) & 78.3 & 72.7 & 68.3 & 58.0 & 49.7 & 41.7 \\
 \bottomrule
 \end{tabular}
 
-\textbf{Takeaway:} Damping helps at 10pm ($\alpha$=0.1 matches baseline) but hurts
-everywhere else. Pure GAD is strictly better. The NR step is redundant---GAD's own
-dynamics already navigate $n_{\text{neg}}\geq 2 \to 1$ correctly.
+\textbf{Takeaway:} Preconditioning \textbf{hurts} GAD badly. At dt=0.005, $-21$pp at 10pm, $-43$pp at 50pm.
+$|\mathbf{H}|^{-1}$ creates 100:1 step-size ratios between flat and steep modes,
+starving the steep modes (often including the TS mode $\lambda_1$) of progress.
+The eig\_floor (0.01--0.1) has no effect. Doubling dt to 0.01 partially recovers
+but still underperforms plain GAD everywhere.
+
+\textbf{Why:} Newton-like scaling helps descent toward \textit{minima}, but GAD navigates
+a \textit{saddle} where all modes need uniform progress to maintain mode tracking.
 
 %----------------------------------------------------------------------
-\section*{6. Step Budget Ceiling \small(300 samples, dt=0.005)}
+\section*{6. Round 2: Smaller Timestep \& Adaptive dt \small(300 samples)}
 
-Does more compute push convergence higher?
-
-\begin{tabular}{r*{3}{r}}
+\begin{tabular}{l*{6}{r}l}
 \toprule
-Noise & 1000 steps & 2000 steps & 3000 steps \\
+Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm & Config \\
 \midrule
-10pm & 94.3\% & --- & 95.7\% (+1.4) \\
-50pm & 91.3\% & --- & 93.0\% (+1.7) \\
-100pm & 86.7\% & --- & 88.7\% (+2.0) \\
-150pm & 70.3\% & 74.0\% (+3.7) & timed out \\
-200pm & 51.3\% & 58.2\%$^\dagger$ (+6.9) & 60.7\%$^\dagger$ (+9.4) \\
+\textbf{gad\_dt003} & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{88.9} & \textbf{75.3} & \textbf{58.8} & dt=0.003, 2000 steps \\
+gad\_small\_dt      & 94.3 & 94.3 & 91.3 & 86.7 & 70.3 & 51.3 & dt=0.005, 1000 steps \\
+gad\_no\_clamp      & 94.3 & 94.3 & 91.3 & 86.7 & 70.9 & 54.6 & no disp cap \\
+adaptive\_floor     & 83.0 & 80.0 & 70.2 & 43.2 & 26.5 & 15.9 & base=0.005, min=1e-3 \\
+adaptive\_mm        & 53.7 & 40.2 & 35.1 & 22.6 & 12.4 & 5.7 & base=0.002 (MM-GAD) \\
+adaptive\_mm2       & 40.1 & 29.6 & 22.4 & 13.1 & 6.3 & 2.4 & base=0.001 \\
 \bottomrule
 \end{tabular}
 
-{\small $^\dagger$Salvaged from timed-out jobs (275/300 and 224/300 samples completed).}
-
-\textbf{Takeaway:} Ceiling is $\sim$96\% at low noise (diminishing returns). At high noise
-(200pm), more steps help substantially: +9.4pp from 1000$\to$3000 steps.
-
-%----------------------------------------------------------------------
-\section*{7. Trajectory Analysis}
-
-\begin{center}
-\includegraphics[width=\textwidth]{figures/fig5_trajectories.png}
-\captionof{figure}{Representative trajectories: fast convergence (top), slow convergence
-(middle), failure (bottom). Columns: energy, force norm, $n_{\text{neg}}$, eigenvalues.}
-\end{center}
-
-\begin{minipage}[t]{0.48\textwidth}
-\centering
-\includegraphics[width=\textwidth]{figures/fig8_avg_force_trajectory.png}
-\captionof{figure}{Average force: converged (green) drops exponentially, failed (red) plateaus.}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.48\textwidth}
-\centering
-\includegraphics[width=\textwidth]{figures/fig9_dist_to_ts.png}
-\captionof{figure}{RMSD to known TS decreases monotonically. Higher noise starts farther.}
-\end{minipage}
+\textbf{Takeaways:}
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \textbf{dt=0.003 is the new best}: +2.2pp at 100pm, +5pp at 150pm, \textbf{+7.5pp at 200pm} vs dt=0.005.
+      Smaller dt continues to help, especially at high noise.
+\item \textbf{Displacement capping is inert}: gad\_no\_clamp $=$ gad\_small\_dt within noise.
+\item \textbf{All adaptive dt variants fail.} Even corrected Multi-Mode GAD parameters (base=0.002): 54\% at 10pm.
+      Eigenvalue-clamped adaptive dt is fundamentally incompatible with GAD dynamics.
+\end{itemize}
 
 %----------------------------------------------------------------------
-\section*{8. IRC Validation \small(30 samples $\times$ 3 noise levels, threshold 0.5\AA)}
+\section*{7. Round 2: $\lambda_2$-Blended Preconditioned GAD \small(300 samples, 1000 steps)}
 
-When GAD converges, is it the \textit{intended} TS?
+\textbf{Idea:} Smooth, differentiable alternative to hard n\_neg switching. Blend weight
+$w = \sigma(k \cdot \lambda_2)$ controls whether to ascend $\mathbf{v}_1$:
+\[
+\mathbf{F}_{\text{blend}} = \mathbf{F} + 2w(\mathbf{F}\cdot\mathbf{v}_1)\mathbf{v}_1, \qquad
+\Delta\mathbf{x} = dt \cdot |\mathbf{H}|^{-1} \mathbf{F}_{\text{blend}}
+\]
 
-\begin{minipage}[t]{0.45\textwidth}
-\centering
-\includegraphics[width=\textwidth]{figures/fig7_irc_rmsd.png}
-\captionof{figure}{IRC endpoint RMSD. Green region = intended.}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.50\textwidth}
-\vspace{1em}
-\begin{tabular}{rrrr}
+\begin{tabular}{l*{6}{r}l}
 \toprule
-Noise & Intended & Half & Unintended \\
+Method & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm & Config \\
 \midrule
-10pm & 17/30 (57\%) & 3 (10\%) & 10 (33\%) \\
-50pm & 20/30 (67\%) & 3 (10\%) & 7 (23\%) \\
-100pm & 19/30 (63\%) & 4 (13\%) & 7 (23\%) \\
+precond\_descent    & 71.3 & 50.0 & 38.5 & 14.0 & 6.0 & 2.4 & hard switch, $w=0$ when $n_{\text{neg}}\geq 2$ \\
+blend\_k50          & 72.0 & 50.0 & 37.2 & 14.3 & 6.2 & 3.1 & $\sigma(50\lambda_2)$ \\
+blend\_k100         & 71.7 & 50.5 & 37.6 & 13.6 & 4.7 & 3.1 & $\sigma(100\lambda_2)$ \\
 \bottomrule
 \end{tabular}
-\vspace{1em}
 
-\textbf{Takeaway:} 57--67\% intended. Noise \textit{increases} intended rate
-(57\%$\to$67\% from 10$\to$50pm)---may act as regularizer helping escape
-non-target saddle points.
-\end{minipage}
+\textbf{Takeaway:} All three are identical ($\sim$72\% at 10pm, $\sim$14\% at 100pm). The blend
+weight $k$ doesn't matter---\textbf{the preconditioning dominates the failure mode.}
+The $\sigma(k\lambda_2)$ mechanism is differentiable and correct, but it was tested on a
+broken base ($|\mathbf{H}|^{-1}$ scaling). Re-test without preconditioning to isolate the
+blend effect.
 
 %----------------------------------------------------------------------
 \section*{Summary}
@@ -282,20 +235,27 @@ non-target saddle points.
 Finding & Evidence \\
 \midrule
 \textbf{Eckart projection is everything} & 0\% $\to$ 68\% at 50pm \\
-\textbf{dt=0.005 is optimal} & 94\% at 10pm, 91\% at 50pm, 87\% at 100pm \\
+\textbf{dt=0.003 is the new best} & 94.7\% at 10pm, 92\% at 50pm, 89\% at 100pm, 59\% at 200pm \\
 \textbf{Basin stable to 100pm} & 0 wrong TS in 172 converged runs \\
-\textbf{Ceiling $\sim$96\%} & 3000 steps gains only 1--2pp \\
-\textbf{IRC 57--67\% intended} & Noise helps (regularization) \\
-\textbf{Adaptive dt hurts} & $-$20--30pp vs baseline \\
-\textbf{NR-GAD hurts (even damped)} & Pure GAD is strictly better \\
-\textbf{Tight clamping: no effect} & 0.1\AA\ vs 0.35\AA\ cap, $<$1pp \\
-\textbf{Midpoint start viable} & 29\% linear, 46\% geodesic \\
+\textbf{$|\mathbf{H}|^{-1}$ preconditioning hurts GAD} & $-$21pp at 10pm, $-$43pp at 50pm \\
+\textbf{Adaptive dt always hurts} & 5 parameter sets tested, all worse than fixed dt \\
+\textbf{NR switching hurts} & 4 variants (NR, damped NR, grad descent, precond) all worse \\
+\textbf{Clamping: no effect} & No cap vs 0.05\AA\ cap, $<$1pp \\
+\textbf{$\lambda_2$-blend needs re-test} & Mechanism correct, poisoned by preconditioning base \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{Best configuration:}
-\texttt{gad\_small\_dt} --- Eckart-projected GAD, dt=0.005, 1000 steps, no mode tracking,
-no adaptive dt, no NR. The simplest method wins.
+\texttt{gad\_dt003} --- Eckart-projected GAD, dt=0.003, 2000 steps, no mode tracking,
+no adaptive dt, no preconditioning, no NR. \textit{The simplest method wins.}
+
+\textbf{Next steps:}
+\begin{enumerate}[nosep,leftmargin=1.5em]
+\item $\lambda_2$-blended GAD \textit{without} preconditioning (isolate blend effect)
+\item dt=0.002 and dt=0.001 with proportionally more steps
+\item Multiple noise seeds for 95\% confidence intervals
+\item Full Transition1x (9,561 samples)
+\end{enumerate}
 
 \end{document}

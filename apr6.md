@@ -1,112 +1,78 @@
-# GAD+ Status — April 6, 2026 (Updated)
+# GAD+ Status — April 6-7, 2026 (Final)
 
-Active experiments running. This covers what changed since the morning handoff.
-
----
-
-## What's Currently Running
-
-### 1. Preconditioned GAD (SLURM 58885855) — still running
-
-30 MIG jobs, ~25+ min in. 5 methods × 6 noise levels. See original apr6.md for details.
-Output: `/lustre07/scratch/memoozd/gadplus/runs/precond_gad/`
-
-### 2. Round 2 Experiments (SLURM 58886863) — just submitted
-
-48 MIG jobs. 8 methods × 6 noise levels. 300 samples, 1000 steps (except gad_dt003 at 2000 steps).
-Output: `/lustre07/scratch/memoozd/gadplus/runs/round2/`
-
-**Methods:**
-
-| Task IDs | Method | What it is | Diffusion-compatible? |
-|----------|--------|------------|----------------------|
-| 0-5 | adaptive_mm | Corrected adaptive dt, base=0.002 (Multi-Mode GAD params) | Yes |
-| 6-11 | adaptive_mm2 | Even more conservative adaptive dt, base=0.001 | Yes |
-| 12-17 | gad_dt003 | Smaller fixed dt=0.003, 2000 steps | Yes |
-| 18-23 | gad_no_clamp | No displacement cap (max_disp=999) | Yes |
-| 24-29 | adaptive_floor | Adaptive dt with higher floor (dt_min=1e-3) | Yes |
-| 30-35 | **precond_descent** | Precond descent when n_neg≥2, precond GAD when n_neg<2 | No (diagnostic) |
-| 36-41 | **blend_k50** | Blended precond GAD, sigmoid(50·λ₂) | **Yes** |
-| 42-47 | **blend_k100** | Blended precond GAD, sigmoid(100·λ₂) | **Yes** |
+All experiments complete. Both agents' work is documented in EXPERIMENT_LOG.md (detailed) and EXPERIMENTS.tex (publication-ready).
 
 ---
 
-## What Changed: Blended Preconditioned GAD
+## Results at a Glance
 
-The key insight from today's design session: the blend shouldn't be between raw GAD and raw descent — it should be between **preconditioned GAD** and **preconditioned descent**:
+| Rank | Method | 10pm | 50pm | 100pm | 200pm | Diff-compat? |
+|------|--------|------|------|-------|-------|-------------|
+| 1 | **gad_dt003** (dt=0.003, 2000 steps) | **94.7** | **92.0** | **88.9** | **58.8** | Yes |
+| 2 | gad_small_dt (dt=0.005, 1000 steps) | 94.3 | 91.3 | 86.7 | 51.3 | Yes |
+| 3 | gad_no_clamp (no displacement cap) | 94.3 | 91.3 | 86.7 | 54.6 | Yes |
+| 4 | nr_gad_damped a=0.1 | 94.7 | 77.7 | 58.0 | 33.7 | No |
+| 5 | adaptive_floor (dt_min=1e-3) | 83.0 | 70.2 | 43.2 | 15.9 | Yes |
+| 6 | precond_gad_dt01 (|H|^-1, dt=0.01) | 78.3 | 68.3 | 58.0 | 41.7 | Yes |
+| 7 | precond_gad_001 (|H|^-1, dt=0.005) | 73.7 | 48.0 | 21.7 | 3.3 | Yes |
+| 8 | blend_k50 (sigmoid blend + |H|^-1) | 72.0 | 37.2 | 14.3 | 3.1 | Yes |
+| 9 | adaptive_mm (Multi-Mode GAD params) | 53.7 | 35.1 | 22.6 | 5.7 | Yes |
+| 10 | nr_gad_pingpong (undamped NR) | 56.7 | 31.7 | 24.7 | 18.3 | No |
+
+---
+
+## Key Findings
+
+1. **The simplest method wins.** Plain Eckart-projected GAD with small fixed dt (0.003) and enough steps beats every "clever" method. No mode tracking, no adaptive dt, no preconditioning, no NR.
+
+2. **|H|^-1 preconditioning hurts GAD.** -21pp at 10pm, -43pp at 50pm. Newton-like scaling (1/|lambda_i|) starves steep modes of progress. GAD needs uniform step sizes across all modes — it's navigating a saddle, not descending to a minimum.
+
+3. **All adaptive dt variants fail.** 5 parameter sets tested (3 eigenvalue-clamped + 1 floor fix + 1 pure precond). All worse than fixed dt. Step-size variability disrupts GAD's steady mode-tracking.
+
+4. **All NR/descent switching variants fail.** Undamped NR, damped NR (3 alphas), preconditioned descent — all worse than pure GAD. The switching logic (hard or soft) isn't the problem; applying different dynamics when n_neg>=2 is.
+
+5. **Displacement capping is inert.** No cap vs 0.35A vs 0.1A — zero effect. The cap never triggers at small dt.
+
+6. **Lambda_2 blend needs re-test.** The mechanism (sigmoid(k*lambda_2)) is correct and differentiable, but was only tested with preconditioning. The preconditioning failure masked the blend signal. All three variants (k=50, k=100, hard-switch descent) gave identical ~72% — the |H|^-1 was the bottleneck.
+
+---
+
+## What's Left to Try
+
+### Highest priority: Blend WITHOUT preconditioning
 
 ```
-w = sigmoid(k · λ₂)
-F_blend = F + 2·w·(F·v₁)v₁           # partial GAD: w=1 → full flip, w=0 → no flip
-Δx = dt · |H|⁻¹ · F_blend             # always preconditioned
+F_blend = F + 2*sigmoid(k*lambda_2)*(F . v1)*v1
+Dx = dt * F_blend      # plain Euler, no |H|^-1
 ```
 
-Mode by mode:
-- **v₁ (lowest):** step ∝ (F·v₁·(2w-1)) / |λ₁|. w=1 (near TS) → ascend. w=0 (far) → descend. Smooth.
-- **vᵢ (i>1):** step ∝ (F·vᵢ) / |λᵢ|. Always descent, always curvature-scaled. Unaffected by blend.
+This isolates the blend effect on top of the already-good gad_small_dt base. If it helps at high noise (100-200pm) where n_neg oscillates, it's the paper's differentiable method.
 
-**The blend only controls one decision:** ascend v₁ or not. Everything else is preconditioned descent.
-
-### Implementation
-
-Modified `preconditioned_gad_dynamics_projected()` in `projection.py` — added `gad_blend_weight` parameter (default 1.0 = standard GAD). The fixed `2.0` in the GAD formula is now `2.0 * w`.
-
-Added `blend_sharpness` to `GADSearchConfig`. When >0, computes `w = sigmoid(k * λ₂)` at each step and passes it as `gad_blend_weight`.
-
-### precond_descent diagnostic
-
-Hard-switch version: uses `NRGADPingPongConfig` with `descent_mode="preconditioned"`. When n_neg≥2, calls `preconditioned_gad_dynamics_projected(gad_blend_weight=0.0)` (pure precond descent). When n_neg<2, calls with `gad_blend_weight=1.0` (full precond GAD).
-
-Tests whether GAD's v₁ ascent helps or hurts when n_neg≥2. If precond_descent beats precond_GAD at high noise, then v₁ far from the saddle isn't the right mode to ascend — supports the blend approach.
+### Then:
+- dt=0.002 with 3000 steps (continue the "smaller dt wins" trend)
+- Multiple noise seeds (10x) for 95% confidence intervals
+- Full Transition1x (9,561 samples)
+- Sella baselines (TS-BFGS, full Hessian) for paper comparison
 
 ---
 
-## Code Changes Since Morning
+## Jobs & Data
 
-| File | Change |
-|------|--------|
-| `src/gadplus/projection/projection.py` | `preconditioned_gad_dynamics_projected` gains `gad_blend_weight` param |
-| `src/gadplus/search/gad_search.py` | `GADSearchConfig.blend_sharpness`, computes `w=sigmoid(k·λ₂)` |
-| `src/gadplus/search/nr_gad_pingpong.py` | `descent_mode="preconditioned"` uses same precond function with w=0 |
-| `src/gadplus/search/blended_gad.py` | Created (standalone blended GAD — superseded by integrated approach) |
-| `src/gadplus/search/rfo_gad.py` | Created (RFO-GAD — lower priority, not in current batch) |
-| `scripts/method_single.py` | 8 new Round 2 method configs |
-| `scripts/run_round2.slurm` | 48-job array script |
+| Job ID | What | Status | Output |
+|--------|------|--------|--------|
+| 58885855 | Preconditioned GAD (30 jobs) | Complete 30/30 | `precond_gad/` |
+| 58886863 | Round 2 (48 jobs) | 9 complete + 39 partial | `round2/` |
+| 58845357 | Round 1 method cmp (42 jobs) | Complete | `method_cmp_300/` |
+| 58852071 | Damped NR-GAD (42 jobs) | Complete | `targeted/` |
 
----
-
-## Cancelled Jobs
-
-- 58886605 — first round2 attempt, had import error (`_eckart_projector` not exported)
-- 58886708 — second round2 attempt, cancelled to redesign blended experiments
+All data: `/lustre07/scratch/memoozd/gadplus/runs/`
 
 ---
 
-## Baseline Numbers for Comparison
+## Documents
 
-| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
-|--------|------|------|------|-------|-------|-------|
-| **gad_small_dt (dt=0.005)** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
-| gad_projected (dt=0.01) | 72.3 | 70.3 | 69.3 | 66.7 | 58.0 | 45.3 |
-| gad_adaptive_dt (dt=0.01, broken) | 71.3 | 65.0 | 52.7 | 37.7 | 23.7 | 14.3 |
-| nr_gad_damped α=0.1 | 94.7 | 88.0 | 77.7 | 58.0 | 46.0 | 33.7 |
-
----
-
-## What to Do When Results Come In
-
-1. Check for errors: `cat /lustre07/scratch/memoozd/gadplus/logs/round2_58886863_*.err | tail -5`
-2. Check completions: `ls /lustre07/scratch/memoozd/gadplus/runs/round2/summary_*.parquet | wc -l` (expect 48)
-3. Analyze:
-```sql
-SELECT method, noise_pm, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       ROUND(100.0 * conv / total, 1) as rate
-FROM '/lustre07/scratch/memoozd/gadplus/runs/round2/summary_*.parquet'
-GROUP BY method, noise_pm ORDER BY method, noise_pm;
-```
-4. Key comparisons:
-   - `blend_k50` and `blend_k100` vs `gad_small_dt` — does blending help?
-   - `precond_descent` vs `gad_small_dt` — does v₁ ascent hurt at n_neg≥2?
-   - `adaptive_mm` vs `gad_adaptive_dt` — did correcting dt_base fix adaptive dt?
-5. Update EXPERIMENT_LOG.md and EXPERIMENTS.tex with results
+- **EXPERIMENT_LOG.md** — Full log with all 13 experiments, detailed stats, consolidated rankings
+- **EXPERIMENTS.tex** — Publication-ready 7-section report with tables and figures
+- **EXPERIMENT_PLAN_ROUND2.md** — Original plan (for reference)
+- **PAPER_INSIGHTS.md** — Paper narrative vs noisyTS/LMHE
+- **DATA_REFERENCE.md** — Parquet schemas, DuckDB queries, plot recipes

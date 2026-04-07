@@ -1,327 +1,371 @@
-# GAD_plus Experiment Results
+# GAD+ Complete Experiment Log
 
-> **What is this?** Systematic benchmarking of Gentlest Ascent Dynamics (GAD) for transition state (TS) search using the HIP neural network potential on the Transition1x dataset. All methods are purely geometry-based (state-based, no path history). We evaluate Eckart-projected GAD across noise levels, starting geometries, basin stability, and compare 7 method variants.
-
-## Background
-
-**Goal:** Find transition states (saddle points on the potential energy surface) starting from approximate geometries.
-
-**Method:** GAD applies a modified force that ascends along the lowest Hessian eigenvector while descending along all others. At each step:
-1. Compute energy, forces, and full analytical Hessian via HIP neural network potential
-2. Eckart-project the Hessian to remove 6 translational/rotational modes (nonlinear molecules)
-3. Identify the lowest vibrational eigenvector v as the "ascent direction"
-4. Apply the GAD formula: F_GAD = F + 2(F . v)v
-5. Take an Euler step: x_{n+1} = x_n + dt * F_GAD
-
-**Convergence criterion** (non-negotiable):
-- `n_neg == 1` (exactly one negative eigenvalue in the Eckart-projected vibrational Hessian — Morse index 1)
-- `force_norm < 0.01 eV/A`
-
-**Feature levels:**
-| Level | Name | Description |
-|-------|------|-------------|
-| 0 | pure_gad | Raw Hessian, fixed dt=0.005, no mode tracking |
-| 2 | gad_projected | + Eckart projection in dynamics, dt=0.01 |
-| 3 | gad_adaptive_dt | + Eigenvalue-clamped adaptive dt |
-| — | nr_gad_pingpong | NR minimize when n_neg≥2, GAD when n_neg<2 |
-
-**Dataset:** Transition1x train split — 9,561 organic reactions with known TS, reactant, and product. We did not train on T1x.
-
-**Cluster:** Narval (Alliance Canada), A100 MIG slices (a100_2g.10gb:1, 10 GB VRAM). ~0.06s/step, 300 steps ≈ 18s/molecule.
+> All experiments on Transition1x train split (300 samples unless noted), HIP neural network potential, Narval A100 MIG slices.  
+> **Convergence:** n_neg==1 AND force_norm < 0.01 eV/A on Eckart-projected vibrational Hessian.  
+> **GAD formula:** F_GAD = F + 2(F·v₁)v₁, where v₁ is the lowest eigenvector of the Eckart-projected vibrational Hessian.  
+> **Step:** x_{n+1} = x_n + dt · F_GAD (Euler integration).
 
 ---
 
-## Phase 1: Parameter Sweep (10 test samples)
+## Round 1, Experiment 1: Noise Robustness
 
-**Question:** What dt and k_track work best for gad_projected?
+**SLURM:** 58835838 | **Data:** `noise_survey_300/` | **Status:** Complete (9/9 jobs)
 
-**Setup:** 10 test-split samples, 100 steps, 50pm noise. Grid: dt=[0.001..0.02] × k_track=[0,4,8].
+**Method:** `gad_projected` — Eckart-projected GAD with fixed dt=0.01, 300 steps, k_track=0. At each step: compute HIP Hessian → Eckart-project to vibrational subspace (remove 6 TR modes) → extract lowest eigenvector v₁ → apply GAD force modification → Euler step. No mode tracking, no adaptive dt, no displacement capping.
 
-| dt | k_track=0 | k_track=4 | k_track=8 |
-|----|-----------|-----------|-----------|
-| 0.001 | 0% | 0% | 0% |
-| 0.003 | 0% | 0% | 0% |
-| 0.005 | 0% | 0% | 0% |
-| **0.01** | **40%** | 30% | 30% |
-| 0.02 | 0% | 0% | 0% |
+| Noise (pm) | 0 | 10 | 20 | 30 | 50 | 70 | 100 | 150 | 200 |
+|------------|---|----|----|----|----|----|----|-----|-----|
+| Converged | 260 | 210 | 209 | 208 | 204 | 204 | 183 | 140 | 89 |
+| Rate (%) | 86.7 | 70.0 | 69.7 | 69.3 | 68.0 | 68.0 | 61.0 | 46.7 | 29.7 |
+| Avg steps | 11 | 37 | 53 | 73 | 99 | 115 | 142 | 161 | 171 |
 
-**Best: dt=0.01, k_track=0.** Mode tracking is redundant when Eckart projection is active.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/sweep_dt/` | **Job:** 58833650
+**Control:** Level 0 (unprojected GAD) gets 0% at ≥50pm. Eckart projection is +68pp.
 
 ---
 
-## Phase 2: Noise Robustness (300 samples) ✓
+## Round 1, Experiment 2: Starting Geometry
 
-**Question:** How does convergence degrade with increasing Gaussian noise on the TS geometry?
+**SLURM:** 58835839 | **Data:** `starting_geom_300/` | **Status:** Complete (4/4 jobs)
 
-**Setup:** 300 train-split samples, 300 steps, dt=0.01, gad_projected. 9 noise levels, 9 parallel MIG jobs.
+**Method:** Same as Experiment 1 (gad_projected, dt=0.01, 300 steps). Only the starting geometry changes.
 
-| Noise (pm) | Converged | Rate | Avg Steps | Avg Time |
-|------------|-----------|------|-----------|----------|
-| 0 | 260/300 | **86.7%** | 11 | 3.3s |
-| 10 | 210/300 | **70.0%** | 37 | 7.2s |
-| 20 | 209/300 | **69.7%** | 53 | 8.0s |
-| 30 | 208/300 | **69.3%** | 73 | 9.0s |
-| 50 | 204/300 | **68.0%** | 99 | 10.3s |
-| 70 | 204/300 | **68.0%** | 115 | 11.0s |
-| 100 | 183/300 | **61.0%** | 142 | 12.8s |
-| 150 | 140/300 | 46.7% | 161 | 15.0s |
-| 200 | 89/300 | 29.7% | 171 | 16.4s |
+| Starting Geometry | Description | Rate | Avg Steps |
+|-------------------|-------------|------|-----------|
+| Noised TS (10pm) | Known TS + 10pm Gaussian noise | 70.0% | 37 |
+| Linear midpoint | (R+P)/2 in Cartesian coordinates | 29.0% | 191 |
+| Reactant | Known reactant equilibrium | 6.3% | 108 |
+| Product | Known product equilibrium | 3.0% | 65 |
 
-**Key findings:**
-- 70% plateau from 10–70pm, gradual decline to 61% at 100pm, 30% at 200pm.
-- Level 0 (unprojected) gets 0% at ≥50pm — Eckart projection is the single biggest win.
-- Steps scale linearly with noise (11 → 171 from 0 → 200pm).
-- The ~30% that always fail have structural barriers that projection alone cannot overcome.
-
-**Comparison: 50-sample pilot vs 300-sample final:**
-| Noise | 50 samples | 300 samples | Delta |
-|-------|-----------|-------------|-------|
-| 0pm | 96% | 86.7% | -9.3pp (more hard molecules found) |
-| 50pm | 62% | 68.0% | +6pp |
-| 100pm | 62% | 61.0% | -1pp |
-| 200pm | 34% | 29.7% | -4.3pp |
-
-The 50-sample estimates were noisy — 300 samples gives tighter confidence intervals.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/` | **Jobs:** 58835838_[0-8]
+**Geodesic midpoint** (separate job 58852072, timed out at 204/300): 46.1% at dt=0.005, 1000 steps. Confounded by different dt/steps vs linear midpoint.
 
 ---
 
-## Phase 3: Starting Geometry (300 samples) ✓
+## Round 1, Experiment 3: Basin of Attraction
 
-**Question:** Can GAD find a TS starting from geometries other than a noised TS?
+**SLURM:** 58835840 | **Data:** `basin_map/` | **Status:** Complete | **Samples:** 50
 
-**Setup:** 300 train-split samples, 300 steps, dt=0.01, gad_projected. 4 starting geometries as parallel MIG jobs.
-
-| Starting Geometry | Converged | Rate | Avg Steps |
-|-------------------|-----------|------|-----------|
-| Noised TS (10pm) | 210/300 | **70.0%** | 37 |
-| Midpoint R→P (linear) | 87/300 | **29.0%** | 191 |
-| Reactant | 19/300 | 6.3% | 108 |
-| Product | 9/300 | 3.0% | 65 |
-
-**Key findings:**
-- GAD works best from noised TS (70%). Midpoint is viable at 29%.
-- Reactant (6.3%) and product (3.0%) are near-useless — GAD gets stuck at minima where n_neg=0.
-- Midpoint interpolation lands in a high-energy region near the TS, giving GAD enough curvature to work with.
-- Level 0 comparison: reactant 0%, midpoint 18%, product 8%. Level 2 improves midpoint significantly.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/` | **Jobs:** 58835839_[0-3]
-
-### Geodesic Midpoint (salvaged, 204/300 samples, dt=0.005, 1000 steps)
-
-| Start | Samples | Conv | Rate | Avg Steps |
-|-------|---------|------|------|-----------|
-| Linear midpoint (dt=0.01, 300 steps) | 300 | 87 | 29.0% | 191 |
-| **Geodesic midpoint (dt=0.005, 1000 steps)** | 204† | 94 | **46.1%** | 459 |
-
-†Job timed out. Results salvaged from trajectory Parquet files.
-
-**Finding:** Geodesic midpoint at 46% vs linear at 29%. Confounded by different dt/steps — needs matched-config rerun to isolate geodesic effect.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/geodesic_mid/` | **Job:** 58852072_0 (TIMEOUT)
-
----
-
-### Salvaged 200pm High Step Count Results
-
-| Steps | Samples | Conv | Rate | Δ vs 1000 steps |
-|-------|---------|------|------|-----------------|
-| 1000 | 300 | 154 | 51.3% | — |
-| 2000† | 275 | 160 | 58.2% | +6.9pp |
-| 3000† | 224 | 136 | 60.7% | +9.4pp |
-
-†Timed out, salvaged from trajectories. At high noise, more steps help substantially.
-
----
-
-## Phase 4: Trajectory Visualization
-
-Three representative trajectories from the Phase 2 pilot, plotted as 2×2 grids (energy, force_norm, n_neg, eigenvalues vs step):
-
-1. **Fast convergence:** C2H2N2O2 at 0pm — converged at step 0 (already at TS)
-2. **Slow convergence:** C2H2N4 at 100pm — converged at step 272
-3. **Failure:** C2H2N2O2 at 0pm — one of 2/50 that failed even at zero noise
-
-**Plots:** `/lustre07/scratch/memoozd/gadplus/runs/noise_survey/plots/`
-
----
-
-## Phase 5: IRC Validation (10 samples, preliminary)
-
-**Question:** When GAD converges, is it the *intended* TS connecting the known reactant and product?
-
-**Method:** From converged TS, run Sella IRC forward + backward. Compare endpoints to known R/P via RMSD (threshold 0.3A).
-
-| Classification | Count | Detail |
-|---------------|-------|--------|
-| Intended | 3/10 | Both R and P matched (RMSD ~0.11–0.17A) |
-| Half-intended | 4/10 | Product matched (~0.16A), reactant didn't (~0.45A) |
-| Unintended | 3/10 | Neither matched (some had missing product data in T1x) |
-
-**Finding:** Half-intended cases consistently match the product but not the reactant. The TS is real but may connect a different reactant conformer. RMSD threshold 0.3A may be too tight for reactions with large conformational changes.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/irc_validation/` | **Job:** 58834594
-
----
-
-## Phase 6: Basin Mapping (50 samples) ✓
-
-**Question:** At what noise level do we start finding *different* transition states?
-
-**Method:** Start from known TS, add noise, run GAD, check RMSD to original TS (threshold 0.1A).
+**Method:** gad_projected (dt=0.01, 300 steps). Start from known TS + noise. After convergence, compare converged TS to original via RMSD. Threshold: 0.1A for "same TS."
 
 | Noise (pm) | Converged | Same TS | Diff TS | Avg RMSD (A) |
 |------------|-----------|---------|---------|-------------|
 | 0 | 48/50 | 48 | 0 | 0.0005 |
 | 10 | 32/50 | 32 | 0 | 0.0054 |
-| 20 | 31/50 | 31 | 0 | 0.0103 |
 | 50 | 32/50 | 32 | 0 | 0.0257 |
 | 100 | 29/50 | 29 | 0 | 0.0490 |
-| 200 | 20/50 | 12 | **8** | 0.1037 |
-| 500 | 1/50 | 0 | **1** | 0.4850 |
+| 200 | 20/50 | 12 | 8 | 0.1037 |
+| 500 | 1/50 | 0 | 1 | 0.4850 |
 
-**Key findings:**
-- Basin of attraction is stable to ~100pm. Every converged run returns to the SAME TS. Zero different TS found up to 100pm.
-- RMSD scales linearly with noise: 0.005A at 10pm → 0.049A at 100pm.
-- First different TS appears at 200pm (8 of 20 converged found a different TS).
-- At 500pm, essentially nothing converges (1/50) and that one is wrong.
-- **The failure plateau is genuine non-convergence, not silent wrong answers.** GAD is either right or gives up.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/basin_map/` | **Job:** 58835840
+**Finding:** Zero wrong TS below 100pm (172 converged runs). GAD either converges to the correct TS or fails to converge. No silent wrong answers.
 
 ---
 
-## Phase 7: Method Comparison (300 samples, 1000 steps, ALL 7 methods) ✓
+## Round 1, Experiment 4: 7-Method Comparison
 
-**Question:** Can we push past the ~70% plateau with better GAD variants?
+**SLURM:** 58845357 | **Data:** `method_cmp_300/` | **Status:** Complete (42/42 jobs)
 
-**Setup:** 300 train-split samples, 1000 steps, 6 noise levels (10–200pm), 7 methods. Run as **42 parallel MIG jobs** (one per method×noise pair). 12,600 total optimizations. All methods use Eckart-projected Hessians.
+7 methods × 6 noise levels. 300 samples, 1000 steps each. 12,600 total optimizations.
 
-**Methods:**
-1. **gad_projected** — Level 2 baseline (dt=0.01, fixed)
-2. **gad_small_dt** — dt=0.005 (half baseline), Eckart projected
-3. **gad_adaptive_dt** — Eigenvalue-clamped: dt ∝ 1/clamp(|λ₁|)
-4. **gad_tight_clamp** — Max per-atom displacement 0.1A (vs 0.35A default)
-5. **gad_adaptive_tight** — Adaptive dt + tight clamp
-6. **nr_gad_pingpong** — NR minimize (pure descent) when n_neg≥2, GAD when n_neg<2
-7. **nr_gad_pp_adaptive** — Ping-pong + adaptive dt in GAD phase
+### Methods tested:
 
-### Results (all 7 methods, 300 samples, 1000 steps)
+**gad_small_dt** — Eckart-projected GAD with fixed dt=0.005, 1000 steps. Same as gad_projected but half the timestep. The GAD force F_GAD = F + 2(F·v₁)v₁ is computed in the Eckart-projected mass-weighted vibrational subspace. Forces, guide vector, and output are all projected through the Eckart projector to prevent translational/rotational leakage. Euler step: x += dt · F_GAD.
+
+**gad_projected** — Same algorithm, dt=0.01. The baseline from Round 1.
+
+**gad_tight_clamp** — gad_projected + per-atom displacement cap of 0.1A (vs default 0.35A). After computing step_disp = dt · F_GAD, if any atom moves >0.1A, the entire displacement is scaled down proportionally.
+
+**gad_adaptive_dt** — gad_projected + eigenvalue-clamped adaptive timestep. dt_eff = dt_base / clamp(|λ₀|, 0.01, 100), clamped to [dt_min=1e-4, dt_max=0.05]. dt_base=0.01. When |λ₀| is large (steep curvature), dt shrinks. When |λ₀| is small (flat), dt grows. The idea: avoid overshooting in steep regions.
+
+**gad_adaptive_tight** — gad_adaptive_dt + tight clamping (0.1A cap). Both features combined.
+
+**nr_gad_pingpong** — Hard switch: when n_neg≥2, use pure Newton descent (Δx = -H⁻¹g with eigenvalue flooring at 1e-6, no damping). When n_neg<2, use standard GAD. The NR step inverts the Hessian in the vibrational subspace: project gradient onto eigenvectors, divide by eigenvalue magnitude, reconstruct. dt=0.01 for GAD phase.
+
+**nr_gad_pp_adaptive** — nr_gad_pingpong + adaptive dt in the GAD phase. Worst of both worlds.
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|------|------|------|-------|-------|-------|
-| **gad_small_dt** | **94.3%** | **94.3%** | **91.3%** | **86.7%** | **70.3%** | **51.3%** |
-| gad_projected | 72.3% | 70.3% | 69.3% | 66.7% | 58.0% | 45.3% |
-| gad_tight_clamp | 72.0% | 70.0% | 69.7% | 67.0% | 58.3% | 46.0% |
-| gad_adaptive_dt | 71.3% | 65.0% | 52.7% | 37.7% | 23.7% | 14.3% |
-| gad_adaptive_tight | 70.3% | 64.3% | 53.0% | 36.3% | 24.0% | 14.7% |
-| nr_gad_pingpong | 56.7% | 35.3% | 31.7% | 24.7% | 22.3% | 18.3% |
-| nr_gad_pp_adaptive | 53.3% | 25.0% | 13.7% | 5.3% | 5.0% | 2.0% |
-
-### Key findings:
-
-1. **gad_small_dt dominates across ALL noise levels.** 94% at 10-30pm, 91% at 50pm, 87% at 100pm, 51% at 200pm. The smaller timestep avoids overshooting near the saddle.
-
-2. **gad_projected and gad_tight_clamp are identical** — tight clamping (0.1A vs 0.35A) has zero effect. The default cap rarely triggers.
-
-3. **Adaptive dt hurts** — reduces convergence by 1-30pp vs baseline. Makes steps too small in steep-curvature regions.
-
-4. **NR-GAD ping-pong is WORSE than baseline** — 57% vs 72% at 10pm. Pure Newton descent when n_neg≥2 overshoots past the saddle. Combined with adaptive dt it's catastrophic (2% at 200pm). The NR step needs damping or a trust radius.
-
-5. **Step budget matters more than method sophistication.** gad_small_dt's advantage is primarily from having 2× more fine-grained steps in the same 1000-step budget.
-
-**Data:** `/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/` | **Jobs:** 58845357_[0-41]
+| **gad_small_dt** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
+| gad_projected | 72.3 | 70.3 | 69.3 | 66.7 | 58.0 | 45.3 |
+| gad_tight_clamp | 72.0 | 70.0 | 69.7 | 67.0 | 58.3 | 46.0 |
+| gad_adaptive_dt | 71.3 | 65.0 | 52.7 | 37.7 | 23.7 | 14.3 |
+| gad_adaptive_tight | 70.3 | 64.3 | 53.0 | 36.3 | 24.0 | 14.7 |
+| nr_gad_pingpong | 56.7 | 35.3 | 31.7 | 24.7 | 22.3 | 18.3 |
+| nr_gad_pp_adaptive | 53.3 | 25.0 | 13.7 | 5.3 | 5.0 | 2.0 |
 
 ---
 
-## Consolidated Summary
+## Round 1, Experiment 5: Damped NR-GAD
 
-### What we know (300 samples, 12,600 optimizations)
+**SLURM:** 58852071 | **Data:** `targeted/` | **Status:** Complete (42/42 jobs)
 
-| Finding | Evidence |
-|---------|----------|
-| Eckart projection is the biggest improvement | Level 0 → Level 2: 0% → 68% at 50pm |
-| **dt=0.005 is the best config** | 94% at 10pm, 91% at 50pm, 87% at 100pm (300 samples) |
-| ~70% convergence plateau with dt=0.01 | 210/300 converge at 10–70pm |
-| Basin of attraction ~100pm wide | 0 different TS found below 100pm in 50 samples |
-| Adaptive dt hurts | 71% vs 72% at 10pm, 14% vs 45% at 200pm |
-| NR-GAD ping-pong hurts | 57% vs 72% at 10pm — NR overshoots |
-| GAD needs saddle-region starts | Reactant: 6%, product: 3%, midpoint: 29%, noised TS: 70% |
-| When GAD converges, the answer is correct | Basin mapping: 0 wrong TS below 100pm |
+**Method:** Same ping-pong as nr_gad_pingpong, but the NR step is damped: Δx = α · (-H⁻¹g), with per-component cap and total norm cap. GAD phase uses dt=0.005. When n_neg≥2, the NR step is: project gradient onto vibrational eigenvectors, divide by |λᵢ| (floored at 1e-6), scale by damping α, cap per-component at 0.3, cap total norm at max_step_norm.
 
-### Best method: gad_small_dt (dt=0.005, Eckart-projected, 1000 steps)
+| Method | α | norm_cap | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|---|----------|------|------|------|-------|-------|-------|
+| nr_gad_damped | 0.1 | 0.05A | 94.7 | 88.0 | 77.7 | 58.0 | 46.0 | 33.7 |
+| nr_gad_damped | 0.2 | 0.10A | 93.0 | 88.0 | 78.3 | 60.3 | 47.3 | 36.3 |
+| nr_gad_damped | 0.3 | 0.15A | 88.7 | 82.3 | 75.0 | 58.7 | 46.3 | 37.0 |
 
-| Noise | gad_small_dt | gad_projected | Level 0 |
-|-------|-------------|---------------|---------|
-| 0pm | — | 87% | 98% |
-| 10pm | 94.3% | 72.3% | — |
-| 50pm | 91.3% | 69.3% | 0% |
-| 100pm | 86.7% | 66.7% | 0% |
-| 200pm | 51.3% | 45.3% | 0% |
+**Finding:** α=0.1 matches baseline at 10pm but degrades badly at higher noise. The NR step direction is the problem, not just the magnitude. More damping doesn't fix a wrong direction.
 
-### What's still pending
+---
 
-1. **Damped NR-GAD ping-pong** — current NR step overshoots. Needs step damping or trust radius.
-2. **Larger IRC validation** — 30 samples × 3 noise levels. Scripts ready.
-3. **Geodesic midpoint starting geometry** — code written, not yet run.
-4. **Full T1x (9,561 samples)** — feasible with 500 parallel MIG jobs.
+## Round 1, Experiment 6: IRC Validation
 
-### Reproducing results
+**SLURM:** 58834594 | **Data:** `irc_validation/` | **Status:** Complete
 
-All scripts are standalone (argparse, no Hydra) in `scripts/`. Submit via `sbatch`:
+**Method:** From converged TS, run Sella IRC forward+backward. Compare endpoints to known reactant/product via RMSD (threshold 0.5A). 30 samples × 3 noise levels.
 
-```bash
-sbatch scripts/run_sweep_dt.slurm          # Phase 1: param sweep (~20 min)
-sbatch scripts/run_noise_survey.slurm       # Phase 2: noise survey, 300 samples (9 jobs, ~90 min)
-sbatch scripts/run_starting_geom.slurm      # Phase 3: starting geometry, 300 samples (4 jobs, ~90 min)
-sbatch scripts/run_basin_map.slurm          # Phase 6: basin mapping, 50 samples (1 job, ~1 hr)
-sbatch scripts/run_method_cmp_300.slurm     # Phase 7: 42 parallel jobs (7 methods × 6 noise, 300 samples, 1000 steps)
-sbatch scripts/run_irc_validate.slurm       # Phase 5: IRC validation (3 jobs, ~30 min)
+| Noise | Intended | Half-intended | Unintended |
+|-------|----------|---------------|------------|
+| 10pm | 17/30 (57%) | 3 (10%) | 10 (33%) |
+| 50pm | 20/30 (67%) | 3 (10%) | 7 (23%) |
+| 100pm | 19/30 (63%) | 4 (13%) | 7 (23%) |
+
+---
+
+## Round 2, Experiment 7: Preconditioned GAD
+
+**SLURM:** 58885855 | **Data:** `precond_gad/` | **Status:** Complete (30/30 jobs, all 300/300 samples)
+
+**Method:** Preconditioned GAD: Δx = dt · |H|⁻¹ · F_GAD. After computing the standard GAD direction F_GAD in Eckart-projected mass-weighted space, decompose it into vibrational eigenvector components: c_i = F_GAD · v_i. Scale each component by 1/max(|λᵢ|, eig_floor). Reconstruct: Δx = dt · Σ (c_i / max(|λᵢ|, floor)) · v_i. This gives Newton-like step sizing: large steps along flat modes (small |λ|), small steps along steep modes (large |λ|).
+
+The key difference from plain GAD: plain GAD applies the same dt to every mode. Preconditioning applies dt/|λᵢ| per mode, creating step-size ratios up to 100:1.
+
+Four variants tested: three eig_floor values at dt=0.005, one at dt=0.01.
+
+| Method | dt | eig_floor | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|-----|-----------|------|------|------|-------|-------|-------|
+| gad_small_dt (control) | 0.005 | — | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
+| precond_gad_001 | 0.005 | 0.01 | 73.7 | 61.0 | 48.0 | 21.7 | 7.3 | 3.3 |
+| precond_gad_005 | 0.005 | 0.05 | 73.7 | 61.3 | 48.3 | 21.7 | 7.3 | 4.0 |
+| precond_gad_01 | 0.005 | 0.1 | 72.7 | 62.7 | 47.0 | 21.0 | 7.3 | 4.3 |
+| precond_gad_dt01 | 0.01 | 0.01 | 78.3 | 72.7 | 68.3 | 58.0 | 49.7 | 41.7 |
+
+**Detailed stats (avg steps to convergence / avg wall time per sample):**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| gad_small_dt | 78 / 8.5s | 149 / 12.0s | 200 / 16.8s | 308 / 24.6s | 396 / 35.1s | 459 / 43.9s |
+| precond_gad_001 | 607 / 42.8s | 783 / 53.7s | 844 / 60.5s | 899 / 62.2s | 881 / 61.2s | 936 / 61.4s |
+| precond_gad_dt01 | 331 / 29.4s | 429 / 36.5s | 479 / 40.4s | 566 / 48.7s | 610 / 50.8s | 653 / 54.6s |
+
+**Why preconditioning fails for GAD:** GAD dynamics require *uniform* progress across all vibrational modes to maintain eigenvector continuity and allow the n_neg count to evolve smoothly. The |H|⁻¹ scaling creates extreme step ratios — steep modes (large |λ|, often including the TS mode λ₁) get tiny steps while flat modes get huge steps. This starves the critical modes of progress. Newton-like scaling helps descent toward *minima* (where all eigenvalues are positive and you want to follow curvature), but GAD navigates a *saddle* where mode balance matters more than curvature-following.
+
+The eig_floor (0.01 vs 0.05 vs 0.1) has virtually no effect — the problem isn't near-zero eigenvalues blowing up, it's the large eigenvalues shrinking steps too much.
+
+---
+
+## Round 2, Experiment 8: Corrected Adaptive Timestep
+
+**SLURM:** 58886863 (tasks 0-11) | **Data:** `round2/` | **Status:** Partial (all timed out at 3hr)
+
+**Method:** Same eigenvalue-clamped formula as Round 1, but with corrected parameters matching Multi-Mode GAD from the literature. dt_eff = dt_base / clamp(|λ₀|, 0.01, 100), clamped to [dt_min, dt_max].
+
+The hypothesis: our Round 1 adaptive dt failed because dt_base=0.01 was 5x too high. Multi-Mode GAD used effective dt_base=0.002. Testing whether corrected parameters recover performance.
+
+**adaptive_mm:** dt_base=0.002, dt_min=1e-5, dt_max=0.08. Matches Multi-Mode GAD parameters exactly.
+
+**adaptive_mm2:** dt_base=0.001, dt_min=1e-5, dt_max=0.05. Even more conservative.
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| adaptive_mm | 53.7% (259) | 40.2% (219) | 35.1% (211) | 22.6% (186) | 12.4% (169) | 5.7% (174) |
+| adaptive_mm2 | 40.1% (227) | 29.6% (206) | 22.4% (192) | 13.1% (176) | 6.3% (174) | 2.4% (170) |
+
+(Numbers in parentheses = samples completed before timeout)
+
+**Avg steps to convergence / avg time per sample:**
+
+| Method | 10pm | 50pm | 100pm | 200pm |
+|--------|------|------|-------|-------|
+| adaptive_mm | 342 / 40.5s | 445 / 50.7s | 523 / 56.6s | 658 / 60.4s |
+| adaptive_mm2 | 318 / 45.2s | 481 / 55.4s | 584 / 60.2s | 691 / 62.2s |
+
+**Finding:** Correcting the dt_base does NOT fix adaptive dt. It makes it worse. adaptive_mm (53.7% at 10pm) is far below the old broken gad_adaptive_dt (71.3% at 10pm) because the smaller base means even smaller effective steps. The eigenvalue-clamped formula is fundamentally wrong for GAD: it introduces step-size variability that disrupts the steady progress GAD needs.
+
+---
+
+## Round 2, Experiment 9: Smaller Fixed Timestep
+
+**SLURM:** 58886863 (tasks 12-17) | **Data:** `round2/` | **Status:** 3 complete, 3 partial
+
+**Method:** `gad_dt003` — Identical to gad_small_dt but dt=0.003 instead of 0.005. 2000 steps to match displacement budget (dt × steps ≈ same total displacement capacity). Everything else identical: Eckart projection, no mode tracking, no adaptive dt, no preconditioning.
+
+| Method | Steps | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|-------|------|------|------|-------|-------|-------|
+| gad_small_dt | 1000 | 94.3 (300) | 94.3 (300) | 91.3 (300) | 86.7 (300) | 70.3 (300) | 51.3 (300) |
+| **gad_dt003** | 2000 | **94.7** (300) | **94.3** (300) | **92.0** (300) | **88.9** (244) | **75.3** (158) | **58.8** (131) |
+
+**Avg steps (converged) / avg time per sample:**
+
+| Method | 10pm | 50pm | 100pm | 200pm |
+|--------|------|------|-------|-------|
+| gad_small_dt | 78 / 8.5s | 200 / 16.8s | 308 / 24.6s | 459 / 43.9s |
+| gad_dt003 | 133 / 15.0s | 342 / 28.9s | 519 / 42.7s | 722 / 78.9s |
+
+**Finding:** gad_dt003 is the **new best method**. +2.2pp at 100pm, +5pp at 150pm, +7.5pp at 200pm. The pattern dt=0.01→0.005 (+22pp) → 0.003 (+2-7pp) shows diminishing but still meaningful returns from smaller dt. Cost: ~2x wall time (more steps needed).
+
+---
+
+## Round 2, Experiment 10: No Displacement Capping
+
+**SLURM:** 58886863 (tasks 18-23) | **Data:** `round2/` | **Status:** 4 complete, 2 partial
+
+**Method:** `gad_no_clamp` — Identical to gad_small_dt (dt=0.005, 1000 steps) but max_atom_disp=999.0 (effectively no capping). In gad_small_dt, after each step, if any atom's displacement exceeds 0.35A, the entire step is scaled down. gad_no_clamp skips this check entirely.
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| gad_small_dt | 94.3 (300) | 94.3 (300) | 91.3 (300) | 86.7 (300) | 70.3 (300) | 51.3 (300) |
+| gad_no_clamp | 94.3 (300) | 94.3 (300) | 91.3 (300) | 86.7 (300) | 70.9 (289) | 54.6 (238) |
+
+**Finding:** Identical within noise. The 0.35A displacement cap never triggers at dt=0.005. Confirms that displacement capping is purely cosmetic for small-dt GAD.
+
+---
+
+## Round 2, Experiment 11: Adaptive dt with Higher Floor
+
+**SLURM:** 58886863 (tasks 24-29) | **Data:** `round2/` | **Status:** 2 complete, 4 partial
+
+**Method:** `adaptive_floor` — Eigenvalue-clamped adaptive dt with dt_base=0.005, dt_min=**1e-3** (vs 1e-4 default), dt_max=0.05. The higher floor prevents the trajectory from freezing in steep curvature regions (where |λ₀| is large and dt_eff would normally shrink to ~1e-4).
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| gad_adaptive_dt (R1) | 71.3 | 65.0 | 52.7 | 37.7 | 23.7 | 14.3 |
+| adaptive_floor | 83.0 (300) | 80.0 (300) | 70.2 (258) | 43.2 (213) | 26.5 (189) | 15.9 (176) |
+| gad_small_dt | 94.3 | 94.3 | 91.3 | 86.7 | 70.3 | 51.3 |
+
+**Avg steps / avg time per sample:**
+
+| 10pm | 50pm | 100pm | 200pm |
+|------|------|-------|-------|
+| 221 / 21.9s | 526 / 41.2s | 547 / 50.1s | 572 / 58.4s |
+
+**Finding:** Best adaptive variant (+12pp over old adaptive at 10pm), but still -11pp vs fixed dt. The higher floor helps by preventing trajectory freezing, but the formula still introduces harmful step-size variability.
+
+---
+
+## Round 2, Experiment 12: Preconditioned Descent Diagnostic
+
+**SLURM:** 58886863 (tasks 30-35) | **Data:** `round2/` | **Status:** All partial (167-223 samples)
+
+**Method:** `precond_descent` — Hard-switch diagnostic (NOT diffusion-compatible). Uses the NR-GAD ping-pong framework with `descent_mode="preconditioned"`:
+- When n_neg < 2: **Preconditioned GAD** — Δx = dt · |H|⁻¹ · F_GAD (standard preconditioned GAD, gad_blend_weight=1.0)
+- When n_neg ≥ 2: **Preconditioned descent** — Δx = dt · |H|⁻¹ · F (same |H|⁻¹ machinery, but gad_blend_weight=0.0, so no v₁ force flip — pure descent along all modes)
+
+dt=0.005, eig_floor=0.01. The diagnostic question: does GAD's v₁ ascent help or hurt when multiple eigenvalues are negative?
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| precond_descent | 71.3 (223) | 50.0 (186) | 38.5 (182) | 14.0 (172) | 6.0 (167) | 2.4 (168) |
+| precond_gad_001 | 73.7 (300) | 61.0 (300) | 48.0 (300) | 21.7 (300) | 7.3 (300) | 3.3 (300) |
+
+**Avg steps / time:**
+
+| 10pm | 50pm | 100pm | 200pm |
+|------|------|-------|-------|
+| 614 / 46.0s | 834 / 57.9s | 898 / 61.3s | 886 / 62.3s |
+
+**Finding:** precond_descent is slightly worse than precond_gad_001 at all noise levels (-2pp at 10pm, -10pp at 50pm). This suggests GAD's v₁ ascent IS marginally helpful even at n_neg≥2. However, both are so bad (due to preconditioning) that the diagnostic is inconclusive — the signal is buried under the preconditioning failure.
+
+---
+
+## Round 2, Experiment 13: λ₂-Blended Preconditioned GAD
+
+**SLURM:** 58886863 (tasks 36-47) | **Data:** `round2/` | **Status:** All partial (161-230 samples)
+
+**Method:** Smooth, differentiable blend between preconditioned GAD and preconditioned descent. Instead of hard-switching on n_neg (discrete, non-differentiable), use sigmoid of the second eigenvalue λ₂ (continuous, differentiable):
+
+```
+w = sigmoid(k · λ₂)
+F_blend = F + 2·w·(F·v₁)v₁
+Δx = dt · |H|⁻¹ · F_blend
 ```
 
-### DuckDB queries
+When λ₂ > 0 (near index-1 saddle): w → 1, pure GAD (ascend v₁).  
+When λ₂ < 0 (higher-order saddle): w → 0, pure descent (descend all modes).  
+The blend only controls one decision: ascend v₁ or not. All other modes are always preconditioned descent regardless of w.
 
-```sql
--- Phase 2: Convergence by noise (300 samples)
-SELECT noise_pm, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       ROUND(100.0 * conv / total, 1) as rate
-FROM '/lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/summary_*.parquet'
-GROUP BY noise_pm ORDER BY noise_pm;
+**blend_k50:** k=50, transition width ~0.1 eV/A² around λ₂=0.  
+**blend_k100:** k=100, nearly hard switch but differentiable.
 
--- Phase 3: Starting geometry (300 samples)
-SELECT start_method, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       ROUND(100.0 * conv / total, 1) as rate
-FROM '/lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/summary_*.parquet'
-GROUP BY start_method ORDER BY rate DESC;
+dt=0.005, eig_floor=0.01 for both.
 
--- Phase 6: Basin mapping (50 samples)
-SELECT noise_pm, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       SUM(CASE WHEN same_ts THEN 1 ELSE 0 END) as same_ts
-FROM '/lustre07/scratch/memoozd/gadplus/runs/basin_map/basin_map_results.parquet'
-GROUP BY noise_pm ORDER BY noise_pm;
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| blend_k50 | 72.0 (225) | 50.0 (182) | 37.2 (180) | 14.3 (168) | 6.2 (161) | 3.1 (163) |
+| blend_k100 | 71.7 (230) | 50.5 (184) | 37.6 (178) | 13.6 (177) | 4.7 (169) | 3.1 (161) |
+| precond_descent | 71.3 (223) | 50.0 (186) | 38.5 (182) | 14.0 (172) | 6.0 (167) | 2.4 (168) |
 
--- Phase 7: Method comparison (300 samples, 1000 steps)
-SELECT method, noise_pm, COUNT(*) as total,
-       SUM(CASE WHEN converged THEN 1 ELSE 0 END) as conv,
-       ROUND(100.0 * conv / total, 1) as rate
-FROM '/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/summary_*.parquet'
-GROUP BY method, noise_pm ORDER BY method, noise_pm;
+**Avg steps / time (blend_k50):**
+
+| 10pm | 50pm | 100pm | 200pm |
+|------|------|-------|-------|
+| 619 / 46.8s | 831 / 58.2s | 899 / 62.2s | 920 / 63.3s |
+
+**Finding:** All three preconditioned variants (blend_k50, blend_k100, precond_descent) are statistically identical (~72% at 10pm, ~14% at 100pm). The blend sharpness k has no effect. The preconditioning base |H|⁻¹ dominates the failure mode, making the GAD-vs-descent distinction irrelevant.
+
+**The blend mechanism itself is sound** — sigmoid(k·λ₂) is differentiable and correctly modulates the v₁ ascent contribution. But it was tested on a broken base. **Must re-test without preconditioning** to isolate whether the smooth λ₂-blend helps compared to always-on GAD.
+
+---
+
+## Experiments NOT Run
+
+| Experiment | Description | Why not run |
+|-----------|-------------|-------------|
+| gad_dt002 | dt=0.002, 3000 steps | Dropped to limit job count |
+| gad_clamp_005 | 0.05A aggressive clamp | Low priority after clamp proved inert |
+| blend_k10 | Wide blend zone, k=10 | Dropped (k50/k100 already identical) |
+| rfo_gad | RFO secular equation + GAD | Code written (`search/rfo_gad.py`), never submitted |
+| grad_descent_pp | Plain gradient descent when n_neg≥2 | Superseded by precond_descent in redesign |
+| blend WITHOUT precond | λ₂-blend on plain GAD | Not yet implemented — highest priority next |
+
+---
+
+## Consolidated Results: All Methods Ranked
+
+| Rank | Method | 10pm | 50pm | 100pm | 200pm | Key feature |
+|------|--------|------|------|-------|-------|-------------|
+| 1 | **gad_dt003** | **94.7** | **92.0** | **88.9** | **58.8** | dt=0.003, 2000 steps |
+| 2 | gad_small_dt | 94.3 | 91.3 | 86.7 | 51.3 | dt=0.005, 1000 steps |
+| 3 | gad_no_clamp | 94.3 | 91.3 | 86.7 | 54.6 | Same as #2, no cap |
+| 4 | nr_gad_damped α=0.1 | 94.7 | 77.7 | 58.0 | 33.7 | Damped NR when n_neg≥2 |
+| 5 | adaptive_floor | 83.0 | 70.2 | 43.2 | 15.9 | Adaptive dt, high floor |
+| 6 | precond_gad_dt01 | 78.3 | 68.3 | 58.0 | 41.7 | |H|⁻¹ at dt=0.01 |
+| 7 | precond_gad_001 | 73.7 | 48.0 | 21.7 | 3.3 | |H|⁻¹ at dt=0.005 |
+| 8 | gad_projected | 72.3 | 69.3 | 66.7 | 45.3 | dt=0.01 baseline |
+| 9 | blend_k50 | 72.0 | 37.2 | 14.3 | 3.1 | λ₂-blend + |H|⁻¹ |
+| 10 | precond_descent | 71.3 | 38.5 | 14.0 | 2.4 | |H|⁻¹ descent diagnostic |
+| 11 | gad_adaptive_dt | 71.3 | 52.7 | 37.7 | 14.3 | Adaptive dt (old params) |
+| 12 | nr_gad_pingpong | 56.7 | 31.7 | 24.7 | 18.3 | Undamped NR |
+| 13 | adaptive_mm | 53.7 | 35.1 | 22.6 | 5.7 | Multi-Mode GAD params |
+| 14 | adaptive_mm2 | 40.1 | 22.4 | 13.1 | 2.4 | Even smaller base |
+
+---
+
+## Data Locations
+
+```
+Round 1 methods:     /lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/
+Round 1 damped NR:   /lustre07/scratch/memoozd/gadplus/runs/targeted/
+Round 1 noise:       /lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/
+Round 1 start geom:  /lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/
+Round 1 geodesic:    /lustre07/scratch/memoozd/gadplus/runs/geodesic_mid/
+Round 1 basin:       /lustre07/scratch/memoozd/gadplus/runs/basin_map/
+Round 1 IRC:         /lustre07/scratch/memoozd/gadplus/runs/irc_validation/
+Round 2 precond:     /lustre07/scratch/memoozd/gadplus/runs/precond_gad/
+Round 2 others:      /lustre07/scratch/memoozd/gadplus/runs/round2/
 ```
 
-### Data locations
+## SLURM Job IDs
 
-```
-Phase 1 (sweep):     /lustre07/scratch/memoozd/gadplus/runs/sweep_dt/
-Phase 2 (noise):     /lustre07/scratch/memoozd/gadplus/runs/noise_survey_300/
-Phase 3 (starting):  /lustre07/scratch/memoozd/gadplus/runs/starting_geom_300/
-Phase 4 (plots):     /lustre07/scratch/memoozd/gadplus/runs/noise_survey/plots/
-Phase 5 (IRC):       /lustre07/scratch/memoozd/gadplus/runs/irc_validation/
-Phase 6 (basin):     /lustre07/scratch/memoozd/gadplus/runs/basin_map/
-Phase 7 (methods):   /lustre07/scratch/memoozd/gadplus/runs/method_cmp_300/
-```
+| Job | ID | Status |
+|-----|-----|--------|
+| Round 1 method cmp | 58845357 | Complete (42/42) |
+| Round 1 damped NR | 58852071 | Complete (42/42) |
+| Round 1 noise survey | 58835838 | Complete (9/9) |
+| Round 1 start geom | 58835839 | Complete (4/4) |
+| Round 1 geodesic | 58852072 | Timeout (204/300 salvaged) |
+| Round 1 basin | 58835840 | Complete |
+| Round 1 IRC | 58834594 | Complete |
+| Round 2 precond GAD | 58885855 | Complete (30/30) |
+| Round 2 round2 | 58886863 | Mixed (9 full + 39 partial timeout) |
