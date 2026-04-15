@@ -31,6 +31,7 @@ from gadplus.core.convergence import (
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
 from gadplus.projection import vib_eig
 from gadplus.projection import gad_dynamics_projected
+from gadplus.projection import multimode_gad_dynamics_projected
 from gadplus.projection import preconditioned_gad_dynamics_projected
 from gadplus.projection import atomic_nums_to_symbols
 from gadplus.logging.trajectory import TrajectoryLogger
@@ -61,6 +62,9 @@ class GADSearchConfig:
     # Lambda2-blended preconditioning: w = sigmoid(k * lambda_2)
     # 0 = no blend (standard GAD/precond GAD), >0 = blended
     blend_sharpness: float = 0.0
+    # Multi-mode GAD: "" = standard single-mode, "all_neg"/"smooth"/"top2"
+    multimode: str = ""
+    multimode_sharpness: float = 50.0  # sigmoid sharpness for "smooth" mode
 
 
 @dataclass
@@ -222,38 +226,48 @@ def run_gad_search(
             else:
                 gad_vec = forces.clone()  # just follow forces
         elif cfg.use_projection:
-            # Mode tracking on projected eigenvectors
-            k_track = cfg.k_track
-            n_evecs = evecs_vib_3N.shape[1]
-            k_eff = min(k_track, n_evecs) if k_track > 0 else n_evecs
-            V_cand = evecs_vib_3N[:, :max(k_eff, 1)].to(device=forces.device, dtype=forces.dtype)
-            v_prev_local = (
-                v_prev.to(device=forces.device, dtype=forces.dtype).reshape(-1)
-                if v_prev is not None else None
-            )
-            v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
-
-            # Compute blend weight: w = sigmoid(k * lambda_2) if blending
-            if cfg.blend_sharpness > 0:
-                blend_w = torch.sigmoid(torch.tensor(
-                    cfg.blend_sharpness * eig1,
-                    dtype=torch.float64,
-                ))
-            else:
-                blend_w = 1.0  # standard GAD (full v1 ascent)
-
-            if cfg.use_preconditioning:
-                gad_vec, v_proj, _info = preconditioned_gad_dynamics_projected(
-                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+            if cfg.multimode:
+                # Multi-mode GAD: flip along multiple eigenvectors
+                gad_vec, v_proj, _info = multimode_gad_dynamics_projected(
+                    coords=coords, forces=forces, atomsymbols=atomsymbols,
                     evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
-                    eig_floor=cfg.eig_floor, gad_blend_weight=blend_w,
+                    mode=cfg.multimode,
+                    sigmoid_sharpness=cfg.multimode_sharpness,
                 )
+                v_prev = v_proj.detach().clone().reshape(-1)
             else:
-                gad_vec, v_proj, _info = gad_dynamics_projected(
-                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
-                    gad_blend_weight=blend_w,
+                # Standard single-mode GAD (with optional blend/preconditioning)
+                k_track = cfg.k_track
+                n_evecs = evecs_vib_3N.shape[1]
+                k_eff = min(k_track, n_evecs) if k_track > 0 else n_evecs
+                V_cand = evecs_vib_3N[:, :max(k_eff, 1)].to(device=forces.device, dtype=forces.dtype)
+                v_prev_local = (
+                    v_prev.to(device=forces.device, dtype=forces.dtype).reshape(-1)
+                    if v_prev is not None else None
                 )
-            v_prev = v_proj.detach().clone().reshape(-1)
+                v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
+
+                # Compute blend weight: w = sigmoid(k * lambda_2) if blending
+                if cfg.blend_sharpness > 0:
+                    blend_w = torch.sigmoid(torch.tensor(
+                        cfg.blend_sharpness * eig1,
+                        dtype=torch.float64,
+                    ))
+                else:
+                    blend_w = 1.0  # standard GAD (full v1 ascent)
+
+                if cfg.use_preconditioning:
+                    gad_vec, v_proj, _info = preconditioned_gad_dynamics_projected(
+                        coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                        evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
+                        eig_floor=cfg.eig_floor, gad_blend_weight=blend_w,
+                    )
+                else:
+                    gad_vec, v_proj, _info = gad_dynamics_projected(
+                        coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                        gad_blend_weight=blend_w,
+                    )
+                v_prev = v_proj.detach().clone().reshape(-1)
         else:
             # Raw GAD on unprojected Hessian
             gad_vec, v_next, _info = compute_gad_vector_tracked(

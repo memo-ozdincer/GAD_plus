@@ -184,3 +184,26 @@ def pairwise_rmsd_matrix(
             D[i, j] = rmsd
             D[j, i] = rmsd
     return D
+
+
+def equivalence_classes_from_atomic_numbers(atomic_nums: np.ndarray) -> dict[str, list[int]]:
+    """Group atom indices by atomic number for permutation-aware alignment.
+
+    This is a generic fallback when molecule-specific symmetry annotations are
+    unavailable. It allows Hungarian matching among atoms of the same element.
+    """
+    nums = np.asarray(atomic_nums, dtype=int).reshape(-1)
+    classes: dict[str, list[int]] = {}
+    for idx, z in enumerate(nums.tolist()):
+        classes.setdefault(f"Z{z}", []).append(idx)
+    return classes
+
+
+def aligned_rmsd_by_element(
+    geom1: np.ndarray,
+    geom2: np.ndarray,
+    atomic_nums: np.ndarray,
+) -> float:
+    """Compute aligned RMSD using element-wise permutation classes only."""
+    equiv_classes = equivalence_classes_from_atomic_numbers(atomic_nums)
+    return aligned_rmsd(geom1, geom2, equiv_classes)

@@ -24,6 +24,7 @@ except ImportError:  # pragma: no cover - optional runtime dependency
     nx = None
 
 from gadplus.projection import Z_TO_SYMBOL
+from gadplus.geometry.alignment import aligned_rmsd_by_element
 
 
 @dataclass
@@ -37,6 +38,10 @@ class IRCResult:
     reverse_coords: Optional[np.ndarray]    # Final geometry from reverse IRC
     rmsd_to_reactant: Optional[float]
     rmsd_to_product: Optional[float]
+    forward_rmsd_to_reactant: Optional[float]
+    forward_rmsd_to_product: Optional[float]
+    reverse_rmsd_to_reactant: Optional[float]
+    reverse_rmsd_to_product: Optional[float]
     forward_graph_matches_reactant: bool
     forward_graph_matches_product: bool
     reverse_graph_matches_reactant: bool
@@ -103,8 +108,9 @@ def _to_numpy_coords(coords: Optional[torch.Tensor]) -> Optional[np.ndarray]:
     return coords.detach().cpu().numpy().reshape(-1, 3)
 
 
-def _coords_rmsd(coords_a: np.ndarray, coords_b: np.ndarray) -> float:
-    return float(np.sqrt(np.mean((coords_a - coords_b) ** 2)))
+def _coords_rmsd(coords_a: np.ndarray, coords_b: np.ndarray, atomic_nums: torch.Tensor) -> float:
+    nums = atomic_nums.detach().cpu().numpy().astype(int)
+    return float(aligned_rmsd_by_element(coords_a, coords_b, nums))
 
 
 def _min_optional(a: Optional[float], b: Optional[float]) -> Optional[float]:
@@ -143,6 +149,10 @@ def run_irc_validation(
             topology_intended=False, topology_half_intended=False,
             forward_coords=None, reverse_coords=None,
             rmsd_to_reactant=None, rmsd_to_product=None,
+            forward_rmsd_to_reactant=None,
+            forward_rmsd_to_product=None,
+            reverse_rmsd_to_reactant=None,
+            reverse_rmsd_to_product=None,
             forward_graph_matches_reactant=False,
             forward_graph_matches_product=False,
             reverse_graph_matches_reactant=False,
@@ -181,10 +191,10 @@ def run_irc_validation(
     reactant_np = _to_numpy_coords(reactant_coords)
     product_np = _to_numpy_coords(product_coords)
 
-    fr_rmsd = _coords_rmsd(forward_coords, reactant_np) if (forward_coords is not None and reactant_np is not None) else None
-    rr_rmsd = _coords_rmsd(reverse_coords, reactant_np) if (reverse_coords is not None and reactant_np is not None) else None
-    fp_rmsd = _coords_rmsd(forward_coords, product_np) if (forward_coords is not None and product_np is not None) else None
-    rp_rmsd = _coords_rmsd(reverse_coords, product_np) if (reverse_coords is not None and product_np is not None) else None
+    fr_rmsd = _coords_rmsd(forward_coords, reactant_np, atomic_nums) if (forward_coords is not None and reactant_np is not None) else None
+    rr_rmsd = _coords_rmsd(reverse_coords, reactant_np, atomic_nums) if (reverse_coords is not None and reactant_np is not None) else None
+    fp_rmsd = _coords_rmsd(forward_coords, product_np, atomic_nums) if (forward_coords is not None and product_np is not None) else None
+    rp_rmsd = _coords_rmsd(reverse_coords, product_np, atomic_nums) if (reverse_coords is not None and product_np is not None) else None
 
     rmsd_to_reactant = _min_optional(fr_rmsd, rr_rmsd)
     rmsd_to_product = _min_optional(fp_rmsd, rp_rmsd)
@@ -250,6 +260,10 @@ def run_irc_validation(
         reverse_coords=reverse_coords,
         rmsd_to_reactant=rmsd_to_reactant,
         rmsd_to_product=rmsd_to_product,
+        forward_rmsd_to_reactant=fr_rmsd,
+        forward_rmsd_to_product=fp_rmsd,
+        reverse_rmsd_to_reactant=rr_rmsd,
+        reverse_rmsd_to_product=rp_rmsd,
         forward_graph_matches_reactant=forward_graph_matches_reactant,
         forward_graph_matches_product=forward_graph_matches_product,
         reverse_graph_matches_reactant=reverse_graph_matches_reactant,

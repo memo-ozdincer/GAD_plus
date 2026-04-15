@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  7 APR 2026 14:06
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  15 APR 2026 03:22
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -505,133 +505,139 @@ LaTeX Info: Redefining \nameref on input line 19.
 \@outlinefile=\write3
 \openout3 = `EXPERIMENTS.out'.
 
-<figures/fig1_conv_vs_noise.png, id=4, 564.79005pt x 372.55185pt>
+ [1
+
+{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
+tex/updmap/pdftex.map}]
+Overfull \hbox (9.21448pt too wide) in paragraph at lines 64--65
+[]\OT1/cmr/m/n/10.95 The first re-fined IRC re-run is now sci-en-tif-i-cally me
+an-ing-ful: most er-rors are \OT1/cmtt/m/n/10.95 ts[]quality[]gate[]failed\OT1/
+cmr/m/n/10.95 ,
+ []
+
+<figures/fig1_conv_vs_noise.png, id=20, 564.79005pt x 372.55185pt>
 File: figures/fig1_conv_vs_noise.png Graphic file (type png)
 <use figures/fig1_conv_vs_noise.png>
-Package pdftex.def Info: figures/fig1_conv_vs_noise.png  used on input line 43.
+Package pdftex.def Info: figures/fig1_conv_vs_noise.png  used on input line 91.
 
 (pdftex.def)             Requested size: 232.41867pt x 153.31003pt.
 
-
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 45.
+(caption)                particular \caption on input line 93.
 See the caption package documentation for explanation.
 
-<figures/fig6_steps_vs_noise.png, id=6, 508.7808pt x 344.7279pt>
+<figures/fig6_steps_vs_noise.png, id=22, 508.7808pt x 344.7279pt>
 File: figures/fig6_steps_vs_noise.png Graphic file (type png)
 <use figures/fig6_steps_vs_noise.png>
-Package pdftex.def Info: figures/fig6_steps_vs_noise.png  used on input line 49
+Package pdftex.def Info: figures/fig6_steps_vs_noise.png  used on input line 97
 .
 (pdftex.def)             Requested size: 232.41867pt x 157.47739pt.
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 51.
+(caption)                particular \caption on input line 99.
 See the caption package documentation for explanation.
 
-[1
-
-{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
-tex/updmap/pdftex.map} <./figures/fig1_conv_vs_noise.png> <./figures/fig6_steps
-_vs_noise.png>]
-<figures/fig2_starting_geometry.png, id=25, 501.19244pt x 370.0224pt>
+[2 <./figures/fig1_conv_vs_noise.png> <./figures/fig6_steps_vs_noise.png>]
+<figures/fig2_starting_geometry.png, id=33, 501.19244pt x 370.0224pt>
 File: figures/fig2_starting_geometry.png Graphic file (type png)
 <use figures/fig2_starting_geometry.png>
 Package pdftex.def Info: figures/fig2_starting_geometry.png  used on input line
- 76.
+ 124.
 (pdftex.def)             Requested size: 232.41867pt x 171.59pt.
 
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 78.
+(caption)                particular \caption on input line 126.
 See the caption package documentation for explanation.
 
-<figures/fig3_basin_mapping.png, id=26, 927.58545pt x 350.14815pt>
+<figures/fig3_basin_mapping.png, id=34, 927.58545pt x 350.14815pt>
 File: figures/fig3_basin_mapping.png Graphic file (type png)
 <use figures/fig3_basin_mapping.png>
-Package pdftex.def Info: figures/fig3_basin_mapping.png  used on input line 106
+Package pdftex.def Info: figures/fig3_basin_mapping.png  used on input line 154
 .
 (pdftex.def)             Requested size: 266.31691pt x 100.53056pt.
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 108.
+(caption)                particular \caption on input line 156.
 See the caption package documentation for explanation.
 
-[2 <./figures/fig2_starting_geometry.png>]
-<figures/fig4_method_heatmap.png, id=37, 742.2129pt x 425.30894pt>
+[3 <./figures/fig2_starting_geometry.png>]
+<figures/fig4_method_heatmap.png, id=44, 742.2129pt x 425.30894pt>
 File: figures/fig4_method_heatmap.png Graphic file (type png)
 <use figures/fig4_method_heatmap.png>
-Package pdftex.def Info: figures/fig4_method_heatmap.png  used on input line 13
-4.
+Package pdftex.def Info: figures/fig4_method_heatmap.png  used on input line 18
+2.
 (pdftex.def)             Requested size: 411.58134pt x 235.85457pt.
 
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 136.
+(caption)                particular \caption on input line 184.
 See the caption package documentation for explanation.
 
-[3 <./figures/fig3_basin_mapping.png> <./figures/fig4_method_heatmap.png>]
-[4]
-Overfull \hbox (24.68832pt too wide) in paragraph at lines 213--222
+[4 <./figures/fig3_basin_mapping.png> <./figures/fig4_method_heatmap.png>]
+[5]
+Overfull \hbox (24.68832pt too wide) in paragraph at lines 261--270
 [][] 
  []
 
-[5]
-<figures/fig_gad_vs_sella.png, id=66, 1004.0712pt x 386.8854pt>
+[6] [7]
+<figures/fig_gad_vs_sella.png, id=79, 1004.0712pt x 386.8854pt>
 File: figures/fig_gad_vs_sella.png Graphic file (type png)
 <use figures/fig_gad_vs_sella.png>
-Package pdftex.def Info: figures/fig_gad_vs_sella.png  used on input line 345.
+Package pdftex.def Info: figures/fig_gad_vs_sella.png  used on input line 436.
 (pdftex.def)             Requested size: 232.41867pt x 89.5544pt.
 
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 347.
+(caption)                particular \caption on input line 438.
 See the caption package documentation for explanation.
 
-[6]
-Overfull \hbox (78.25232pt too wide) in paragraph at lines 365--381
+
+Overfull \hbox (138.54433pt too wide) in paragraph at lines 456--472
  [] 
  []
 
-[7 <./figures/fig_gad_vs_sella.png>] (./EXPERIMENTS.aux)
+[8 <./figures/fig_gad_vs_sella.png>] [9] (./EXPERIMENTS.aux)
 Package rerunfilecheck Info: File `EXPERIMENTS.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 11040 strings out of 480884
- 172772 string characters out of 5900692
- 486879 words of memory out of 5000000
+ 11044 strings out of 480884
+ 172806 string characters out of 5900692
+ 484879 words of memory out of 5000000
  28120 multiletter control sequences out of 15000+600000
  413056 words of font info for 61 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
- 71i,11n,74p,371b,365s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 71i,11n,74p,371b,442s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/font
 s/enc/dvips/cm-super/cm-super-ts1.enc}</cvmfs/soft.computecanada.ca/gentoo/2023
 /x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></cvm
 fs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1
 /public/amsfonts/cm/cmbx12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
--v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></cvmfs/soft
-.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public
-/amsfonts/cm/cmmi12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr
-/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></cvmfs/soft.compute
-canada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmr10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/te
-xmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></cvmfs/soft.computecanada.ca
-/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7
-.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/f
-onts/type1/public/amsfonts/cm/cmr8.pfb></cvmfs/soft.computecanada.ca/gentoo/202
-3/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></cv
-mfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type
-1/public/amsfonts/cm/cmsy7.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
--v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></cvmfs/soft.
+-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></cvmfs/soft.
 computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmti10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/
-share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/soft.compute
-canada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/cm-supe
-r/sfrm1095.pfb>
-Output written on EXPERIMENTS.pdf (7 pages, 894936 bytes).
+amsfonts/cm/cmmi10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/
+share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></cvmfs/soft.compute
+canada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmmi8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></cvmfs/soft.computecanada.ca
+/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr1
+2.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmr7.pfb></cvmfs/soft.computecanada.ca/gentoo/20
+23/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></cvm
+fs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1
+/public/amsfonts/cm/cmsy10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
+-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></cvmfs/soft.
+computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/
+amsfonts/cm/cmsy8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/s
+hare/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></cvmfs/soft.computec
+anada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts
+/cm/cmtt10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/te
+xmf-dist/fonts/type1/public/cm-super/sfrm1095.pfb>
+Output written on EXPERIMENTS.pdf (9 pages, 912796 bytes).
 PDF statistics:
- 141 PDF objects out of 1000 (max. 8388607)
- 103 compressed objects within 2 object streams
- 30 named destinations out of 1000 (max. 500000)
+ 156 PDF objects out of 1000 (max. 8388607)
+ 115 compressed objects within 2 object streams
+ 34 named destinations out of 1000 (max. 500000)
  31 words of extra memory for PDF output out of 10000 (max. 10000000)
 

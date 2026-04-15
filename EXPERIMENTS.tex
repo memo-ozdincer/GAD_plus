@@ -34,6 +34,54 @@ All methods are purely geometry-based---no path history. $\sim$46,000 total
 optimizations across 18 experiments in three rounds.
 
 %----------------------------------------------------------------------
+\section*{Working Ledger \small(keep this visible even if the document gets compacted)}
+
+This is the deliberately redundant ``what we have done so far'' section so the
+project trail survives later compaction.
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item Built the core GAD baseline on Transition1x with Eckart projection and established that projection is the main source of robustness.
+\item Tested alternative starts: noised TS, linear midpoint, reactant, product, plus a partial geodesic-midpoint attempt.
+\item Mapped the basin of attraction and found no wrong-TS convergence below 100pm in the original basin test.
+\item Ran a broad 7-method comparison and found \texttt{gad\_small\_dt} is the first clearly strong regime.
+\item Tested NR switching, damped NR, one-way descent$\to$GAD, adaptive dt variants, higher-floor adaptive dt, preconditioning, and $\lambda_2$ blends.
+\item Continued the fixed-dt series $0.01 \to 0.005 \to 0.003 \to 0.002$ and found smaller dt keeps helping, but with diminishing returns.
+\item Ran Sella baselines at 200 and 1000 steps, across Cartesian/internal and Eckart/non-Eckart variants, and showed GAD wins more decisively as noise increases.
+\item Added trajectory-level analysis to explain why NR-style switching fails: Hessian inversion overshoots into $n_{\text{neg}}=0$ minima and gets stuck.
+\item Added \texttt{fmax} backfill support so old trajectories can be rescored under the stricter $n_{\text{neg}}=1 + f_{\max}<0.01$ criterion without rerunning them.
+\item Upgraded 3D visualization tooling so trajectories are exported directly to the two VS Code viewers we wanted:
+  \texttt{arianjamasb.protein-viewer} and \texttt{stevenyu.nano-protein-viewer}.
+\item Added batch CPU export of representative flagship \texttt{gad\_small\_dt} trajectories and successfully generated 15 viewer bundles
+  (5 noise levels $\times$ 3 picks: fast / slow / failure).
+\item Reworked IRC validation from a simple RMSD-only check into a stronger pipeline with:
+  better TS candidate selection from saved trajectories,
+  recomputed projected TS metrics,
+  optional pre-IRC projected-GAD refinement,
+  element-aware Kabsch/Hungarian endpoint alignment,
+  topology-based bond-graph checks,
+  and viewer-bundle export for IRC endpoint inspection.
+\item Fixed an important schema bug in the new IRC tooling: older trajectory Parquets often had \texttt{force\_norm} but not \texttt{force\_max}, so the loader now detects the schema and falls back cleanly.
+\item The first refined IRC rerun is now scientifically meaningful: most errors are \texttt{ts\_quality\_gate\_failed}, not code failures, which directly confirms that the old convergence criterion was too permissive for TS identity claims.
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+Refined IRC rerun & Intended & Half & Topo-intended & Topo-half & Unintended & Error \\
+\midrule
+0pm  & 0 & 7 & 0 & 8 & 5 & 18 \\
+10pm & 0 & 3 & 0 & 4 & 6 & 21 \\
+50pm & 0 & 0 & 0 & 0 & 4 & 26 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Interpretation before deeper analysis:} the new IRC pipeline is now mostly
+measuring TS quality rather than failing operationally. The dominant story is that
+many ``converged'' points from the old criterion do \emph{not} survive a stricter
+$f_{\max}$-based screen, even after short projected-GAD refinement.
+
+%----------------------------------------------------------------------
 \section*{1. Noise Robustness \small(300 samples, dt=0.01, 300 steps)}
 
 How does convergence degrade as we add Gaussian noise to the known TS geometry?
@@ -273,6 +321,49 @@ Then $0.005 \to 0.003$: $+$1--4pp. Then $0.003 \to 0.002$: $+$0--3pp, only at $\
 At 10--100pm, dt=0.003 and dt=0.002 are \textbf{identical}. The cost is 3$\times$ wall time for marginal gains.
 
 %----------------------------------------------------------------------
+\section*{7d. Round 4: Descent$\to$GAD One-Way Switch + Trajectory Analysis}
+
+\textbf{Idea:} Instead of NR-GAD ping-pong (which oscillates), do a \textit{one-way} switch:
+plain gradient descent ($\Delta\mathbf{x} = dt \cdot \mathbf{F}$, no Hessian inversion)
+until $n_{\text{neg}} \leq$ threshold, then GAD permanently. No switching back. Same dt=0.005.
+
+\begin{tabular}{l*{3}{r}l}
+\toprule
+Method & 50pm & 100pm & 200pm & Notes \\
+\midrule
+\textbf{gad\_small\_dt} & \textbf{91.3} & \textbf{86.7} & \textbf{51.3} & Pure GAD \\
+descent\_then\_gad\_2  & 91.7 & 86.3 & 52.9$^\dagger$ & Switch at $n_{\text{neg}} \leq 2$ \\
+descent\_then\_gad\_3  & 91.3 & 86.7 & 52.5$^\dagger$ & Switch at $n_{\text{neg}} \leq 3$ \\
+\bottomrule
+\end{tabular}
+
+{\small $^\dagger$200pm still running ($\sim$238/300 samples).}
+
+\textbf{Result:} Identical to baseline. The descent phase is 1--3 steps long (at dt=0.005,
+$n_{\text{neg}}$ drops to $\leq$2 within 1--2 steps regardless of force type), too short to matter.
+
+\textbf{Trajectory analysis} reveals \textit{why} NR-GAD ping-pong fails while this doesn't:
+
+\vspace{0.3em}
+\begin{tabular}{l*{4}{r}}
+\toprule
+Metric (100pm, 30 samples) & Pure GAD & NR-GAD & NR $\alpha$=0.1 & Desc$\to$GAD \\
+\midrule
+Converged & 90\% & 23\% & 40\% & 90\% \\
+Phase transitions & 0 & 11.5 & 3.2 & 0.9 \\
+$n_{\text{neg}}$ changes & 2.6 & \textbf{105.9} & 6.4 & 2.6 \\
+Steps at $n_{\text{neg}}$=0 & 0 & \textbf{224.5} & \textbf{225.7} & 0 \\
+\bottomrule
+\end{tabular}
+
+\textbf{Key finding:} NR-GAD's Newton step ($\mathbf{H}^{-1}\mathbf{g}$) \textbf{overshoots through
+$n_{\text{neg}}=1$ into $n_{\text{neg}}=0$} (a minimum). Samples then spend $\sim$225 steps
+trapped at a minimum, with $n_{\text{neg}}$ oscillating 105$\times$. Pure GAD and
+Descent$\to$GAD \textit{never} visit $n_{\text{neg}}=0$ (0 steps). The problem is definitively
+the Hessian inversion creating steps orders of magnitude too large along near-zero eigenvalue modes,
+not the switching logic itself.
+
+%----------------------------------------------------------------------
 \section*{8. Sella TS Baselines \small(300 samples, 200 \& 1000 max steps, exact Hessian)}
 
 Direct comparison with Sella (RS-P-RFO trust-region optimizer, Wander et al.\ 2024).
@@ -374,7 +465,7 @@ Finding & Evidence \\
 \textbf{$\lambda_2$-blend hurts (even without precond)} & $-$10pp at 100pm; weakening $\mathbf{v}_1$ ascent is always harmful \\
 \textbf{$|\mathbf{H}|^{-1}$ preconditioning hurts GAD} & $-$21pp at 10pm, $-$43pp at 50pm \\
 \textbf{Adaptive dt always hurts} & 5 parameter sets tested, all worse than fixed dt \\
-\textbf{NR switching hurts} & 4 variants all worse than pure GAD \\
+\textbf{NR switching hurts (trajectory proof)} & NR overshoots to $n_{\text{neg}}$=0, 225 steps trapped; gentle descent is fine but pointless \\
 \textbf{1000 steps doesn't help Sella} & $<$1pp vs 200 steps; failures are geometric \\
 \bottomrule
 \end{tabular}
@@ -384,7 +475,7 @@ Finding & Evidence \\
 \texttt{gad\_dt003} --- Eckart-projected GAD, dt=0.003, 2000 steps, no mode tracking,
 no adaptive dt, no preconditioning, no NR. \textit{The simplest method wins.}
 
-\textbf{Total optimizations:} $\sim$46,000 across 18 experiments (Rounds 1--3).
+\textbf{Total optimizations:} $\sim$48,000 across 19 experiments (Rounds 1--4).
 
 \textbf{Next steps:}
 \begin{enumerate}[nosep,leftmargin=1.5em]

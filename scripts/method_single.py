@@ -186,6 +186,16 @@ METHOD_CONFIGS = {
     "descent_then_gad_3": dict(
         runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, descent_until_nneg=3
     ),
+    # === Round 4: Multi-mode GAD ===
+    # Ascend along ALL negative-eigenvalue modes, not just v₁
+    "multimode_all_neg": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                              multimode="all_neg"),
+    # Smooth differentiable version: sigmoid(-λᵢ·k) weight per mode
+    "multimode_smooth": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                             multimode="smooth", multimode_sharpness=50.0),
+    # Top-2: always flip v₁ and v₂
+    "multimode_top2": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                           multimode="top2"),
     # === Tight convergence presets (for high-precision TS refinement) ===
     "gad_projected_fmax1e4": dict(
         runner="gad",
@@ -336,6 +346,8 @@ def main():
             eig_floor=mcfg.get("eig_floor", 0.01),
             blend_sharpness=mcfg.get("blend_sharpness", 0.0),
             descent_until_nneg=mcfg.get("descent_until_nneg", 0),
+            multimode=mcfg.get("multimode", ""),
+            multimode_sharpness=mcfg.get("multimode_sharpness", 50.0),
         )
     elif runner == "pingpong":
         cfg = NRGADPingPongConfig(

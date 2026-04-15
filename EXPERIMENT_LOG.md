@@ -8,6 +8,94 @@
 
 ---
 
+## Broad Running Ledger (Keep This Even After Compaction)
+
+This section is intentionally redundant. It is the "everything we've done that comes to mind" ledger so the full arc remains visible even if later sections get tightened.
+
+### Core experimental arc so far
+
+1. Established the Eckart-projected GAD baseline on Transition1x and showed projection is the main unlock.
+2. Tested starting geometries beyond noised TS: midpoint, reactant, product, and a partial geodesic-midpoint run.
+3. Mapped the TS basin of attraction and found no silent wrong-TS convergence below 100pm in the original basin test.
+4. Ran a 7-method comparison and found `gad_small_dt` clearly dominates the first round.
+5. Tested NR-GAD ping-pong and then damped NR-GAD; both underperformed because Hessian-inversion steps overshoot.
+6. Ran an initial IRC validation pass on converged TS candidates using a simple RMSD endpoint check.
+7. Ran preconditioned GAD and showed `|H|^{-1}` scaling is actively harmful for GAD dynamics.
+8. Re-tested adaptive timestep variants, including literature-inspired corrected settings; all remained worse than fixed dt.
+9. Continued the fixed-dt series (`0.01 -> 0.005 -> 0.003 -> 0.002`) and found smaller dt helps monotonically with diminishing returns.
+10. Tested removing displacement capping and found the cap is effectively inert at small dt.
+11. Tested higher-floor adaptive dt and found it improves over bad adaptive variants but still loses to fixed dt.
+12. Ran a preconditioned-descent diagnostic to separate "preconditioning failure" from "GAD-vs-descent" effects.
+13. Implemented and tested `lambda_2`-blended dynamics with preconditioning; found preconditioning dominated the behavior.
+14. Re-tested the `lambda_2` blend without preconditioning and found the blend itself hurts relative to plain GAD.
+15. Ran Sella baselines at 200 steps, then a 1000-step Sella follow-up with Cartesian/internal and Eckart/non-Eckart variants.
+16. Showed GAD beats Sella increasingly strongly as noise rises, especially under the strict `n_neg==1 + fmax<0.01` comparison.
+17. Ran one-way descent-to-GAD switching plus trajectory analysis and showed the real failure mode is Newton overshoot into `n_neg=0`, not switching logic alone.
+18. Added backfill support for `fmax` so we can migrate reporting to `n_neg==1 AND fmax<0.01` without rerunning the original trajectories.
+
+### Infrastructure and analysis upgrades
+
+1. Standardized on viewing Narval CPU-only jobs as the right place for bulk visualization/export work, with MIG slicing still available for heavy parallel experiment sweeps.
+2. Added [scripts/backfill_fmax.py](scripts/backfill_fmax.py) so old Parquet outputs can be retroactively rescored with `fmax`.
+3. Upgraded [scripts/visualize_3d.py](scripts/visualize_3d.py) so it no longer assumes `force_max` exists in every trajectory schema.
+4. Made the visualization workflow viewer-first rather than Plotly-only:
+   - multi-frame XYZ for `arianjamasb.protein-viewer`
+   - `frames_xyz/` bundles for `stevenyu.nano-protein-viewer`
+5. Added [.vscode/extensions.json](.vscode/extensions.json) with those two 3D viewer recommendations.
+6. Added [scripts/export_converged_ts_xyz.py](scripts/export_converged_ts_xyz.py) to export converged final TS structures for later inspection.
+7. Added [scripts/make_flagship_visualizations.py](scripts/make_flagship_visualizations.py) to batch-export representative `gad_small_dt` trajectories.
+8. Added [scripts/run_flagship_visualizations_cpu.slurm](scripts/run_flagship_visualizations_cpu.slurm) to run those exports on CPU nodes.
+9. Fixed a schema bug in `make_flagship_visualizations.py`:
+   - original assumption: `search_method` and `run_id` existed in the summary parquet
+   - actual schema: `method` existed and `run_id` had to be resolved from trajectory parquet files
+10. Verified the flagship visualization batch succeeded and wrote 15 viewer bundles plus a manifest under `method_cmp_300/flagship_visualizations/`.
+11. Added [scripts/visualize_irc.py](scripts/visualize_irc.py) so saved IRC validation results can also be exported as viewer bundles after the fact.
+
+### IRC-specific redesign work before the first serious rerun
+
+1. Strengthened endpoint comparison in [src/gadplus/search/irc_validate.py](src/gadplus/search/irc_validate.py):
+   - replaced naive Cartesian RMSD with element-aware Kabsch/Hungarian aligned RMSD
+   - kept topology-based bond-graph matching as an additional chemistry-aware endpoint check
+2. Added alignment helpers in [src/gadplus/geometry/alignment.py](src/gadplus/geometry/alignment.py) for element-aware equivalence classes and aligned RMSD.
+3. Reworked [scripts/irc_validate.py](scripts/irc_validate.py) so TS candidates are selected from saved trajectories instead of blindly using final saved frames.
+4. Added TS-pick modes such as `best_nneg1`, `final`, and `best_force`.
+5. Added recomputation of `force_norm`, `fmax`, and projected `n_neg` on the chosen TS geometry before IRC.
+6. Added a TS quality gate so IRC can reject weak "converged" candidates before spending time on path following.
+7. Added an optional projected-GAD pre-IRC refinement stage so borderline TS candidates can be tightened before IRC.
+8. Recorded both pre-refinement and post-refinement metrics in the validation parquet.
+9. Stored coordinate payloads in the validation output:
+   - selected TS coordinates
+   - refined TS coordinates
+   - reactant/product references
+   - forward/reverse IRC endpoints
+   - atomic numbers
+10. Added viewer-bundle writing for IRC outputs so endpoint/path-context structures can be opened in the same VS Code viewers as the GAD trajectories.
+11. Updated [scripts/run_irc_validate.slurm](scripts/run_irc_validate.slurm) and [scripts/run_geodesic_irc.slurm](scripts/run_geodesic_irc.slurm) to use stricter defaults and the refinement stage.
+
+### Recent run history that should not be forgotten
+
+1. An early new-style IRC run failed because older trajectory parquet files lacked `force_max`; the code still hard-selected that column.
+2. That bug was fixed by schema-detecting optional columns and falling back cleanly to `force_norm`.
+3. A later rerun confirmed that the pipeline was doing real IRC work rather than failing at Parquet read time.
+4. The stricter TS gate immediately exposed a key issue: many previously "converged" samples satisfy `n_neg==1 + force_norm<0.01` while failing `fmax<0.01`.
+5. The flagship CPU visualization batch completed successfully and produced 15 representative `gad_small_dt` bundles:
+   - 5 noise levels: `10, 50, 100, 150, 200`
+   - 3 picks each: `fast`, `slow`, `failure`
+6. The refined IRC run `59367455_[0-2]` completed and is the first run in the new stronger pipeline worth treating as scientifically meaningful.
+7. The headline from that refined IRC rerun is not "many intended reactions," but rather that the TS-quality gate is now doing serious filtering and that refinement rescues some borderline candidates while many still fail the tighter gate.
+8. The first refined-run summaries currently in hand are:
+
+| Noise | Intended | Half | Topology Intended | Topology Half | Unintended | Error |
+|-------|----------|------|-------------------|---------------|------------|-------|
+| 0pm | 0 | 7 | 0 | 8 | 5 | 18 |
+| 10pm | 0 | 3 | 0 | 4 | 6 | 21 |
+| 50pm | 0 | 0 | 0 | 0 | 4 | 26 |
+
+9. The dominant error category in that refined rerun is now `ts_quality_gate_failed`, which is exactly the intended behavior of the stronger screening logic.
+10. Several failures are borderline after refinement, which is why a second rerun with improved refinement thresholds/step budgets is the natural next experiment.
+
+---
+
 ## Round 1, Experiment 1: Noise Robustness
 
 **SLURM:** 58835838 | **Data:** `noise_survey_300/` | **Status:** Complete (9/9 jobs)
@@ -659,6 +747,141 @@ These replace the Round 2 partial data (which had 131-244 samples). The 100pm an
 
 ---
 
+## Round 4, Experiment 18: One-Way Descent→GAD with Trajectory Analysis
+
+**SLURM:** 59362083 | **Data:** `round4/` | **Status:** 4/6 complete (200pm still running, ~238/300)
+
+### Motivation
+
+All previous NR/descent switching experiments (Experiments 4, 5, 12) used **ping-pong switching** — checking n_neg every step and bouncing between NR and GAD. Trajectory analysis of the NR-GAD pingpong (Experiment 4) revealed the failure mode: NR overshoots through n_neg=1 into n_neg=0 (a minimum), GAD then wanders at n_neg=0, eventually n_neg bounces back to ≥2, NR fires again, overshoots again. Samples oscillate with 10-100+ phase transitions and spend 100-900 steps stuck at n_neg=0.
+
+This experiment tests a **one-way switch**: plain gradient descent (Δx = dt · F, no Hessian inversion) until n_neg drops to threshold, then permanent GAD. No switching back. No Newton step. Same dt=0.005 throughout both phases — no overshoot risk from Hessian inversion.
+
+### Method
+
+```
+Phase 1 (descent): Δx = dt · F_projected       (follow Eckart-projected forces, no v₁ flip)
+                    Until n_neg ≤ threshold → switch permanently
+Phase 2 (GAD):     Δx = dt · F_GAD_projected    (standard Eckart-projected GAD, forever)
+```
+
+Implemented via `gad_blend_weight=0.0` during descent phase (same `gad_dynamics_projected` function, just with the v₁ force flip turned off). dt=0.005, 1000 steps, Eckart projection. Two threshold values tested:
+- **descent_then_gad_2**: switch when n_neg ≤ 2
+- **descent_then_gad_3**: switch when n_neg ≤ 3 (hand off to GAD earlier)
+
+### Results
+
+| Method | 50pm | 100pm | 200pm* |
+|--------|------|-------|--------|
+| **gad_small_dt (baseline)** | **91.3** | **86.7** | **51.3** |
+| descent_then_gad_2 | 91.7 | 86.3 | 52.9 |
+| descent_then_gad_3 | 91.3 | 86.7 | 52.5 |
+
+*200pm still running (~238/300 samples).
+
+**Verdict: Identical to baseline.** The one-way descent→GAD switch neither helps nor hurts. The two thresholds (≤2 vs ≤3) are within noise of each other and of pure GAD.
+
+### Trajectory Analysis: Why It's Identical
+
+The trajectory data reveals why: at dt=0.005, **the descent phase is only 1-3 steps long**. Most samples start with n_neg=2-6 at 100pm, and n_neg drops to ≤2 within 1-2 steps regardless of whether we use GAD or plain descent. The "descent until n_neg≤2" phase is over before it can make any difference.
+
+**At 100pm (30 samples):**
+
+| Metric | Pure GAD | NR-GAD undamped | NR-GAD α=0.1 | Descent→GAD(2) |
+|--------|----------|-----------------|--------------|----------------|
+| Converged | 27/30 (90%) | 7/30 (23%) | 12/30 (40%) | 27/30 (90%) |
+| Starting n_neg (mean) | 3.5 | 3.5 | 3.5 | 3.5 |
+| Steps to n_neg≤2 | 2 | 3 | 7 | 2 |
+| Steps to n_neg=1 | 39 | 36 | 15 | 39 |
+| Phase transitions | 0 | 11.5 | 3.2 | 0.9 |
+| n_neg changes | 2.6 | 105.9 | 6.4 | 2.6 |
+| Steps at n_neg=0 | 0 | 224.5 | 225.7 | 0 |
+
+Key observations:
+1. **Descent→GAD has ~1 phase transition** (the one-way switch), vs 11.5 for NR-GAD pingpong.
+2. **Zero steps at n_neg=0** for both Pure GAD and Descent→GAD, vs 224 for NR-GAD. The gentle descent (dt·F) never overshoots into minimum territory.
+3. **n_neg changes: 2.6 for both Pure GAD and Descent→GAD**, vs 106 for NR-GAD. The trajectory is smooth, not oscillating.
+4. **Steps to n_neg≤2 is already 2** for Pure GAD — there's no room for descent to be faster.
+
+### Per-Sample Trajectory Comparison at 200pm
+
+Examining the same 10 molecules across three methods reveals the dynamics:
+
+| Sample | Start n_neg | Pure GAD | NR-GAD undamped | Descent→GAD(2) |
+|--------|-------------|----------|-----------------|----------------|
+| 0 | 5 | FAIL (n=2, stuck oscillating 2-4) | CONV (NR drops to 1 fast, 6 NR steps) | FAIL (same as pure GAD) |
+| 1 | 6 | FAIL (n=1 but force=0.025) | CONV (10 NR steps, fast convergence) | FAIL (same as pure GAD) |
+| 4 | 2 | FAIL (drops to n=0, recovers to 1 but slow) | CONV (2 NR steps) | FAIL (same as pure GAD) |
+| 5 | 4 | CONV (step 651) | FAIL (NR overshoots to n=0, 402 NR steps!) | CONV (step 643) |
+| 6 | 5 | CONV (step 835) | FAIL (oscillates 0-4, 515 NR steps) | CONV (step 834) |
+| 9 | 4 | CONV (step 361) | FAIL (NR overshoot, force=0.017) | CONV (step 359) |
+
+**The pattern:** Descent→GAD trajectories are **nearly identical to Pure GAD** — same convergence, same step count, same failures. The 1-3 descent steps at the start don't alter the trajectory. Meanwhile NR-GAD takes different paths entirely: it sometimes converges faster (samples 0, 1, 4) by aggressively reducing n_neg, but more often overshoots into n_neg=0 territory and spends hundreds of steps stuck there (samples 5, 6).
+
+**NR-GAD's failure mode in detail:** Sample 5 at 200pm starts at n_neg=4. NR-GAD fires the Newton step, n_neg immediately drops to 0. The trajectory spends 402 of 1000 steps in NR phase trying to escape, with n_neg oscillating between 0 and 3-4. The same sample with Pure GAD smoothly descends from n_neg=4→2→1 and converges at step 651. The Newton step's Hessian inversion (H⁻¹g) creates step components that are orders of magnitude too large along near-zero eigenvalue modes.
+
+### Descent Phase Details
+
+How long is the descent phase, and what does it do?
+
+**At 50pm:** descent_then_gad_2 spends median **1 step** in descent (0-4 range). 24/50 samples start with n_neg≤2 and skip descent entirely. descent_then_gad_3 spends median **0 steps** (37/50 skip). The n_neg trajectories are identical across all three methods: step0=2.8→step1=1.8→step2=1.4→step5=1.1→step10=1.1.
+
+**At 100pm:** descent_then_gad_2 spends median **1 step** in descent (0-18 range). 11/50 skip. At handoff, n_neg is almost always 2 (45/50 samples). descent_then_gad_3 spends median **0 steps** (26/50 skip). Mean n_neg trajectories are again identical across methods.
+
+**At 200pm:** descent_then_gad_2 spends median **4 steps** in descent (0-53 range). Now there's real variation — one sample takes 53 descent steps. At handoff, 48/50 samples switch at exactly n_neg=2. descent_then_gad_3 spends median **1 step** (0-24 range). 16/50 skip. The mean n_neg trajectory finally shows a tiny difference: at step 10, pure GAD has mean n_neg=2.1 while descent→GAD(2) has 1.9. But by step 50 they've converged to the same trajectory.
+
+| Noise | Method | Median descent steps | Max | Skipped (n_neg already ≤ thresh) |
+|-------|--------|---------------------|-----|----------------------------------|
+| 50pm | desc→GAD(2) | 1 | 4 | 24/50 (48%) |
+| 50pm | desc→GAD(3) | 0 | 3 | 37/50 (74%) |
+| 100pm | desc→GAD(2) | 1 | 18 | 11/50 (22%) |
+| 100pm | desc→GAD(3) | 0 | 12 | 26/50 (52%) |
+| 200pm | desc→GAD(2) | 4 | 53 | 6/50 (12%) |
+| 200pm | desc→GAD(3) | 1 | 24 | 16/50 (32%) |
+
+### Per-Sample Trajectory Divergence at 200pm
+
+Despite identical aggregate rates (~52%), **32/236 individual samples diverge** — one method converges, the other fails (or vice versa). The 1-4 steps of descent vs GAD at the start put the trajectory on a slightly different path, which sometimes leads to a different outcome 500+ steps later. Examples:
+
+| Sample | Start n_neg | Pure GAD | Desc→GAD(2) | Desc→GAD(3) | What happened |
+|--------|-------------|----------|-------------|-------------|---------------|
+| 17 | 4 | FAIL (stuck at n_neg 2-3) | **CONV** (1 desc step, fast collapse to n_neg=1) | **CONV** | Descent step avoided a v₁ that would have trapped the trajectory |
+| 49 | 5 | FAIL (oscillates n_neg 3-5) | **CONV** (9 desc steps, steady descent) | **CONV** (4 desc steps) | Longer descent phase at high n_neg avoided n_neg oscillation |
+| 67 | 5 | **CONV** (step 835) | FAIL (26 desc steps, drops to n_neg=0!) | FAIL | Descent phase went too long, overshot into minimum |
+| 81 | 4 | **CONV** | FAIL (2 desc steps → n_neg=0, stuck) | FAIL (1 desc → oscillates) | Early descent step sent geometry toward wrong basin |
+| 90 | 4 | FAIL (stuck at n_neg 2-3) | **CONV** (3 desc steps) | FAIL | Threshold matters: (≤2) helped, (≤3) didn't |
+
+**Key pattern:** Descent→GAD(2) wins some samples where pure GAD gets stuck oscillating between n_neg=2-4 — the descent phase avoids applying the v₁ flip during the chaotic high-n_neg region, resulting in a slightly different trajectory that finds a path to n_neg=1. But it also loses samples where the descent phase sends the geometry toward n_neg=0 (a minimum), which pure GAD would have avoided by ascending v₁.
+
+These effects roughly cancel out, explaining the identical aggregate rate. The descent phase is a **dice roll** — it helps some samples and hurts others, with no net benefit.
+
+### Comparison with NR-GAD Pingpong
+
+The descent→GAD comparison conclusively separates the Newton step problem from the switching concept:
+
+| Metric (100pm, 30 samples) | Pure GAD | NR-GAD undamped | NR-GAD α=0.1 | Descent→GAD(2) |
+|----------------------------|----------|-----------------|--------------|----------------|
+| Converged | 90% | 23% | 40% | 90% |
+| Phase transitions | 0 | 11.5 | 3.2 | 0.9 |
+| n_neg changes | 2.6 | **105.9** | 6.4 | 2.6 |
+| Steps at n_neg=0 | 0 | **224.5** | **225.7** | 0 |
+
+### Conclusions
+
+1. **The one-way switch produces identical aggregate rates but different per-sample trajectories.** 32/236 samples (14%) diverge at 200pm. The 1-4 descent steps create a "butterfly effect" — a slightly different starting trajectory that amplifies over 1000 steps.
+
+2. **Descent→GAD(2) both wins and loses samples vs pure GAD.** It wins when the descent phase avoids the v₁ flip during chaotic high-n_neg oscillation (samples 17, 49, 90). It loses when descent overshoots into n_neg=0 (samples 67, 81). Net effect: zero.
+
+3. **Threshold matters for individual samples but not aggregate.** descent_then_gad_2 and descent_then_gad_3 diverge on specific samples (e.g., sample 90: threshold ≤2 converges, threshold ≤3 doesn't). But the aggregate rates are within noise.
+
+4. **NR-GAD's problem is definitively the Newton step, not the switching logic.** Descent→GAD uses the same switching concept (different dynamics at high n_neg) but with gentle gradient descent instead of H⁻¹g. It matches pure GAD's performance exactly. The Newton step's Hessian inversion (H⁻¹g) creates step components orders of magnitude too large along near-zero eigenvalue modes, overshooting through n_neg=1 into n_neg=0.
+
+5. **The NR overshoot to n_neg=0 is the single biggest failure mode.** NR-GAD samples spend mean 224 steps at n_neg=0 (up to 993). Descent→GAD spends 0. Pure GAD spends 0. The overshoot traps the trajectory in a minimum basin where GAD has no negative eigenvalue to ascend along.
+
+6. **GAD's v₁ ascent is a small perturbation at high n_neg.** At n_neg=5, the gradient dominates — |F| >> |2(F·v₁)v₁|. Whether you apply the v₁ flip or not barely changes the step direction, which is why the descent phase is only 1-4 steps and the trajectories converge immediately after handoff.
+
+---
+
 ## Experiments NOT Run
 
 | Experiment | Description | Why not run |
@@ -666,6 +889,7 @@ These replace the Round 2 partial data (which had 131-244 samples). The 100pm an
 | gad_clamp_005 | 0.05A aggressive clamp | Low priority after clamp proved inert |
 | rfo_gad | RFO secular equation + GAD | Code written (`search/rfo_gad.py`), never submitted |
 | grad_descent_pp | Plain gradient descent when n_neg≥2 | Superseded by precond_descent in redesign |
+| multi_mode_gad | Ascend along all negative-eigenvalue modes | Next experiment to implement |
 
 ---
 
@@ -734,6 +958,7 @@ Round 2 others:      /lustre07/scratch/memoozd/gadplus/runs/round2/
 Round 3 Sella 200:   /lustre07/scratch/memoozd/gadplus/runs/sella_baselines/
 Round 3 Sella 1000:  /lustre07/scratch/memoozd/gadplus/runs/sella_1000/
 Round 3 blend+dt002: /lustre07/scratch/memoozd/gadplus/runs/round3/
+Round 4 descent→GAD: /lustre07/scratch/memoozd/gadplus/runs/round4/
 ```
 
 ## SLURM Job IDs
@@ -753,4 +978,5 @@ Round 3 blend+dt002: /lustre07/scratch/memoozd/gadplus/runs/round3/
 | Round 3 Sella 1000-step | 58937673 | 20/24 complete (internal 150/200pm timeout) |
 | Round 3 blend + dt002 | 58932864 | 22/24 complete (dt002 150/200pm partial) |
 | Round 3 dt003 rerun | 58933021 | 2/3 complete (200pm partial 259/300) |
+| Round 4 descent→GAD | 59362083 | 4/6 complete (200pm ~238/300) |
 | Round 3 Sella 1000-step | 58937673 | 20/24 (internal 150/200pm timeout) |

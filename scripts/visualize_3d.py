@@ -24,6 +24,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 from ase import Atoms
+from ase.io import write as ase_write
 from ase.neighborlist import natural_cutoffs, neighbor_list
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -52,6 +53,11 @@ def _auto_path(candidates: list[str], label: str) -> str:
 
 def _summary_df(summary_glob: str) -> pd.DataFrame:
     return duckdb.execute(f"SELECT * FROM '{summary_glob}'").df()
+
+
+def _parquet_columns(parquet_glob: str) -> set[str]:
+    schema_df = duckdb.execute(f"DESCRIBE SELECT * FROM '{parquet_glob}'").df()
+    return set(schema_df["column_name"].tolist())
 
 
 def _pick_target_row(
@@ -109,9 +115,18 @@ def _pick_target_row(
 
 
 def _load_traj(traj_glob: str, run_id: str, sample_id: int) -> pd.DataFrame:
+    available = _parquet_columns(traj_glob)
+    required = ["step", "coords_flat"]
+    optional = ["energy", "force_norm", "force_max", "force_rms", "n_neg", "eig0", "eig1"]
+    missing_required = [col for col in required if col not in available]
+    if missing_required:
+        raise ValueError(
+            f"Trajectory parquet is missing required columns: {missing_required}"
+        )
+    select_cols = required + [col for col in optional if col in available]
     return duckdb.execute(
         f"""
-        SELECT step, coords_flat, energy, force_norm, force_max, n_neg, eig0, eig1
+        SELECT {", ".join(select_cols)}
         FROM '{traj_glob}'
         WHERE run_id = '{run_id}' AND sample_id = {sample_id}
         ORDER BY step
@@ -214,6 +229,85 @@ def _trace_title(row: pd.Series, formula: str, run_id: str, sample_id: int) -> s
     return f"{formula} | method={method} | noise={noise}pm | sample={sample_id} | run={run_id} | {state}"
 
 
+def _viewer_slug(run_id: str, sample_id: int) -> str:
+    safe_run_id = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in run_id)
+    return f"{safe_run_id}_{sample_id}"
+
+
+def _frame_comment(tdf: pd.DataFrame, idx: int) -> str:
+    row = tdf.iloc[idx]
+    metrics: list[str] = [f"step={int(row['step'])}"]
+    for col, label, fmt in [
+        ("energy", "E", "{:.6f}"),
+        ("force_norm", "force_norm", "{:.5f}"),
+        ("force_rms", "force_rms", "{:.5f}"),
+        ("force_max", "fmax", "{:.5f}"),
+        ("n_neg", "n_neg", "{}"),
+    ]:
+        if col in tdf.columns and pd.notna(row[col]):
+            value = int(row[col]) if col == "n_neg" else float(row[col])
+            metrics.append(f"{label}={fmt.format(value)}")
+    return " | ".join(metrics)
+
+
+def _build_atoms_frames(
+    coords_series: list[np.ndarray],
+    z: np.ndarray,
+    tdf: pd.DataFrame,
+) -> list[Atoms]:
+    frames: list[Atoms] = []
+    for idx, coords in enumerate(coords_series):
+        atoms = Atoms(numbers=z.tolist(), positions=coords)
+        atoms.info["comment"] = _frame_comment(tdf, idx)
+        frames.append(atoms)
+    return frames
+
+
+def _write_viewer_bundle(
+    base_dir: str,
+    run_id: str,
+    sample_id: int,
+    formula: str,
+    atoms_frames: list[Atoms],
+) -> tuple[str, str, str]:
+    slug = _viewer_slug(run_id, sample_id)
+    bundle_dir = os.path.join(base_dir, "viewer_bundle", slug)
+    sequence_dir = os.path.join(bundle_dir, "frames_xyz")
+    os.makedirs(sequence_dir, exist_ok=True)
+
+    multi_xyz = os.path.join(bundle_dir, f"{slug}.xyz")
+    ase_write(multi_xyz, atoms_frames)
+
+    for idx, atoms in enumerate(atoms_frames):
+        frame_path = os.path.join(sequence_dir, f"frame_{idx:04d}.xyz")
+        ase_write(frame_path, atoms)
+
+    readme_path = os.path.join(bundle_dir, "README_viewers.md")
+    with open(readme_path, "w", encoding="utf-8") as fh:
+        fh.write(
+            "\n".join(
+                [
+                    f"# Trajectory Viewer Bundle: {formula}",
+                    "",
+                    "Recommended VS Code extensions:",
+                    "- `arianjamasb.protein-viewer`",
+                    "- `stevenyu.nano-protein-viewer`",
+                    "",
+                    "Suggested usage:",
+                    f"- Open `{os.path.basename(multi_xyz)}` with Protein Viewer for a single-file trajectory.",
+                    f"- Open the `frames_xyz/` folder with Nano Protein Viewer for frame-by-frame browsing or sequence playback.",
+                    "",
+                    "Files:",
+                    f"- Multi-frame XYZ: `{os.path.basename(multi_xyz)}`",
+                    f"- Per-frame XYZ folder: `{os.path.basename(sequence_dir)}/`",
+                ]
+            )
+            + "\n"
+        )
+
+    return bundle_dir, multi_xyz, sequence_dir
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -237,15 +331,26 @@ def main() -> None:
     parser.add_argument("--stride", type=int, default=None)
     parser.add_argument("--bond-source", type=str, default="first", choices=["first", "none"])
     parser.add_argument("--cutoff-scale", type=float, default=1.2)
+    parser.add_argument(
+        "--output-mode",
+        type=str,
+        default="viewer",
+        choices=["viewer", "plotly", "both"],
+        help="Write VS Code viewer bundle, Plotly HTML, or both",
+    )
+    parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--output-html", type=str, default=None)
     args = parser.parse_args()
 
-    try:
-        import plotly.graph_objects as go
-    except ImportError as exc:
-        raise ImportError(
-            "plotly is required for 3D HTML visualization. Install with: pip install plotly"
-        ) from exc
+    go = None
+    if args.output_mode in {"plotly", "both"}:
+        try:
+            import plotly.graph_objects as go
+        except ImportError as exc:
+            raise ImportError(
+                "plotly is required for --output-mode plotly/both. "
+                "Use --output-mode viewer or install with: pip install plotly"
+            ) from exc
 
     summary_glob = os.path.join(args.traj_dir, args.summary_pattern)
     traj_glob = os.path.join(args.traj_dir, args.traj_pattern)
@@ -282,8 +387,19 @@ def main() -> None:
     tdf = tdf.iloc[frame_idx].reset_index(drop=True)
 
     coords_series = [_coords_from_flat(v, n_atoms) for v in tdf["coords_flat"].tolist()]
+    atoms_frames = _build_atoms_frames(coords_series, z, tdf)
     all_coords = np.concatenate(coords_series, axis=0)
     xr, yr, zr = _axis_bounds(all_coords)
+    out_root = args.output_dir or os.path.join(args.traj_dir, "plots")
+    os.makedirs(out_root, exist_ok=True)
+
+    bundle_dir = None
+    multi_xyz = None
+    sequence_dir = None
+    if args.output_mode in {"viewer", "both"}:
+        bundle_dir, multi_xyz, sequence_dir = _write_viewer_bundle(
+            out_root, run_id, sample_id, formula, atoms_frames
+        )
 
     if args.bond_source == "first":
         edges = _bond_edges(coords_series[0], z, args.cutoff_scale)
@@ -319,110 +435,99 @@ def main() -> None:
             )
             traces.insert(0, bond_trace)
 
-        step = int(tdf.iloc[idx]["step"])
-        e = float(tdf.iloc[idx]["energy"])
-        fn = float(tdf.iloc[idx]["force_norm"])
-        fm = (
-            float(tdf.iloc[idx]["force_max"])
-            if "force_max" in tdf.columns and pd.notna(tdf.iloc[idx]["force_max"])
-            else None
-        )
-        nneg = int(tdf.iloc[idx]["n_neg"])
+        return traces, _frame_comment(tdf, idx)
 
-        if fm is None:
-            subtitle = f"step={step} | E={e:.6f} eV | force_norm={fn:.5f} | n_neg={nneg}"
+    out_html = None
+    if args.output_mode in {"plotly", "both"}:
+        traces0, subtitle0 = frame_data(coords_series[0], 0)
+        frames = []
+        for i, coords in enumerate(coords_series):
+            traces_i, subtitle_i = frame_data(coords, i)
+            frames.append(
+                go.Frame(
+                    data=traces_i,
+                    name=str(i),
+                    layout={
+                        "title": {
+                            "text": f"{_trace_title(row, formula, run_id, sample_id)}<br><sup>{subtitle_i}</sup>"
+                        }
+                    },
+                )
+            )
+
+        fig = go.Figure(data=traces0, frames=frames)
+        fig.update_layout(
+            title={
+                "text": f"{_trace_title(row, formula, run_id, sample_id)}<br><sup>{subtitle0}</sup>"
+            },
+            scene={
+                "xaxis": {"range": xr, "title": "x (A)", "showgrid": True},
+                "yaxis": {"range": yr, "title": "y (A)", "showgrid": True},
+                "zaxis": {"range": zr, "title": "z (A)", "showgrid": True},
+                "aspectmode": "cube",
+            },
+            margin={"l": 0, "r": 0, "t": 70, "b": 0},
+            updatemenus=[
+                {
+                    "type": "buttons",
+                    "showactive": False,
+                    "x": 0.05,
+                    "y": 0.0,
+                    "buttons": [
+                        {
+                            "label": "Play",
+                            "method": "animate",
+                            "args": [
+                                None,
+                                {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True},
+                            ],
+                        },
+                        {
+                            "label": "Pause",
+                            "method": "animate",
+                            "args": [
+                                [None],
+                                {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"},
+                            ],
+                        },
+                    ],
+                }
+            ],
+            sliders=[
+                {
+                    "active": 0,
+                    "x": 0.17,
+                    "y": 0.0,
+                    "len": 0.8,
+                    "steps": [
+                        {
+                            "method": "animate",
+                            "args": [
+                                [str(i)],
+                                {"mode": "immediate", "frame": {"duration": 0, "redraw": True}},
+                            ],
+                            "label": str(int(tdf.iloc[i]["step"])),
+                        }
+                        for i in range(len(tdf))
+                    ],
+                }
+            ],
+        )
+
+        if args.output_html is None:
+            out_html = os.path.join(out_root, f"traj3d_{run_id}_{sample_id}.html")
         else:
-            subtitle = (
-                f"step={step} | E={e:.6f} eV | force_norm={fn:.5f} | fmax={fm:.5f} | n_neg={nneg}"
-            )
+            out_html = args.output_html
+            os.makedirs(os.path.dirname(out_html) or ".", exist_ok=True)
 
-        return traces, subtitle
+        fig.write_html(out_html, include_plotlyjs="cdn")
 
-    traces0, subtitle0 = frame_data(coords_series[0], 0)
-    frames = []
-    for i, coords in enumerate(coords_series):
-        traces_i, subtitle_i = frame_data(coords, i)
-        frames.append(
-            go.Frame(
-                data=traces_i,
-                name=str(i),
-                layout={
-                    "title": {
-                        "text": f"{_trace_title(row, formula, run_id, sample_id)}<br><sup>{subtitle_i}</sup>"
-                    }
-                },
-            )
-        )
-
-    fig = go.Figure(data=traces0, frames=frames)
-    fig.update_layout(
-        title={
-            "text": f"{_trace_title(row, formula, run_id, sample_id)}<br><sup>{subtitle0}</sup>"
-        },
-        scene={
-            "xaxis": {"range": xr, "title": "x (A)", "showgrid": True},
-            "yaxis": {"range": yr, "title": "y (A)", "showgrid": True},
-            "zaxis": {"range": zr, "title": "z (A)", "showgrid": True},
-            "aspectmode": "cube",
-        },
-        margin={"l": 0, "r": 0, "t": 70, "b": 0},
-        updatemenus=[
-            {
-                "type": "buttons",
-                "showactive": False,
-                "x": 0.05,
-                "y": 0.0,
-                "buttons": [
-                    {
-                        "label": "Play",
-                        "method": "animate",
-                        "args": [
-                            None,
-                            {"frame": {"duration": 80, "redraw": True}, "fromcurrent": True},
-                        ],
-                    },
-                    {
-                        "label": "Pause",
-                        "method": "animate",
-                        "args": [
-                            [None],
-                            {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"},
-                        ],
-                    },
-                ],
-            }
-        ],
-        sliders=[
-            {
-                "active": 0,
-                "x": 0.17,
-                "y": 0.0,
-                "len": 0.8,
-                "steps": [
-                    {
-                        "method": "animate",
-                        "args": [
-                            [str(i)],
-                            {"mode": "immediate", "frame": {"duration": 0, "redraw": True}},
-                        ],
-                        "label": str(int(tdf.iloc[i]["step"])),
-                    }
-                    for i in range(len(tdf))
-                ],
-            }
-        ],
-    )
-
-    if args.output_html is None:
-        out_dir = os.path.join(args.traj_dir, "plots")
-        os.makedirs(out_dir, exist_ok=True)
-        out_html = os.path.join(out_dir, f"traj3d_{run_id}_{sample_id}.html")
-    else:
-        out_html = args.output_html
-        os.makedirs(os.path.dirname(out_html) or ".", exist_ok=True)
-
-    fig.write_html(out_html, include_plotlyjs="cdn")
-    print(f"Saved 3D trajectory HTML: {out_html}")
+    if bundle_dir is not None:
+        print(f"Saved viewer bundle: {bundle_dir}")
+        print(f"Protein Viewer XYZ: {multi_xyz}")
+        print(f"Nano Protein Viewer frames: {sequence_dir}")
+    if out_html is not None:
+        print(f"Saved 3D trajectory HTML: {out_html}")
     print(f"Frames: {len(tdf)} | run_id={run_id} | sample_id={sample_id} | formula={formula}")
 
 

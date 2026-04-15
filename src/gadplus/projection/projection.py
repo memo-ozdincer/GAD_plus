@@ -218,6 +218,91 @@ def gad_dynamics_projected(
     return gad_vec, v_proj.to(v.dtype), info
 
 
+def multimode_gad_dynamics_projected(
+    coords: torch.Tensor,
+    forces: torch.Tensor,
+    atomsymbols: list[str],
+    evals_vib: torch.Tensor,
+    evecs_vib_3N: torch.Tensor,
+    mode: str = "all_neg",
+    sigmoid_sharpness: float = 50.0,
+    eps: float = 1e-10,
+) -> tuple[torch.Tensor, torch.Tensor, dict]:
+    """Multi-mode GAD: ascend along multiple Hessian eigenvectors.
+
+    Standard GAD: F_GAD = -g + 2(g·v₁)v₁  (flip force along lowest mode only)
+    Multi-mode:   F_GAD = -g + 2·Σᵢ wᵢ(g·vᵢ)vᵢ  (flip along multiple modes)
+
+    Three modes:
+      "all_neg":  wᵢ = 1 if λᵢ < 0, else 0. Flip all negative-eigenvalue modes.
+      "smooth":   wᵢ = sigmoid(-λᵢ · sharpness). Differentiable soft version.
+      "top2":     Flip the 2 lowest modes (v₁ and v₂), regardless of sign.
+
+    All operate in Eckart-projected mass-weighted vibrational space.
+
+    Returns:
+        gad_vec: (N, 3) multi-mode GAD direction in Cartesian space.
+        v_proj: (3N,) lowest eigenvector (for mode tracking continuity).
+        info: Diagnostic dict with n_modes_flipped, weights.
+    """
+    device = coords.device
+    coords_3d = coords.reshape(-1, 3).to(torch.float64)
+    f_flat = forces.reshape(-1).to(torch.float64)
+    num_atoms = coords_3d.shape[0]
+
+    masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
+    P = _eckart_projector(coords_3d, masses, eps=eps)
+
+    # Gradient in MW vibrational space
+    grad_mw = P @ (-sqrt_m_inv * f_flat)
+
+    evecs = evecs_vib_3N.to(torch.float64)
+    evals = evals_vib.to(torch.float64)
+
+    # Project gradient onto each vibrational eigenvector
+    # g_i = grad_mw · v_i
+    coeffs = evecs.T @ grad_mw  # (M,)
+
+    # Compute weights for each mode
+    if mode == "all_neg":
+        # Hard: flip all modes with λ < 0
+        weights = (evals < 0).to(torch.float64)
+    elif mode == "smooth":
+        # Soft: sigmoid(-λ · k), differentiable
+        weights = torch.sigmoid(-evals * sigmoid_sharpness)
+    elif mode == "top2":
+        # Flip the 2 lowest modes regardless of sign
+        weights = torch.zeros_like(evals)
+        weights[0] = 1.0
+        if evals.numel() > 1:
+            weights[1] = 1.0
+    else:
+        raise ValueError(f"Unknown multi-mode GAD mode: {mode}")
+
+    # Multi-mode GAD: dq = -g + 2·Σᵢ wᵢ·(g·vᵢ)·vᵢ
+    # The flip term for each mode i: 2·wᵢ·(g·vᵢ)·vᵢ
+    flip_coeffs = 2.0 * weights * coeffs  # (M,)
+    flip_term = evecs @ flip_coeffs  # (3N,)
+
+    dq = P @ (-grad_mw + flip_term)
+
+    # Back to Cartesian
+    gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
+
+    # Return v₁ for mode tracking (even though we flip multiple modes)
+    v1_proj = P @ evecs[:, 0]
+    v1_proj = v1_proj / (v1_proj.norm() + 1e-12)
+
+    n_flipped = int((weights > 0.5).sum().item())
+    info = {
+        "n_modes_flipped": n_flipped,
+        "weights_sum": float(weights.sum().item()),
+        "grad_norm_mw": float(grad_mw.norm().item()),
+        "mode": mode,
+    }
+    return gad_vec, v1_proj.to(forces.dtype), info
+
+
 def preconditioned_gad_dynamics_projected(
     coords: torch.Tensor,
     forces: torch.Tensor,

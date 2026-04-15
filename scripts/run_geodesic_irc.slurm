@@ -62,6 +62,15 @@ else
         --max-validate 30 \
         --irc-steps 200 \
         --rmsd-threshold 0.5 \
+        --ts-pick best_nneg1 \
+        --ts-force-criterion fmax \
+        --ts-force-threshold 0.01 \
+        --refine-ts \
+        --refine-steps 300 \
+        --refine-dt 0.003 \
+        --refine-force-criterion fmax \
+        --refine-force-threshold 0.005 \
+        --skip-if-ts-poor \
         --survey-dir "$SCRATCH/gadplus/runs/noise_survey_300" \
         --n-dataset-samples 300 \
         --output-dir "$SCRATCH/gadplus/runs/irc_validation_300"
