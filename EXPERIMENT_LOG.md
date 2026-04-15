@@ -747,9 +747,66 @@ These replace the Round 2 partial data (which had 131-244 samples). The 100pm an
 
 ---
 
-## Round 4, Experiment 18: One-Way Descent→GAD with Trajectory Analysis
+## Round 4: Switching & Handoff Experiments with Trajectory Analysis
 
-**SLURM:** 59362083 | **Data:** `round4/` | **Status:** 4/6 complete (200pm still running, ~238/300)
+This section covers all experiments that alter the dynamics based on n_neg — NR-GAD ping-pong (Round 1, revisited), descent-GAD handoff, NR-GAD handoff with displacement cap, and multi-mode GAD. Trajectory analysis reveals the failure mechanisms behind each approach.
+
+---
+
+### Experiment 18a: NR-GAD Ping-Pong (Round 1, revisited with trajectory analysis)
+
+**SLURM:** 58845357, 58852071 | **Data:** `method_cmp_300/`, `targeted/`
+
+**Method:** Per-step switching — every step checks n_neg:
+- n_neg ≥ 2 → Newton descent: `Δx = α · (-H⁻¹g)` with eigenvalue flooring at 1e-6
+- n_neg < 2 → Standard GAD: `Δx = dt · F_GAD`
+
+Can switch back and forth every step. Four damping variants tested (α=1.0, 0.3, 0.2, 0.1). The NR step projects the gradient onto vibrational eigenvectors, divides by |λᵢ| (floored at 1e-6), applies damping α, caps per-component at 0.3, and caps total norm at max_step_norm. Code: `nr_minimize_step()` in `nr_gad_pingpong.py:56-116`.
+
+**Results:**
+
+| Method | 10pm | 50pm | 100pm | 200pm |
+|--------|------|------|-------|-------|
+| **gad_small_dt (baseline)** | **94.3** | **91.3** | **86.7** | **51.3** |
+| nr_gad_damped α=0.1 | 94.7 | 77.7 | 58.0 | 33.7 |
+| nr_gad_damped α=0.2 | 93.0 | 78.3 | 60.3 | 36.3 |
+| nr_gad_damped α=0.3 | 88.7 | 75.0 | 58.7 | 37.0 |
+| nr_gad_pingpong (α=1.0) | 56.7 | 31.7 | 24.7 | 18.3 |
+
+**Trajectory analysis (100pm, 30 samples):**
+
+| Metric | Pure GAD | NR-GAD undamped | NR-GAD α=0.1 |
+|--------|----------|-----------------|--------------|
+| Converged | 90% | 23% | 40% |
+| Phase transitions | 0 | **11.5** | 3.2 |
+| n_neg changes | 2.6 | **105.9** | 6.4 |
+| Steps at n_neg=0 (overshoot) | 0 | **224.5** | **225.7** |
+| Final n_neg distribution | {1:28, 2:2} | {1:25, 0:4, 4:1} | {1:26, 0:4} |
+
+**The failure mechanism:** The Newton step (H⁻¹g) inverts eigenvalues — when |λᵢ| is small (near-zero modes), the step component along that mode is amplified by 1/|λᵢ|, potentially 1000x or more. This causes the trajectory to **overshoot through n_neg=1 directly into n_neg=0** (a minimum basin). Once at n_neg=0, GAD takes over but has no negative eigenvalue to ascend along. The trajectory wanders until n_neg bounces back to ≥2 (triggering NR again), which overshoots again. This creates an oscillation cycle:
+
+```
+NR overshoot → n_neg=0 (stuck) → eventually n_neg≥2 → NR overshoot → n_neg=0 ...
+```
+
+Samples spend mean 224 steps at n_neg=0 with 106 n_neg changes. This is NOT the "NR until near TS then GAD" pattern we expected — it's chaotic oscillation with 100+ phase transitions. Even damping at α=0.1 doesn't prevent the overshoot (225 steps at n_neg=0, same as undamped).
+
+**Per-sample trajectory examples at 200pm:**
+
+| Sample | Start n_neg | Pure GAD | NR-GAD undamped |
+|--------|-------------|----------|-----------------|
+| 0 | 5 | FAIL (oscillates 2-4) | **CONV** (6 NR steps → n_neg=1, fast) |
+| 5 | 4 | **CONV** (step 651) | FAIL (NR→n_neg=0, 402 NR steps stuck) |
+| 6 | 5 | **CONV** (step 835) | FAIL (oscillates 0-4, 515 NR steps) |
+| 9 | 4 | **CONV** (step 361) | FAIL (NR overshoot, force=0.017) |
+
+NR-GAD occasionally wins a sample by aggressively dropping n_neg (sample 0), but more often overshoots and loses (samples 5, 6, 9).
+
+---
+
+### Experiment 18b: Descent-GAD Handoff
+
+**SLURM:** 59362083 | **Data:** `round4/` | **Status:** 4/6 complete (200pm ~238/300)
 
 ### Motivation
 
@@ -882,14 +939,96 @@ The descent→GAD comparison conclusively separates the Newton step problem from
 
 ---
 
+### Experiment 18c: NR-GAD Handoff with Displacement Cap
+
+**SLURM:** 59385266 (full sweep), 59385318 (quick 100pm) | **Data:** `nr_then_gad/`, `nr_then_gad_quick/` | **Status:** Running (~9-43 samples per noise level)
+
+**Method:** One-way switch like Experiment 18b, but using Newton descent (H⁻¹g) instead of plain gradient descent. To prevent the overshoot that killed NR-GAD ping-pong, the Newton step is **aggressively capped**:
+
+```
+Phase 1 (NR): Δx = α · (-H⁻¹g), damping=0.3, capped at max_step_norm
+              Until n_neg ≤ 2 → switch permanently to GAD
+Phase 2 (GAD): Δx = dt · F_GAD (standard Eckart-projected GAD, forever)
+```
+
+Code: uses `NRGADPingPongConfig` with `one_way=True, one_way_threshold=2`. The NR step is computed by `nr_minimize_step()` (project gradient onto vibrational eigenvectors, divide by |λᵢ| floored at 1e-6, apply damping, cap norm). Two cap tightness levels:
+- **nr_then_gad_cap01**: max_step_norm=0.01Å, max_atom_disp=0.01Å
+- **nr_then_gad_cap005**: max_step_norm=0.005Å, max_atom_disp=0.005Å
+
+The Newton direction (H⁻¹g) is curvature-aware (larger steps along flat modes, smaller along steep), but the tight cap ensures each step moves at most 0.01Å total — preventing the overshoot into n_neg=0 that killed NR-GAD ping-pong.
+
+**Results (preliminary, still running):**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|--------|------|------|------|-------|-------|-------|
+| **gad_small_dt (baseline)** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
+| nr_then_gad_cap01 | 90.7* | 83.3* | 87.5* | 64.3* | 45.5* | 33.3* |
+| nr_then_gad_cap005 | 89.2* | 83.3* | 86.4* | 71.4* | 50.0* | 33.3* |
+
+*Preliminary (9-43 samples per cell, still running). Numbers may shift significantly with more data.
+
+**Early assessment:** Both variants are **worse than baseline** by 4-20pp. The tight displacement cap prevents overshoot (good) but also makes the NR steps so small they're effectively frozen — a Newton step capped at 0.01Å across a molecule with 10+ atoms gives ~0.002Å per coordinate, slower than GAD's ~0.005Å per atom. The trajectory wastes step budget crawling through the NR phase before handing off to GAD.
+
+**The fundamental tradeoff:** Newton's advantage is large, curvature-informed steps. A displacement cap kills exactly that advantage. A Newton step capped at 0.01Å is just an expensive way to compute a direction that gets scaled to nothing. The curvature information is preserved (the *direction* is still Newton-optimal) but the magnitude is forced to be the same as a gradient step, making the Hessian inversion overhead wasted compute.
+
+---
+
+### Experiment 19: Multi-Mode GAD
+
+**SLURM:** 59367568 | **Data:** `multimode/` | **Status:** 12/18 complete, 6 running (150/200pm partial)
+
+**Method:** Instead of flipping the force along v₁ only (standard GAD), flip along multiple eigenvectors simultaneously:
+
+**multimode_all_neg:** `F_GAD = F + 2·Σᵢ(F·vᵢ)vᵢ` for all i where λᵢ < 0. Hard threshold — every negative-eigenvalue mode gets the force flip. Code: `multimode_gad_dynamics_projected()` in `projection.py` with `mode="all_neg"`.
+
+**multimode_smooth:** `F_GAD = F + 2·Σᵢ σ(-λᵢ·50)·(F·vᵢ)vᵢ`. Differentiable sigmoid weighting — modes with strongly negative λ get full flip, modes near zero get partial. `mode="smooth"`, `sigmoid_sharpness=50.0`.
+
+**multimode_top2:** `F_GAD = F + 2(F·v₁)v₁ + 2(F·v₂)v₂`. Always flip the two lowest modes regardless of eigenvalue sign. `mode="top2"`.
+
+All use dt=0.005, 1000 steps, Eckart projection.
+
+**Results:**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm* | 200pm* |
+|--------|------|------|------|-------|--------|--------|
+| **gad_small_dt (baseline)** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
+| multimode_all_neg | 87.7 | 86.7 | 83.7 | 71.0 | 33.6 | 7.7 |
+| multimode_smooth | 87.3 | 86.3 | 82.7 | 69.7 | 33.5 | 7.6 |
+| multimode_top2 | 36.1 | 17.2 | 13.4 | 6.6 | 4.4 | 1.1 |
+
+*150/200pm partial (177-215 samples).
+
+**multimode_top2 is catastrophic** (36% at 10pm). Always flipping v₂ regardless of sign forces ascent along a mode that should be descended when λ₂>0, pushing the geometry away from the saddle.
+
+**all_neg and smooth** are ~7pp worse at 10pm, ~16pp at 100pm, and collapse at high noise (8% at 200pm vs 51% baseline). all_neg and smooth are nearly identical (sigmoid sharpness doesn't matter when the hard threshold already separates negative from positive).
+
+**Why multi-mode GAD fails:** Flipping all negative modes simultaneously is incoherent — the trajectory tries to ascend along 3-5 directions at once, pushing toward a higher-order saddle (index n_neg) instead of the index-1 saddle we want. Standard single-mode GAD ascends v₁ while descending all other modes including v₂...v₅. This naturally reduces n_neg one mode at a time as the geometry approaches index-1. Multi-mode GAD fights this process by trying to maintain all negative eigenvalues — which is the opposite of what we want.
+
+---
+
+### Unified Conclusions: Switching, Handoff & Multi-Mode Experiments
+
+1. **Pure single-mode GAD is optimal.** Across 8 switching/handoff/multi-mode variants tested, none outperform `gad_small_dt`. The v₁-only ascent with uniform fixed timestep is already the best dynamics for saddle-point search.
+
+2. **NR-GAD ping-pong fails due to Newton step overshoot.** Trajectory analysis proves the mechanism: H⁻¹g amplifies near-zero eigenvalue modes by 1000x+, overshooting through n_neg=1 into n_neg=0. Samples spend 224 steps trapped at a minimum with 106 n_neg changes. Not "NR then GAD" — chaotic oscillation.
+
+3. **Descent-GAD handoff is identical to pure GAD.** Plain gradient descent (dt·F) is gentle enough to avoid overshoot (0 steps at n_neg=0), but the phase is only 1-4 steps — too short to matter. 14% of individual samples diverge via butterfly effects, but wins and losses cancel.
+
+4. **NR-GAD handoff with tight cap is worse than pure GAD.** Capping Newton steps at 0.01-0.005Å prevents overshoot but kills Newton's advantage (large curvature-informed steps). The NR phase becomes slower than GAD, wasting step budget.
+
+5. **Multi-mode GAD is worse than single-mode.** Ascending along all negative modes pushes toward higher-order saddles instead of index-1. The v₁-only focus is a feature, not a limitation — it naturally reduces n_neg one mode at a time.
+
+6. **The v₁ ascent is a small perturbation at high n_neg but a critical one.** At n_neg=5, |F| >> |2(F·v₁)v₁| — the GAD modification barely changes the step. But it consistently biases the trajectory toward reducing n_neg, which is what makes it better than pure descent (despite nearly identical trajectories for the first few steps).
+
+---
+
 ## Experiments NOT Run
 
 | Experiment | Description | Why not run |
 |-----------|-------------|-------------|
 | gad_clamp_005 | 0.05A aggressive clamp | Low priority after clamp proved inert |
 | rfo_gad | RFO secular equation + GAD | Code written (`search/rfo_gad.py`), never submitted |
-| grad_descent_pp | Plain gradient descent when n_neg≥2 | Superseded by precond_descent in redesign |
-| multi_mode_gad | Ascend along all negative-eigenvalue modes | Next experiment to implement |
+| nr_then_gad_loose_cap | NR→GAD with 0.05-0.1Å cap | Would test intermediate cap between "frozen" and "overshoot" |
 
 ---
 

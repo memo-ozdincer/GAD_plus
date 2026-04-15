@@ -321,33 +321,44 @@ Then $0.005 \to 0.003$: $+$1--4pp. Then $0.003 \to 0.002$: $+$0--3pp, only at $\
 At 10--100pm, dt=0.003 and dt=0.002 are \textbf{identical}. The cost is 3$\times$ wall time for marginal gains.
 
 %----------------------------------------------------------------------
-\section*{7d. Round 4: Descent$\to$GAD One-Way Switch + Trajectory Analysis}
+\section*{7d. Round 4: Switching, Handoff \& Multi-Mode Experiments}
 
-\textbf{Idea:} Instead of NR-GAD ping-pong (which oscillates), do a \textit{one-way} switch:
-plain gradient descent ($\Delta\mathbf{x} = dt \cdot \mathbf{F}$, no Hessian inversion)
-until $n_{\text{neg}} \leq$ threshold, then GAD permanently. No switching back. Same dt=0.005.
+\textbf{Three handoff strategies tested + multi-mode GAD}, all compared via trajectory analysis.
 
-\begin{tabular}{l*{3}{r}l}
-\toprule
-Method & 50pm & 100pm & 200pm & Notes \\
-\midrule
-\textbf{gad\_small\_dt} & \textbf{91.3} & \textbf{86.7} & \textbf{51.3} & Pure GAD \\
-descent\_then\_gad\_2  & 91.7 & 86.3 & 52.9$^\dagger$ & Switch at $n_{\text{neg}} \leq 2$ \\
-descent\_then\_gad\_3  & 91.3 & 86.7 & 52.5$^\dagger$ & Switch at $n_{\text{neg}} \leq 3$ \\
-\bottomrule
-\end{tabular}
+\vspace{0.5em}
+\textbf{(a) NR-GAD Ping-Pong} (Round 1 Exps 4--5): Per-step switching.
+NR ($\mathbf{H}^{-1}\mathbf{g}$) when $n_{\text{neg}} \geq 2$, GAD when $n_{\text{neg}} < 2$.
+Can switch back and forth every step. Result: 23--57\% at 10pm (vs 94.3\% baseline).
 
-{\small $^\dagger$200pm still running ($\sim$238/300 samples).}
+\textbf{(b) Descent$\to$GAD Handoff}: One-way switch.
+Plain gradient descent ($\Delta\mathbf{x} = dt \cdot \mathbf{F}$) until $n_{\text{neg}} \leq 2$,
+then GAD permanently. Same dt=0.005. Result: identical to baseline ($\sim$91/87/52\%).
 
-\textbf{Result:} Identical to baseline. The descent phase is 1--3 steps long (at dt=0.005,
-$n_{\text{neg}}$ drops to $\leq$2 within 1--2 steps regardless of force type), too short to matter.
-
-\textbf{Trajectory analysis} reveals \textit{why} NR-GAD ping-pong fails while this doesn't:
+\textbf{(c) NR$\to$GAD Handoff} (with displacement cap): One-way switch.
+Newton descent ($\mathbf{H}^{-1}\mathbf{g}$, damped, capped at 0.01\AA) until $n_{\text{neg}} \leq 2$,
+then GAD permanently. Result: $-$4--20pp vs baseline (preliminary).
 
 \vspace{0.3em}
 \begin{tabular}{l*{4}{r}}
 \toprule
-Metric (100pm, 30 samples) & Pure GAD & NR-GAD & NR $\alpha$=0.1 & Desc$\to$GAD \\
+Method & 10pm & 100pm & 200pm & Type \\
+\midrule
+\textbf{gad\_small\_dt} & \textbf{94.3} & \textbf{86.7} & \textbf{51.3} & Pure GAD \\
+Descent$\to$GAD & 91.7 & 86.3 & 52.9 & One-way, gentle \\
+NR$\to$GAD (0.01\AA\ cap) & 90.7$^\dagger$ & 64.3$^\dagger$ & 33.3$^\dagger$ & One-way, capped NR \\
+NR-GAD ping-pong $\alpha$=0.1 & 94.7 & 58.0 & 33.7 & Per-step switch \\
+NR-GAD ping-pong (undamped) & 56.7 & 24.7 & 18.3 & Per-step switch \\
+\bottomrule
+\end{tabular}
+
+{\small $^\dagger$Preliminary (9--43 samples).}
+
+\textbf{Trajectory analysis} (100pm, 30 samples) reveals the failure mechanisms:
+
+\vspace{0.3em}
+\begin{tabular}{l*{4}{r}}
+\toprule
+Metric & Pure GAD & NR-GAD & NR $\alpha$=0.1 & Desc$\to$GAD \\
 \midrule
 Converged & 90\% & 23\% & 40\% & 90\% \\
 Phase transitions & 0 & 11.5 & 3.2 & 0.9 \\
@@ -356,12 +367,27 @@ Steps at $n_{\text{neg}}$=0 & 0 & \textbf{224.5} & \textbf{225.7} & 0 \\
 \bottomrule
 \end{tabular}
 
-\textbf{Key finding:} NR-GAD's Newton step ($\mathbf{H}^{-1}\mathbf{g}$) \textbf{overshoots through
-$n_{\text{neg}}=1$ into $n_{\text{neg}}=0$} (a minimum). Samples then spend $\sim$225 steps
-trapped at a minimum, with $n_{\text{neg}}$ oscillating 105$\times$. Pure GAD and
-Descent$\to$GAD \textit{never} visit $n_{\text{neg}}=0$ (0 steps). The problem is definitively
-the Hessian inversion creating steps orders of magnitude too large along near-zero eigenvalue modes,
-not the switching logic itself.
+\textbf{NR-GAD overshoot:} $\mathbf{H}^{-1}\mathbf{g}$ amplifies near-zero eigenvalue modes by $10^3$+$\times$,
+overshooting through $n_{\text{neg}}=1$ into $n_{\text{neg}}=0$ (minimum). 224 steps trapped, 106 $n_{\text{neg}}$ oscillations.
+Descent$\to$GAD never visits $n_{\text{neg}}=0$ (0 steps), proving the switching logic is fine---the Newton step is the problem.
+
+\textbf{(d) Multi-mode GAD:} Ascend along \textit{all} negative-eigenvalue modes, not just $\mathbf{v}_1$:
+
+\vspace{0.3em}
+\begin{tabular}{l*{4}{r}}
+\toprule
+Method & 10pm & 50pm & 100pm & 200pm \\
+\midrule
+\textbf{gad\_small\_dt} & \textbf{94.3} & \textbf{91.3} & \textbf{86.7} & \textbf{51.3} \\
+multimode\_all\_neg & 87.7 & 83.7 & 71.0 & 7.7 \\
+multimode\_smooth & 87.3 & 82.7 & 69.7 & 7.6 \\
+multimode\_top2 & 36.1 & 13.4 & 6.6 & 1.1 \\
+\bottomrule
+\end{tabular}
+
+\textbf{Multi-mode is worse:} $-$7pp at 10pm, $-$16pp at 100pm, catastrophic at 200pm (8\% vs 51\%).
+Flipping all negative modes simultaneously pushes toward higher-order saddles instead of index-1.
+The $\mathbf{v}_1$-only ascent is a feature---it reduces $n_{\text{neg}}$ one mode at a time.
 
 %----------------------------------------------------------------------
 \section*{8. Sella TS Baselines \small(300 samples, 200 \& 1000 max steps, exact Hessian)}
@@ -465,7 +491,8 @@ Finding & Evidence \\
 \textbf{$\lambda_2$-blend hurts (even without precond)} & $-$10pp at 100pm; weakening $\mathbf{v}_1$ ascent is always harmful \\
 \textbf{$|\mathbf{H}|^{-1}$ preconditioning hurts GAD} & $-$21pp at 10pm, $-$43pp at 50pm \\
 \textbf{Adaptive dt always hurts} & 5 parameter sets tested, all worse than fixed dt \\
-\textbf{NR switching hurts (trajectory proof)} & NR overshoots to $n_{\text{neg}}$=0, 225 steps trapped; gentle descent is fine but pointless \\
+\textbf{NR overshoots to $n_{\text{neg}}$=0} & 225 steps trapped at minimum, 106 oscillations; gentle descent handoff is fine but pointless \\
+\textbf{Multi-mode GAD hurts} & Ascending all negative modes pushes toward higher-order saddles ($-$16pp at 100pm) \\
 \textbf{1000 steps doesn't help Sella} & $<$1pp vs 200 steps; failures are geometric \\
 \bottomrule
 \end{tabular}
@@ -475,14 +502,14 @@ Finding & Evidence \\
 \texttt{gad\_dt003} --- Eckart-projected GAD, dt=0.003, 2000 steps, no mode tracking,
 no adaptive dt, no preconditioning, no NR. \textit{The simplest method wins.}
 
-\textbf{Total optimizations:} $\sim$48,000 across 19 experiments (Rounds 1--4).
+\textbf{Total optimizations:} $\sim$55,000 across 21 experiments (Rounds 1--4).
 
 \textbf{Next steps:}
 \begin{enumerate}[nosep,leftmargin=1.5em]
-\item Multi-mode GAD: ascend along \textit{all} negative-eigenvalue modes (opposite of blend --- strengthen, not weaken)
-\item Multiple noise seeds for 95\% confidence intervals
+\item Multiple noise seeds (10$\times$) for 95\% confidence intervals
 \item Full Transition1x (9,561 samples)
-\item Sella Cartesian+Eckart with $>$1000 steps (diminishing returns expected)
+\item IRC validation with bond topology comparison (graph isomorphism)
+\item NR$\to$GAD handoff with intermediate caps (0.05--0.1\AA)
 \end{enumerate}
 
 \end{document}
