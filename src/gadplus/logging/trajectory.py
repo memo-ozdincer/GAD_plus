@@ -52,6 +52,12 @@ def _force_rms(forces: Tensor) -> float:
     return float(f.pow(2).mean().sqrt().item())
 
 
+def _force_max(forces: Tensor) -> float:
+    """Max absolute Cartesian force component (fmax)."""
+    f = forces.detach().reshape(-1)
+    return float(f.abs().max().item())
+
+
 def _displacement(a: Tensor, b: Tensor) -> float:
     """RMSD between two coordinate tensors (A)."""
     diff = (a.detach().reshape(-1, 3) - b.detach().reshape(-1, 3))
@@ -184,6 +190,7 @@ class TrajectoryLogger:
 
         # ── Forces ───────────────────────────────────────────────────
         force_norm = _force_norm(forces)
+        force_max = _force_max(forces)
         force_rms = _force_rms(forces)
 
         # ── Eigenvalue basics ────────────────────────────────────────
@@ -263,6 +270,7 @@ class TrajectoryLogger:
             "wall_time_s": wall_time,
             "energy": energy,
             "force_norm": force_norm,
+            "force_max": force_max,
             "force_rms": force_rms,
             "n_neg": n_neg,
             "eig0": eig0,

@@ -48,6 +48,7 @@ def _build_gad_config(cfg: DictConfig) -> GADSearchConfig:
         max_atom_disp=cfg.search.get("max_atom_disp", 0.35),
         min_interatomic_dist=cfg.search.get("min_interatomic_dist", 0.4),
         force_threshold=cfg.search.get("force_threshold", 0.01),
+        force_criterion=cfg.search.get("force_criterion", "fmax"),
         purify_hessian=cfg.search.get("purify_hessian", False),
     )
 
@@ -62,6 +63,7 @@ def _build_nr_gad_config(cfg: DictConfig) -> NRGADConfig:
         min_interatomic_dist=cfg.search.get("min_interatomic_dist", 0.4),
         nr_max_step_component=cfg.search.get("nr_max_step_component", 0.3),
         force_threshold=cfg.search.get("force_threshold", 0.01),
+        force_criterion=cfg.search.get("force_criterion", "fmax"),
         purify_hessian=cfg.search.get("purify_hessian", False),
     )
 
@@ -189,6 +191,7 @@ def main(cfg: DictConfig):
                     "total_steps": result.total_steps,
                     "final_n_neg": result.final_n_neg,
                     "final_force_norm": result.final_force_norm,
+                    "final_force_max": result.final_force_max,
                     "final_energy": result.final_energy,
                     "final_eig0": result.final_eig0,
                     "wall_time_s": result.wall_time_s,
@@ -198,7 +201,8 @@ def main(cfg: DictConfig):
                 status = "CONVERGED" if result.converged else f"FAILED ({result.failure_type})"
                 print(f"  [{sample_idx}] {formula} | {start_label} | {status} "
                       f"| steps={result.total_steps} | n_neg={result.final_n_neg} "
-                      f"| force={result.final_force_norm:.4f} | {result.wall_time_s:.1f}s")
+                        f"| force_norm={result.final_force_norm:.4f} "
+                        f"| force_max={result.final_force_max:.4f} | {result.wall_time_s:.1f}s")
 
     # Write summary Parquet
     import pyarrow as pa

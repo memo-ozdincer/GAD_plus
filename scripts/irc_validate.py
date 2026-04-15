@@ -115,8 +115,14 @@ def main():
             results.append({
                 "sample_id": sample_id, "formula": formula,
                 "intended": False, "half_intended": False,
+                "topology_intended": False, "topology_half_intended": False,
                 "rmsd_reactant": None, "rmsd_product": None,
+                "forward_graph_matches_reactant": False,
+                "forward_graph_matches_product": False,
+                "reverse_graph_matches_reactant": False,
+                "reverse_graph_matches_product": False,
                 "error": str(e),
+                "topology_error": str(e),
             })
             continue
 
@@ -125,8 +131,14 @@ def main():
             results.append({
                 "sample_id": sample_id, "formula": formula,
                 "intended": False, "half_intended": False,
+                "topology_intended": False, "topology_half_intended": False,
                 "rmsd_reactant": None, "rmsd_product": None,
                 "error": "no trajectory",
+                "forward_graph_matches_reactant": False,
+                "forward_graph_matches_product": False,
+                "reverse_graph_matches_reactant": False,
+                "reverse_graph_matches_product": False,
+                "topology_error": "no trajectory",
             })
             continue
 
@@ -159,12 +171,20 @@ def main():
         status = "INTENDED" if irc_result.intended else (
             "HALF" if irc_result.half_intended else "UNINTENDED"
         )
+        topology_status = "INTENDED" if irc_result.topology_intended else (
+            "HALF" if irc_result.topology_half_intended else "UNINTENDED"
+        )
         if irc_result.error:
             status = f"ERROR: {irc_result.error}"
 
         rmsd_r = f"{irc_result.rmsd_to_reactant:.3f}" if irc_result.rmsd_to_reactant is not None else "N/A"
         rmsd_p = f"{irc_result.rmsd_to_product:.3f}" if irc_result.rmsd_to_product is not None else "N/A"
-        print(f"  {status} | RMSD->R={rmsd_r} RMSD->P={rmsd_p} | {wall:.1f}s")
+        print(
+            f"  RMSD={status} | TOPO={topology_status} "
+            f"| RMSD->R={rmsd_r} RMSD->P={rmsd_p} | {wall:.1f}s"
+        )
+        if irc_result.topology_error:
+            print(f"  Topology warning: {irc_result.topology_error}")
 
         results.append({
             "sample_id": sample_id,
@@ -172,9 +192,16 @@ def main():
             "noise_pm": args.noise_pm,
             "intended": irc_result.intended,
             "half_intended": irc_result.half_intended,
+            "topology_intended": irc_result.topology_intended,
+            "topology_half_intended": irc_result.topology_half_intended,
             "rmsd_reactant": irc_result.rmsd_to_reactant,
             "rmsd_product": irc_result.rmsd_to_product,
+            "forward_graph_matches_reactant": irc_result.forward_graph_matches_reactant,
+            "forward_graph_matches_product": irc_result.forward_graph_matches_product,
+            "reverse_graph_matches_reactant": irc_result.reverse_graph_matches_reactant,
+            "reverse_graph_matches_product": irc_result.reverse_graph_matches_product,
             "error": irc_result.error,
+            "topology_error": irc_result.topology_error,
             "wall_time_s": wall,
         })
 
@@ -185,6 +212,8 @@ def main():
 
     n_intended = df["intended"].sum()
     n_half = df["half_intended"].sum()
+    n_topology_intended = df["topology_intended"].sum()
+    n_topology_half = df["topology_half_intended"].sum()
     n_unintended = len(df) - n_intended - n_half - df["error"].notna().sum()
     n_error = df["error"].notna().sum()
 
@@ -192,6 +221,8 @@ def main():
     print(f"IRC VALIDATION at noise={args.noise_pm}pm ({len(df)} samples)")
     print(f"  Intended:     {n_intended}")
     print(f"  Half:         {n_half}")
+    print(f"  Topo intended:{n_topology_intended}")
+    print(f"  Topo half:    {n_topology_half}")
     print(f"  Unintended:   {n_unintended}")
     print(f"  Error:        {n_error}")
     print(f"Saved: {out_path}")

@@ -178,6 +178,7 @@ def main():
             dt_adaptation="eigenvalue_clamped",
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            force_criterion=mcfg.get("force_criterion", "fmax"),
             use_preconditioning=mcfg.get("preconditioned", False),
             eig_floor=mcfg.get("eig_floor", 0.01),
             blend_sharpness=mcfg.get("blend_sharpness", 0.0),
@@ -195,6 +196,7 @@ def main():
             nr_max_step_norm=mcfg.get("nr_max_step_norm", 0.1),
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            force_criterion=mcfg.get("force_criterion", "fmax"),
             descent_mode=mcfg.get("descent_mode", "newton"),
         )
     elif runner == "blended":
@@ -203,12 +205,14 @@ def main():
             blend_sharpness=mcfg.get("blend_sharpness", 50.0),
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            force_criterion=mcfg.get("force_criterion", "fmax"),
         )
     elif runner == "rfo_gad":
         cfg = RFOGADConfig(
             n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
             max_atom_disp=mcfg["max_disp"],
             force_threshold=0.01,
+            force_criterion=mcfg.get("force_criterion", "fmax"),
         )
     else:
         sys.exit(f"Unknown runner: {runner}")
@@ -262,7 +266,9 @@ def main():
 
         status = "CONV" if result.converged else "FAIL"
         print(f"  [{i:3d}] {formula:>12s} | {status} | n_neg={result.final_n_neg} "
-              f"| force={result.final_force_norm:.4f} | steps={result.total_steps:3d} | {wall:.1f}s")
+              f"| force_norm={result.final_force_norm:.4f} "
+              f"| force_max={result.final_force_max:.4f} "
+              f"| steps={result.total_steps:3d} | {wall:.1f}s")
 
         results.append({
             "method": args.method,
@@ -274,6 +280,7 @@ def main():
             "total_steps": result.total_steps,
             "final_n_neg": result.final_n_neg,
             "final_force_norm": result.final_force_norm,
+            "final_force_max": result.final_force_max,
             "final_energy": result.final_energy,
             "final_eig0": result.final_eig0,
             "wall_time_s": wall,

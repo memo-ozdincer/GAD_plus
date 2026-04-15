@@ -2,6 +2,7 @@
 
 > All experiments on Transition1x train split (300 samples unless noted), HIP neural network potential, Narval A100 MIG slices.  
 > **Convergence:** n_neg==1 AND force_norm < 0.01 eV/A on Eckart-projected vibrational Hessian.  
+> **Note (2026-04-15):** We can migrate reporting to n_neg==1 AND fmax < 0.01 **without rerunning trajectories** by recomputing metrics from saved final coordinates in trajectory Parquet files (see [scripts/backfill_fmax.py](scripts/backfill_fmax.py)). Existing force_norm tables remain for continuity until full backfill is applied.  
 > **GAD formula:** F_GAD = F + 2(F·v₁)v₁, where v₁ is the lowest eigenvector of the Eckart-projected vibrational Hessian.  
 > **Step:** x_{n+1} = x_n + dt · F_GAD (Euler integration).
 

@@ -24,7 +24,12 @@ import torch
 
 from gadplus.core.types import PredictFn
 from gadplus.core.mode_tracking import pick_tracked_mode
-from gadplus.core.convergence import is_ts_converged, force_mean
+from gadplus.core.convergence import (
+    is_ts_converged,
+    force_mean,
+    force_max,
+    force_value_from_criterion,
+)
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
 from gadplus.projection import vib_eig, gad_dynamics_projected, preconditioned_gad_dynamics_projected, atomic_nums_to_symbols
 from gadplus.logging.trajectory import TrajectoryLogger
@@ -52,6 +57,7 @@ class NRGADPingPongConfig:
     max_atom_disp: float = 0.35
     min_interatomic_dist: float = 0.4
     force_threshold: float = 0.01
+    force_criterion: str = "fmax"
     purify_hessian: bool = False
 
 
@@ -153,6 +159,7 @@ def run_nr_gad_pingpong(
 
     last_n_neg = 0
     last_force_norm = float("inf")
+    last_force_max = float("inf")
     last_eig0 = 0.0
     last_energy = 0.0
     n_gad_steps = 0
@@ -169,6 +176,8 @@ def run_nr_gad_pingpong(
 
         energy = float(out["energy"].detach().reshape(-1)[0].item()) if isinstance(out["energy"], torch.Tensor) else float(out["energy"])
         fn = force_mean(forces)
+        fm = force_max(forces)
+        f_conv = force_value_from_criterion(forces, cfg.force_criterion)
 
         # Vibrational eigendecomposition (always Eckart-projected)
         evals_vib, evecs_vib_3N, _ = vib_eig(
@@ -179,6 +188,7 @@ def run_nr_gad_pingpong(
 
         last_n_neg = n_neg
         last_force_norm = fn
+        last_force_max = fm
         last_eig0 = eig0
         last_energy = energy
 
@@ -196,14 +206,19 @@ def run_nr_gad_pingpong(
             )
 
         # Convergence check
-        if is_ts_converged(n_neg, fn, cfg.force_threshold):
+        if is_ts_converged(
+            n_neg,
+            f_conv,
+            cfg.force_threshold,
+            criterion=cfg.force_criterion,
+        ):
             wall_time = time.time() - t_start
             if logger is not None:
                 logger.flush()
             return SearchResult(
                 converged=True, converged_step=step, total_steps=step + 1,
                 final_coords=coords.detach().cpu(), final_energy=energy,
-                final_n_neg=n_neg, final_force_norm=fn, final_eig0=eig0,
+                final_n_neg=n_neg, final_force_norm=fn, final_force_max=fm, final_eig0=eig0,
                 wall_time_s=wall_time,
             )
 
@@ -298,5 +313,6 @@ def run_nr_gad_pingpong(
         converged=False, converged_step=None, total_steps=cfg.max_steps,
         final_coords=coords.detach().cpu(), final_energy=last_energy,
         final_n_neg=last_n_neg, final_force_norm=last_force_norm,
+        final_force_max=last_force_max,
         final_eig0=last_eig0, wall_time_s=wall_time,
     )

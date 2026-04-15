@@ -29,6 +29,7 @@ TRAJECTORY_SCHEMA = pa.schema([
     # ── Energy surface ───────────────────────────────────────────────────
     ("energy", pa.float64()),
     ("force_norm", pa.float64()),
+    ("force_max", pa.float64()),
     ("force_rms", pa.float64()),
 
     # ── Eigenvalue spectrum ──────────────────────────────────────────────
@@ -85,6 +86,7 @@ SUMMARY_SCHEMA = pa.schema([
     ("total_steps", pa.int32()),
     ("final_n_neg", pa.int32()),
     ("final_force_norm", pa.float64()),
+    ("final_force_max", pa.float64()),
     ("final_energy", pa.float64()),
     ("final_eig0", pa.float64()),
     ("wall_time_total_s", pa.float64()),

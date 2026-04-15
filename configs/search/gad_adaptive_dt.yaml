@@ -12,4 +12,5 @@ dt_adaptation: eigenvalue_clamped
 max_atom_disp: 0.35
 min_interatomic_dist: 0.4
 force_threshold: 0.01
+force_criterion: fmax
 purify_hessian: false
