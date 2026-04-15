@@ -215,8 +215,12 @@ def _build_dataset(h5_path: str, split: str, max_sample_id: int):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results-dir", type=str, required=True,
-                        help="Directory with summary_*.parquet and traj_*.parquet")
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        required=True,
+        help="Directory with summary_*.parquet and traj_*.parquet",
+    )
     parser.add_argument("--summary-pattern", type=str, default="summary_*.parquet")
     parser.add_argument("--traj-pattern", type=str, default="traj_*.parquet")
     parser.add_argument("--split", type=str, default="train")
@@ -225,8 +229,9 @@ def main() -> None:
     parser.add_argument("--ckpt-path", type=str, default=None)
     parser.add_argument("--suffix", type=str, default="_with_fmax")
     parser.add_argument("--in-place", action="store_true")
-    parser.add_argument("--max-rows", type=int, default=None,
-                        help="Optional smoke-test limit per summary file")
+    parser.add_argument(
+        "--max-rows", type=int, default=None, help="Optional smoke-test limit per summary file"
+    )
     args = parser.parse_args()
 
     if args.device == "auto":
@@ -355,15 +360,14 @@ def main() -> None:
         out_df.to_parquet(out_path, index=False)
 
         matched = len(out_df) - missing_coords
-        print(
-            f"  wrote: {out_path} | matched={matched}/{len(out_df)} | "
-            f"missing={missing_coords}"
-        )
+        print(f"  wrote: {out_path} | matched={matched}/{len(out_df)} | missing={missing_coords}")
 
         if matched > 0:
             rate_fmax = 100.0 * out_df["conv_nneg1_fmax001_recomputed"].fillna(False).mean()
             rate_force = 100.0 * out_df["conv_nneg1_force001_recomputed"].fillna(False).mean()
-            print(f"  conv rates: nneg1+fmax<0.01={rate_fmax:.1f}% | nneg1+force<0.01={rate_force:.1f}%")
+            print(
+                f"  conv rates: nneg1+fmax<0.01={rate_fmax:.1f}% | nneg1+force<0.01={rate_force:.1f}%"
+            )
 
 
 if __name__ == "__main__":

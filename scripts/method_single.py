@@ -4,6 +4,7 @@
 Usage:
   python scripts/method_single.py --method gad_projected --noise 0.05 --n-samples 300 --n-steps 1000
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,6 +15,8 @@ import uuid
 
 import pandas as pd
 import torch
+from ase import Atoms
+from ase.io import write as ase_write
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -25,75 +28,192 @@ METHOD_CONFIGS = {
     "gad_adaptive_dt": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.35),
     "gad_tight_clamp": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.1),
     "gad_adaptive_tight": dict(runner="gad", dt=0.01, k_track=0, adaptive=True, max_disp=0.1),
-    "nr_gad_pingpong": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=False, max_disp=0.35,
-                            nr_damping=1.0, nr_max_step_norm=0.3),
-    "nr_gad_pp_adaptive": dict(runner="pingpong", dt=0.01, k_track=0, adaptive=True, max_disp=0.35,
-                               nr_damping=1.0, nr_max_step_norm=0.3),
+    "nr_gad_pingpong": dict(
+        runner="pingpong",
+        dt=0.01,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=1.0,
+        nr_max_step_norm=0.3,
+    ),
+    "nr_gad_pp_adaptive": dict(
+        runner="pingpong",
+        dt=0.01,
+        k_track=0,
+        adaptive=True,
+        max_disp=0.35,
+        nr_damping=1.0,
+        nr_max_step_norm=0.3,
+    ),
     # Damped NR-GAD variants
-    "nr_gad_damped_02": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                             nr_damping=0.2, nr_max_step_norm=0.1),
-    "nr_gad_damped_01": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                             nr_damping=0.1, nr_max_step_norm=0.05),
-    "nr_gad_damped_03": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                             nr_damping=0.3, nr_max_step_norm=0.15),
+    "nr_gad_damped_02": dict(
+        runner="pingpong",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=0.2,
+        nr_max_step_norm=0.1,
+    ),
+    "nr_gad_damped_01": dict(
+        runner="pingpong",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=0.1,
+        nr_max_step_norm=0.05,
+    ),
+    "nr_gad_damped_03": dict(
+        runner="pingpong",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=0.3,
+        nr_max_step_norm=0.15,
+    ),
     # Preconditioned GAD
-    "precond_gad_001": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                            preconditioned=True, eig_floor=0.01),
-    "precond_gad_005": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                            preconditioned=True, eig_floor=0.05),
-    "precond_gad_01": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                           preconditioned=True, eig_floor=0.1),
-    "precond_gad_dt01": dict(runner="gad", dt=0.01, k_track=0, adaptive=False, max_disp=0.35,
-                             preconditioned=True, eig_floor=0.01),
-
+    "precond_gad_001": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.01,
+    ),
+    "precond_gad_005": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.05,
+    ),
+    "precond_gad_01": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.1,
+    ),
+    "precond_gad_dt01": dict(
+        runner="gad",
+        dt=0.01,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.01,
+    ),
     # === Round 2: A — Pure GAD improvements ===
     # A1: Corrected adaptive dt (Multi-Mode GAD parameters)
-    "adaptive_mm": dict(runner="gad", dt=0.002, k_track=0, adaptive=True, max_disp=0.35,
-                        dt_min=1e-5, dt_max=0.08),
-    "adaptive_mm2": dict(runner="gad", dt=0.001, k_track=0, adaptive=True, max_disp=0.35,
-                         dt_min=1e-5, dt_max=0.05),
+    "adaptive_mm": dict(
+        runner="gad", dt=0.002, k_track=0, adaptive=True, max_disp=0.35, dt_min=1e-5, dt_max=0.08
+    ),
+    "adaptive_mm2": dict(
+        runner="gad", dt=0.001, k_track=0, adaptive=True, max_disp=0.35, dt_min=1e-5, dt_max=0.05
+    ),
     # A2: Smaller fixed dt
     "gad_dt003": dict(runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35),
     # A3: Clamping extremes
     "gad_no_clamp": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=999.0),
     # A4: Adaptive dt with floor fix
-    "adaptive_floor": dict(runner="gad", dt=0.005, k_track=0, adaptive=True, max_disp=0.35,
-                           dt_min=1e-3, dt_max=0.05),
-
+    "adaptive_floor": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=True, max_disp=0.35, dt_min=1e-3, dt_max=0.05
+    ),
     # === Round 2: B — Preconditioned descent diagnostic (hard switch, NOT diffusion-compat) ===
     # Preconditioned descent when n_neg>=2, preconditioned GAD when n_neg<2
     # Tests: Is GAD's v₁ ascent helpful at n_neg>=2?
-    "precond_descent": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                            nr_damping=1.0, nr_max_step_norm=0.3, descent_mode="preconditioned",
-                            nr_eig_floor=0.01),
-
+    "precond_descent": dict(
+        runner="pingpong",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=1.0,
+        nr_max_step_norm=0.3,
+        descent_mode="preconditioned",
+        nr_eig_floor=0.01,
+    ),
     # === Round 2: C — Blended preconditioned GAD (diffusion-compatible) ===
     # F_blend = F + 2·sigmoid(k·λ₂)·(F·v₁)v₁, then Δx = dt · |H|⁻¹ · F_blend
     # One scalar w controls ascend-v₁-or-not. Everything else is preconditioned descent.
-    "blend_k50": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                      preconditioned=True, eig_floor=0.01, blend_sharpness=50.0),
-    "blend_k100": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                       preconditioned=True, eig_floor=0.01, blend_sharpness=100.0),
-
+    "blend_k50": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.01,
+        blend_sharpness=50.0,
+    ),
+    "blend_k100": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        preconditioned=True,
+        eig_floor=0.01,
+        blend_sharpness=100.0,
+    ),
     # === Round 3: Blend WITHOUT preconditioning (plain Euler) ===
     # F_blend = F + 2·sigmoid(k·λ₂)·(F·v₁)v₁, Δx = dt · F_blend
     # Tests whether smooth λ₂-blend helps on top of the already-good gad_small_dt base.
-    "blend_plain_k50": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                            blend_sharpness=50.0),
-    "blend_plain_k100": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                             blend_sharpness=100.0),
-    "blend_plain_k10": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                            blend_sharpness=10.0),
-
+    "blend_plain_k50": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, blend_sharpness=50.0
+    ),
+    "blend_plain_k100": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, blend_sharpness=100.0
+    ),
+    "blend_plain_k10": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, blend_sharpness=10.0
+    ),
     # === Round 3: Even smaller fixed dt ===
     "gad_dt002": dict(runner="gad", dt=0.002, k_track=0, adaptive=False, max_disp=0.35),
-
     # === Round 4: One-way descent→GAD ===
     # Plain gradient descent (blend_weight=0) until n_neg <= threshold, then GAD permanently
-    "descent_then_gad_2": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                               descent_until_nneg=2),
-    "descent_then_gad_3": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
-                               descent_until_nneg=3),
+    "descent_then_gad_2": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, descent_until_nneg=2
+    ),
+    "descent_then_gad_3": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, descent_until_nneg=3
+    ),
+    # === Tight convergence presets (for high-precision TS refinement) ===
+    "gad_projected_fmax1e4": dict(
+        runner="gad",
+        dt=0.01,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        force_criterion="fmax",
+        force_threshold=1e-4,
+    ),
+    "gad_small_dt_fmax1e4": dict(
+        runner="gad",
+        dt=0.005,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        force_criterion="fmax",
+        force_threshold=1e-4,
+    ),
+    "gad_dt003_fmax1e4": dict(
+        runner="gad",
+        dt=0.003,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        force_criterion="fmax",
+        force_threshold=1e-4,
+    ),
 }
 
 
@@ -105,16 +225,44 @@ def main():
     parser.add_argument("--n-steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split", type=str, default="train")
-    parser.add_argument("--random-offset", type=int, default=0,
-                        help="Skip first N samples (for randomized sampling from full dataset)")
+    parser.add_argument(
+        "--random-offset",
+        type=int,
+        default=0,
+        help="Skip first N samples (for randomized sampling from full dataset)",
+    )
+    parser.add_argument(
+        "--force-threshold",
+        type=float,
+        default=0.01,
+        help="Convergence threshold for selected force criterion",
+    )
+    parser.add_argument(
+        "--force-criterion",
+        type=str,
+        default="fmax",
+        choices=["fmax", "force_norm"],
+        help="Force criterion for convergence gating",
+    )
+    parser.add_argument(
+        "--save-ts-xyz",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Write converged TS geometries to a multi-frame XYZ file",
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     noise_pm = int(round(args.noise * 1000))
     mcfg = METHOD_CONFIGS[args.method]
-    print(f"Device: {device} | method={args.method} | noise={noise_pm}pm | "
-          f"samples={args.n_samples} | steps={args.n_steps} | dt={mcfg['dt']}")
+    force_threshold = mcfg.get("force_threshold", args.force_threshold)
+    force_criterion = mcfg.get("force_criterion", args.force_criterion)
+    print(
+        f"Device: {device} | method={args.method} | noise={noise_pm}pm | "
+        f"samples={args.n_samples} | steps={args.n_steps} | dt={mcfg['dt']} "
+        f"| conv={force_criterion}<{force_threshold}"
+    )
 
     # ---- Paths ----
     for ckpt_path in [
@@ -140,14 +288,17 @@ def main():
 
     # ---- Load HIP ----
     from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+
     calculator = load_hip_calculator(ckpt_path, device=device)
     predict_fn = make_hip_predict_fn(calculator)
     print("HIP loaded")
 
     # ---- Load dataset ----
     from gadplus.data.transition1x import Transition1xDataset, UsePos
+
     dataset = Transition1xDataset(
-        h5_path, split=args.split,
+        h5_path,
+        split=args.split,
         max_samples=args.n_samples + args.random_offset,
         transform=UsePos("pos_transition"),
     )
@@ -170,15 +321,17 @@ def main():
 
     if runner == "gad":
         cfg = GADSearchConfig(
-            n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
+            n_steps=args.n_steps,
+            dt=mcfg["dt"],
+            k_track=mcfg["k_track"],
             use_projection=True,
             use_adaptive_dt=mcfg.get("adaptive", False),
             dt_min=mcfg.get("dt_min", 1e-4),
             dt_max=mcfg.get("dt_max", 0.05),
             dt_adaptation="eigenvalue_clamped",
             max_atom_disp=mcfg["max_disp"],
-            force_threshold=0.01,
-            force_criterion=mcfg.get("force_criterion", "fmax"),
+            force_threshold=force_threshold,
+            force_criterion=force_criterion,
             use_preconditioning=mcfg.get("preconditioned", False),
             eig_floor=mcfg.get("eig_floor", 0.01),
             blend_sharpness=mcfg.get("blend_sharpness", 0.0),
@@ -186,7 +339,9 @@ def main():
         )
     elif runner == "pingpong":
         cfg = NRGADPingPongConfig(
-            max_steps=args.n_steps, gad_dt=mcfg["dt"], k_track=mcfg["k_track"],
+            max_steps=args.n_steps,
+            gad_dt=mcfg["dt"],
+            k_track=mcfg["k_track"],
             use_adaptive_dt=mcfg.get("adaptive", False),
             dt_min=mcfg.get("dt_min", 1e-4),
             dt_max=mcfg.get("dt_max", 0.05),
@@ -195,24 +350,28 @@ def main():
             nr_damping=mcfg.get("nr_damping", 0.2),
             nr_max_step_norm=mcfg.get("nr_max_step_norm", 0.1),
             max_atom_disp=mcfg["max_disp"],
-            force_threshold=0.01,
-            force_criterion=mcfg.get("force_criterion", "fmax"),
+            force_threshold=force_threshold,
+            force_criterion=force_criterion,
             descent_mode=mcfg.get("descent_mode", "newton"),
         )
     elif runner == "blended":
         cfg = BlendedGADConfig(
-            n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
+            n_steps=args.n_steps,
+            dt=mcfg["dt"],
+            k_track=mcfg["k_track"],
             blend_sharpness=mcfg.get("blend_sharpness", 50.0),
             max_atom_disp=mcfg["max_disp"],
-            force_threshold=0.01,
-            force_criterion=mcfg.get("force_criterion", "fmax"),
+            force_threshold=force_threshold,
+            force_criterion=force_criterion,
         )
     elif runner == "rfo_gad":
         cfg = RFOGADConfig(
-            n_steps=args.n_steps, dt=mcfg["dt"], k_track=mcfg["k_track"],
+            n_steps=args.n_steps,
+            dt=mcfg["dt"],
+            k_track=mcfg["k_track"],
             max_atom_disp=mcfg["max_disp"],
-            force_threshold=0.01,
-            force_criterion=mcfg.get("force_criterion", "fmax"),
+            force_threshold=force_threshold,
+            force_criterion=force_criterion,
         )
     else:
         sys.exit(f"Unknown runner: {runner}")
@@ -232,7 +391,11 @@ def main():
     # ---- Run ----
     run_id = f"{args.method}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     results = []
+    ts_atoms: list[Atoms] = []
+    ts_index_rows: list[dict] = []
     t_total = time.time()
+    ts_xyz_path = os.path.join(output_dir, f"ts_all_{args.method}_{noise_pm}pm.xyz")
+    ts_index_path = os.path.join(output_dir, f"ts_index_{args.method}_{noise_pm}pm.parquet")
 
     for i in sample_indices:
         sample = dataset[i]
@@ -243,48 +406,91 @@ def main():
         coords_start = coords_ts + noise_vecs[i].to(device)
 
         logger = TrajectoryLogger(
-            output_dir=output_dir, run_id=run_id, sample_id=i,
+            output_dir=output_dir,
+            run_id=run_id,
+            sample_id=i,
             start_method=f"noised_ts_{noise_pm}pm",
-            search_method=args.method, formula=formula,
+            search_method=args.method,
+            formula=formula,
         )
 
         t0 = time.time()
         if runner == "gad":
-            result = run_gad_search(predict_fn, coords_start, z, cfg,
-                                    logger=logger, known_ts_coords=coords_ts)
+            result = run_gad_search(
+                predict_fn, coords_start, z, cfg, logger=logger, known_ts_coords=coords_ts
+            )
         elif runner == "pingpong":
-            result = run_nr_gad_pingpong(predict_fn, coords_start, z, cfg,
-                                         logger=logger, known_ts_coords=coords_ts)
+            result = run_nr_gad_pingpong(
+                predict_fn, coords_start, z, cfg, logger=logger, known_ts_coords=coords_ts
+            )
         elif runner == "blended":
-            result = run_blended_gad(predict_fn, coords_start, z, cfg,
-                                     logger=logger, known_ts_coords=coords_ts)
+            result = run_blended_gad(
+                predict_fn, coords_start, z, cfg, logger=logger, known_ts_coords=coords_ts
+            )
         elif runner == "rfo_gad":
-            result = run_rfo_gad(predict_fn, coords_start, z, cfg,
-                                  logger=logger, known_ts_coords=coords_ts)
+            result = run_rfo_gad(
+                predict_fn, coords_start, z, cfg, logger=logger, known_ts_coords=coords_ts
+            )
         wall = time.time() - t0
         logger.flush()
 
         status = "CONV" if result.converged else "FAIL"
-        print(f"  [{i:3d}] {formula:>12s} | {status} | n_neg={result.final_n_neg} "
-              f"| force_norm={result.final_force_norm:.4f} "
-              f"| force_max={result.final_force_max:.4f} "
-              f"| steps={result.total_steps:3d} | {wall:.1f}s")
+        print(
+            f"  [{i:3d}] {formula:>12s} | {status} | n_neg={result.final_n_neg} "
+            f"| force_norm={result.final_force_norm:.4f} "
+            f"| force_max={result.final_force_max:.4f} "
+            f"| steps={result.total_steps:3d} | {wall:.1f}s"
+        )
 
-        results.append({
-            "method": args.method,
-            "noise_pm": noise_pm,
-            "sample_id": i,
-            "formula": formula,
-            "converged": result.converged,
-            "converged_step": result.converged_step,
-            "total_steps": result.total_steps,
-            "final_n_neg": result.final_n_neg,
-            "final_force_norm": result.final_force_norm,
-            "final_force_max": result.final_force_max,
-            "final_energy": result.final_energy,
-            "final_eig0": result.final_eig0,
-            "wall_time_s": wall,
-        })
+        final_coords_flat = result.final_coords.reshape(-1).float().tolist()
+        ts_xyz_frame = None
+        if result.converged and args.save_ts_xyz:
+            frame_idx = len(ts_atoms)
+            ts_xyz_frame = frame_idx
+            atoms = Atoms(
+                numbers=z.detach().cpu().numpy(),
+                positions=result.final_coords.detach().cpu().numpy(),
+            )
+            atoms.info["sample_id"] = int(i)
+            atoms.info["formula"] = str(formula)
+            atoms.info["method"] = args.method
+            atoms.info["noise_pm"] = int(noise_pm)
+            ts_atoms.append(atoms)
+            ts_index_rows.append(
+                {
+                    "run_id": run_id,
+                    "method": args.method,
+                    "noise_pm": noise_pm,
+                    "sample_id": i,
+                    "formula": formula,
+                    "frame_index": frame_idx,
+                    "converged_step": result.converged_step,
+                    "final_force_norm": result.final_force_norm,
+                    "final_force_max": result.final_force_max,
+                }
+            )
+
+        results.append(
+            {
+                "run_id": run_id,
+                "method": args.method,
+                "noise_pm": noise_pm,
+                "sample_id": i,
+                "formula": formula,
+                "converged": result.converged,
+                "converged_step": result.converged_step,
+                "total_steps": result.total_steps,
+                "final_n_neg": result.final_n_neg,
+                "final_force_norm": result.final_force_norm,
+                "final_force_max": result.final_force_max,
+                "final_energy": result.final_energy,
+                "final_eig0": result.final_eig0,
+                "final_coords_flat": final_coords_flat,
+                "ts_xyz_path": ts_xyz_path if result.converged and args.save_ts_xyz else None,
+                "ts_xyz_frame": ts_xyz_frame,
+                "wall_time_s": wall,
+            }
+        )
 
     total_wall = time.time() - t_total
 
@@ -293,12 +499,22 @@ def main():
     out_path = os.path.join(output_dir, f"summary_{args.method}_{noise_pm}pm.parquet")
     df.to_parquet(out_path)
 
+    if args.save_ts_xyz and ts_atoms:
+        ase_write(ts_xyz_path, ts_atoms)
+        pd.DataFrame(ts_index_rows).to_parquet(ts_index_path, index=False)
+        print(f"Saved TS XYZ: {ts_xyz_path} ({len(ts_atoms)} frames)")
+        print(f"Saved TS index: {ts_index_path}")
+    elif args.save_ts_xyz:
+        print("No converged structures; TS XYZ not written.")
+
     n_conv = df["converged"].sum()
     rate = 100 * n_conv / len(df)
     avg_steps = df.loc[df["converged"], "converged_step"].mean()
-    print(f"\n{'='*60}")
-    print(f"{args.method} @ {noise_pm}pm: {n_conv}/{len(df)} ({rate:.1f}%), "
-          f"avg steps={avg_steps:.0f}, wall={total_wall:.0f}s ({total_wall/60:.1f}min)")
+    print(f"\n{'=' * 60}")
+    print(
+        f"{args.method} @ {noise_pm}pm: {n_conv}/{len(df)} ({rate:.1f}%), "
+        f"avg steps={avg_steps:.0f}, wall={total_wall:.0f}s ({total_wall / 60:.1f}min)"
+    )
     print(f"Saved: {out_path}")
 
 
