@@ -1,0 +1,6 @@
+- [Narval SLURM constraints](feedback_narval_slurm.md) — WANDB_DISABLED, PYTHONUNBUFFERED, no internet on compute
+- [HIP dependency fixes](project_hip_dep_fixes.md) — scipy sph_harm, torch weights_only, PyG extensions for torch 2.7
+- [Eckart n_neg fix](project_eckart_n_neg.md) — gad_search.py must always use Eckart projection for n_neg counting
+- [rrg-aspuru inode quota](project_inode_quota.md) — near 500K limit, be careful installing packages
+- [noisyTS paper comparison](project_noisyts_comparison.md) — Compare GAD+ noise results with LMHE paper Figure 3 (0-15pm range)
+- [Diffusion compatibility](feedback_diffusion_compatibility.md) — Methods must be differentiable end-to-end for adjoint sampling; no branching/accept-reject
