@@ -228,7 +228,7 @@ def main():
         default=True,
         help="Run a short projected GAD refinement from the selected TS candidate before IRC",
     )
-    parser.add_argument("--refine-steps", type=int, default=300)
+    parser.add_argument("--refine-steps", type=int, default=600)
     parser.add_argument("--refine-dt", type=float, default=0.003)
     parser.add_argument(
         "--refine-force-criterion",
@@ -236,7 +236,7 @@ def main():
         default="fmax",
         choices=["force_norm", "fmax"],
     )
-    parser.add_argument("--refine-force-threshold", type=float, default=0.005)
+    parser.add_argument("--refine-force-threshold", type=float, default=0.006)
     parser.add_argument(
         "--write-viewer-bundles",
         action=argparse.BooleanOptionalAction,

@@ -53,6 +53,9 @@ class NRGADPingPongConfig:
     nr_max_step_norm: float = 0.1  # Max total NR step norm (Angstrom)
     # Descent mode when n_neg >= 2: "newton", "gradient", or "preconditioned"
     descent_mode: str = "newton"
+    # One-way switch: once n_neg <= threshold, lock into GAD permanently (no ping-pong)
+    one_way: bool = False
+    one_way_threshold: int = 2
     # Shared
     max_atom_disp: float = 0.35
     min_interatomic_dist: float = 0.4
@@ -164,6 +167,7 @@ def run_nr_gad_pingpong(
     last_energy = 0.0
     n_gad_steps = 0
     n_nr_steps = 0
+    gad_locked = not cfg.one_way  # if not one_way, never lock (standard ping-pong)
 
     for step in range(cfg.max_steps):
         out = predict_fn(coords, atomic_nums, do_hessian=True, require_grad=False)
@@ -192,8 +196,15 @@ def run_nr_gad_pingpong(
         last_eig0 = eig0
         last_energy = energy
 
-        # Decide phase: NR when n_neg >= 2, GAD when n_neg < 2
-        phase = "nr" if n_neg >= 2 else "gad"
+        # Decide phase
+        if cfg.one_way:
+            # One-way: NR until n_neg <= threshold, then GAD permanently
+            if not gad_locked and n_neg <= cfg.one_way_threshold:
+                gad_locked = True
+            phase = "gad" if gad_locked else "nr"
+        else:
+            # Standard ping-pong: NR when n_neg >= 2, GAD when n_neg < 2
+            phase = "nr" if n_neg >= 2 else "gad"
 
         # Log
         if logger is not None:

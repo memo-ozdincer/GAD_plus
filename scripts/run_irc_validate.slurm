@@ -46,10 +46,10 @@ python -u "$PROJECT_DIR/scripts/irc_validate.py" \
     --ts-force-criterion fmax \
     --ts-force-threshold 0.01 \
     --refine-ts \
-    --refine-steps 300 \
+    --refine-steps 600 \
     --refine-dt 0.003 \
     --refine-force-criterion fmax \
-    --refine-force-threshold 0.005 \
+    --refine-force-threshold 0.006 \
     --skip-if-ts-poor \
     --survey-dir "$SCRATCH/gadplus/runs/noise_survey_300" \
     --n-dataset-samples 300 \

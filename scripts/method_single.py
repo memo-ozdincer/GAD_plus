@@ -186,6 +186,15 @@ METHOD_CONFIGS = {
     "descent_then_gad_3": dict(
         runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35, descent_until_nneg=3
     ),
+    # === Round 4: NR→GAD one-way (Newton descent until n_neg≤2, then GAD permanently) ===
+    # Uses nr_gad_pingpong framework but with one-way switch logic
+    # Small NR steps via tight displacement cap to prevent overshoot
+    "nr_then_gad_cap01": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False,
+                              max_disp=0.01, nr_damping=0.3, nr_max_step_norm=0.01,
+                              descent_mode="newton", one_way=True, one_way_threshold=2),
+    "nr_then_gad_cap005": dict(runner="pingpong", dt=0.005, k_track=0, adaptive=False,
+                               max_disp=0.005, nr_damping=0.3, nr_max_step_norm=0.005,
+                               descent_mode="newton", one_way=True, one_way_threshold=2),
     # === Round 4: Multi-mode GAD ===
     # Ascend along ALL negative-eigenvalue modes, not just v₁
     "multimode_all_neg": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
@@ -365,6 +374,8 @@ def main():
             force_threshold=force_threshold,
             force_criterion=force_criterion,
             descent_mode=mcfg.get("descent_mode", "newton"),
+            one_way=mcfg.get("one_way", False),
+            one_way_threshold=mcfg.get("one_way_threshold", 2),
         )
     elif runner == "blended":
         cfg = BlendedGADConfig(

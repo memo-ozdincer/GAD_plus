@@ -1,0 +1,233 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{booktabs,array}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0em}
+
+\title{\Large\textbf{IRC Results Snapshot}\\[4pt]
+\normalsize Refined GAD $\rightarrow$ IRC validation, status as of 2026-04-15}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\section*{What This Note Covers}
+
+This note summarizes the \emph{current} IRC validation workflow and the first
+scientifically meaningful refined rerun. It is intentionally compact: the goal is
+to preserve the key numbers, the threshold analysis, and a small amount of
+interpretation in one place.
+
+\textbf{Pipeline used here}
+\begin{enumerate}[nosep,leftmargin=1.5em]
+\item Start from converged GAD trajectories from \texttt{noise\_survey\_300}.
+\item These trajectories come from \textbf{dataset TS geometries} with Gaussian noise added
+      to the \texttt{Transition1x} labeled transition-state coordinates.
+\item Select a TS candidate from the saved trajectory (\texttt{best\_nneg1}).
+\item Recompute projected TS quality with HIP:
+      $n_{\text{neg}}$, force norm, and $f_{\max}$.
+\item If needed, refine the TS candidate with projected GAD.
+\item Run IRC \emph{from that TS} in both downhill directions using Sella's IRC routine.
+\item Compare the two endpoints against the \texttt{Transition1x} labeled reactant/product
+      using:
+      aligned geometry (element-aware Kabsch/Hungarian RMSD) and bond-topology matching.
+\end{enumerate}
+
+\textbf{Important interpretation point}
+The current labels \texttt{intended / half / unintended} mean:
+\emph{does the HIP IRC from this GAD-found TS recover the dataset-labeled
+reactant/product pair?} This is a strong benchmark, but not a complete
+unsupervised analysis of all possible connected minima on HIP's PES.
+
+\section*{Run Summary}
+
+The refined rerun analyzed here is the completed array \texttt{59367455\_[0-2]}.
+It covered 30 converged TS candidates each at noise levels 0, 10, and 50 pm.
+
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+Noise & Total & IRC ran & Gate failed & Half & Topology-half only & Unintended \\
+\midrule
+0 pm  & 30 & 12 & 18 & 7 & 1 & 4 \\
+10 pm & 30 &  9 & 21 & 3 & 2 & 4 \\
+50 pm & 30 &  4 & 26 & 0 & 0 & 4 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Headline:} the dominant failure mode is now \texttt{ts\_quality\_gate\_failed},
+not code failure. No intended rows were found in this rerun. The attempted cases
+become progressively worse with noise: mixed / half-intended at low noise,
+fully unintended by 50 pm.
+
+\section*{Main Figure}
+
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig_irc_refined_summary.png}
+\captionof{figure}{\textbf{Left:} outcome breakdown of the refined rerun.
+\textbf{Right:} number of refined index-1 candidates that would pass under looser
+post-refinement $f_{\max}$ gates, using the already-saved results.}
+\end{center}
+
+\textbf{Interpretation}
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item Noise hurts in two layers:
+      fewer candidates survive TS screening, and the surviving ones connect less
+      cleanly to the labeled endpoints.
+\item Even 0 pm is not ``clean'' under the stricter pipeline. This means the old
+      convergence notion (\(n_{\text{neg}}=1\) plus loose force screening) was broad
+      enough that some nominally converged points were not clean TSs by stricter
+      \(f_{\max}\)-based standards.
+\item The threshold-sweep panel shows that the old post-refinement gate
+      \(f_{\max}<0.005\) was too severe for the saved refined candidates.
+\end{itemize}
+
+\section*{Why The Force Gate Was Too Strict}
+
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig_irc_refined_fmax.png}
+\captionof{figure}{Refined TS \(f_{\max}\) for rows that actually ran IRC versus rows
+that were skipped by the TS-quality gate. Dashed gray: old refined gate \(0.005\).
+Dotted green: new refined gate \(0.006\).}
+\end{center}
+
+\textbf{Most important observation:}
+the previous policy was asymmetric.
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item Unrefined candidates could go straight to IRC if they satisfied
+      \(f_{\max}<0.01\).
+\item Refined candidates were only allowed through if they satisfied
+      \(f_{\max}<0.005\).
+\end{itemize}
+
+That means some \emph{improved} refined TSs were being rejected even though their
+\(f_{\max}\) was smaller than already-accepted unrefined TSs.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Noise & Max accepted pre-gate \(f_{\max}\) & Min rejected refined \(f_{\max}\) & Median rejected refined \(f_{\max}\) \\
+\midrule
+0 pm  & 0.009697 & 0.005027 & 0.005819 \\
+10 pm & 0.009260 & 0.005033 & 0.005794 \\
+50 pm & ---      & 0.005027 & 0.005824 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Conclusion:}
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \(0.005\) was stricter than necessary for a first refined IRC pass.
+\item The saved results support loosening to \(f_{\max}<0.006\), not all the way
+      back to \(0.01\).
+\item Many borderline failures are clustered near \(0.0052\text{--}0.0059\), so
+      \(0.006\) captures the obviously near-pass cases without becoming too loose.
+\end{itemize}
+
+\section*{Updated Rerun Settings}
+
+The new defaults already patched into the repo are:
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \texttt{--refine-steps 600} instead of 300
+\item \texttt{--refine-force-threshold 0.006} instead of 0.005
+\end{itemize}
+
+Why 600 steps? In the completed refined rerun, the refinement stage often hit the
+300-step cap:
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Noise & Rows hitting 300-step refinement cap & Mean refinement steps \\
+\midrule
+0 pm  &  5 & 90 \\
+10 pm &  7 & 174 \\
+50 pm & 14 & 211 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So the next rerun is not just ``looser''; it also gives refinement more room to
+tighten genuinely borderline TSs.
+
+\section*{What To Inspect First In 3D}
+
+The viewer bundles from the completed refined run are already available under:
+\texttt{/lustre07/scratch/memoozd/gadplus/runs/irc\_validation\_300/viewer\_noise\_*pm/viewer\_bundle/}
+
+Recommended cases:
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \texttt{0 pm / sample 51}: refined strongly, still only half-intended
+\item \texttt{0 pm / samples 28, 33}: representative low-noise half-intended cases
+\item \texttt{10 pm / samples 175, 238}: useful geometry-vs-topology disagreement cases
+\item \texttt{50 pm / samples 85, 169}: clearly unintended high-noise examples
+\end{itemize}
+
+Each bundle contains:
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item dataset reactant reference
+\item reverse IRC endpoint
+\item TS input
+\item forward IRC endpoint
+\item dataset product reference
+\end{itemize}
+
+So this is an endpoint/context view of the IRC outcome, not a dense movie of every
+internal IRC integration step.
+
+\section*{Bottom Line}
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item The current refined IRC pipeline is now producing \emph{real} scientific signal.
+\item The main issue is TS admissibility, not numerical IRC crashes.
+\item Noise degrades both TS quality and endpoint agreement.
+\item The old refined gate \(f_{\max}<0.005\) was too strict and internally inconsistent.
+\item The next rerun should be judged under the patched defaults:
+      600 refinement steps and post-refinement \(f_{\max}<0.006\).
+\end{itemize}
+
+\section*{What Is Running Right Now}
+
+\textbf{Queue snapshot captured at 2026-04-15 16:16 UTC}
+
+\begin{center}
+\begin{tabular}{>{\ttfamily}l>{\ttfamily}lcc>{\ttfamily}l}
+\toprule
+JobID & Name & State & Time & Node / Reason \\
+\midrule
+59385318\_0 & run\_nr\_then\_gad\_quic & R & 8:40 & ng20304 \\
+59385318\_1 & run\_nr\_then\_gad\_quic & R & 8:40 & ng20304 \\
+59385481\_0 & run\_irc\_validate.slu  & R & 8:40 & ng20304 \\
+59385481\_1 & run\_irc\_validate.slu  & R & 8:40 & ng20402 \\
+59385481\_2 & run\_irc\_validate.slu  & R & 8:40 & ng20603 \\
+59385266\_0 & run\_nr\_then\_gad.slur & R & 12:09 & ng20601 \\
+59385266\_1 & run\_nr\_then\_gad.slur & R & 12:09 & ng20601 \\
+59385266\_2 & run\_nr\_then\_gad.slur & R & 12:09 & ng20601 \\
+59385266\_3 & run\_nr\_then\_gad.slur & R & 12:09 & ng30102 \\
+59385266\_4 & run\_nr\_then\_gad.slur & R & 12:09 & ng30102 \\
+59385266\_5 & run\_nr\_then\_gad.slur & R & 12:09 & ng30102 \\
+59385266\_6 & run\_nr\_then\_gad.slur & R & 12:09 & ng30102 \\
+59385266\_7 & run\_nr\_then\_gad.slur & R & 12:09 & ng20401 \\
+59385266\_8 & run\_nr\_then\_gad.slur & R & 12:09 & ng20401 \\
+59385266\_9 & run\_nr\_then\_gad.slur & R & 12:09 & ng20401 \\
+59385266\_10 & run\_nr\_then\_gad.slur & R & 8:40 & ng30104 \\
+59385266\_11 & run\_nr\_then\_gad.slur & R & 8:40 & ng20401 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The important item for IRC is that the \textbf{new rerun is currently running as}
+\texttt{59385481\_[0-2]}.
+
+\end{document}
