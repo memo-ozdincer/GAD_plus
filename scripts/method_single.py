@@ -87,6 +87,13 @@ METHOD_CONFIGS = {
 
     # === Round 3: Even smaller fixed dt ===
     "gad_dt002": dict(runner="gad", dt=0.002, k_track=0, adaptive=False, max_disp=0.35),
+
+    # === Round 4: One-way descent→GAD ===
+    # Plain gradient descent (blend_weight=0) until n_neg <= threshold, then GAD permanently
+    "descent_then_gad_2": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                               descent_until_nneg=2),
+    "descent_then_gad_3": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+                               descent_until_nneg=3),
 }
 
 
@@ -174,6 +181,7 @@ def main():
             use_preconditioning=mcfg.get("preconditioned", False),
             eig_floor=mcfg.get("eig_floor", 0.01),
             blend_sharpness=mcfg.get("blend_sharpness", 0.0),
+            descent_until_nneg=mcfg.get("descent_until_nneg", 0),
         )
     elif runner == "pingpong":
         cfg = NRGADPingPongConfig(

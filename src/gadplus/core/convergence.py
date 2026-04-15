@@ -32,6 +32,7 @@ class ConvergenceState:
     """Current convergence state at a given optimization step."""
     n_neg: int                  # Number of negative vibrational eigenvalues
     force_norm: float           # Mean per-atom force norm (eV/A)
+    force_max: float            # Max absolute force component (eV/A)
     min_eval: float             # Smallest vibrational eigenvalue
     status: ConvergenceStatus = ConvergenceStatus.NOT_CONVERGED
 
@@ -41,20 +42,20 @@ class ConvergenceState:
 
 def is_ts_converged(
     n_neg: int,
-    force_norm: float,
+    force_val: float,
     force_threshold: float = 0.01,
 ) -> bool:
     """Check if geometry is a converged transition state.
 
     Args:
         n_neg: Number of negative vibrational eigenvalues after Eckart projection.
-        force_norm: Mean per-atom force norm in eV/A.
+        force_val: Force value in eV/A (either fmax or force_norm).
         force_threshold: Force convergence threshold (default 0.01 eV/A).
 
     Returns:
-        True if n_neg == 1 AND force_norm < force_threshold.
+        True if n_neg == 1 AND force_val < force_threshold.
     """
-    return n_neg == 1 and force_norm < force_threshold
+    return n_neg == 1 and force_val < force_threshold
 
 
 def compute_cascade_n_neg(evals_vib: torch.Tensor) -> dict[str, int]:

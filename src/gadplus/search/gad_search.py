@@ -49,6 +49,9 @@ class GADSearchConfig:
     purify_hessian: bool = False
     use_preconditioning: bool = False
     eig_floor: float = 0.01
+    # One-way descent→GAD switch: follow plain forces until n_neg <= threshold,
+    # then switch to GAD permanently. 0 = disabled (pure GAD from start).
+    descent_until_nneg: int = 0
     # Lambda2-blended preconditioning: w = sigmoid(k * lambda_2)
     # 0 = no blend (standard GAD/precond GAD), >0 = blended
     blend_sharpness: float = 0.0
@@ -98,6 +101,9 @@ def run_gad_search(
     v_prev: Optional[torch.Tensor] = None
     t_start = time.time()
 
+    # One-way descent→GAD switch
+    gad_locked = (cfg.descent_until_nneg == 0)  # if 0, start in GAD immediately
+
     # Track last eigenvalues for result
     last_n_neg = 0
     last_force_norm = float("inf")
@@ -135,12 +141,18 @@ def run_gad_search(
         last_eig0 = eig0
         last_energy = energy
 
+        # One-way switch: once n_neg <= threshold, lock into GAD permanently
+        if not gad_locked and n_neg <= cfg.descent_until_nneg:
+            gad_locked = True
+
+        phase = "gad" if gad_locked else "descent"
+
         # Log step
         if logger is not None:
             dt_eff_for_log = cfg.dt  # will be overwritten if adaptive
             logger.log_step(
                 step=step,
-                phase="gad",
+                phase=phase,
                 dt_eff=dt_eff_for_log,
                 energy=energy,
                 forces=forces,
@@ -171,8 +183,28 @@ def run_gad_search(
                 wall_time_s=wall_time,
             )
 
-        # Compute GAD direction
-        if cfg.use_projection:
+        # Compute step direction
+        if phase == "descent":
+            # Plain projected forces — follow gradient downhill, no v1 flip
+            # Uses gad_dynamics_projected with blend_weight=0 (pure descent)
+            if cfg.use_projection:
+                k_track = cfg.k_track
+                n_evecs = evecs_vib_3N.shape[1]
+                k_eff = min(k_track, n_evecs) if k_track > 0 else n_evecs
+                V_cand = evecs_vib_3N[:, :max(k_eff, 1)].to(device=forces.device, dtype=forces.dtype)
+                v_prev_local = (
+                    v_prev.to(device=forces.device, dtype=forces.dtype).reshape(-1)
+                    if v_prev is not None else None
+                )
+                v, _idx, _overlap = pick_tracked_mode(V_cand, v_prev_local, k=k_track)
+                gad_vec, v_proj, _info = gad_dynamics_projected(
+                    coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+                    gad_blend_weight=0.0,  # pure descent
+                )
+                v_prev = v_proj.detach().clone().reshape(-1)
+            else:
+                gad_vec = forces.clone()  # just follow forces
+        elif cfg.use_projection:
             # Mode tracking on projected eigenvectors
             k_track = cfg.k_track
             n_evecs = evecs_vib_3N.shape[1]
