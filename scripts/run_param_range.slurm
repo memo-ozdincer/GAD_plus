@@ -20,7 +20,7 @@ for DT in $DT_VALUES; do
     for K in $K_VALUES; do
         JOB_NAME="pr_dt${DT}_k${K}"
         JOB_ID=$(sbatch --parsable \
-            --account=def-aspuru \
+            --account=rrg-aspuru \
             --gpus=a100_2g.10gb:1 \
             --cpus-per-task=4 \
             --mem=16G \

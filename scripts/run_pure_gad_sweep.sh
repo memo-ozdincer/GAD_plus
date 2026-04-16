@@ -29,7 +29,7 @@ submit_job() {
     local JOB_NAME="gad_${START}_n${NOISE_PM}"
 
     sbatch --parsable \
-        --account=def-aspuru \
+        --account=rrg-aspuru \
         --gpus=a100_2g.10gb:1 \
         --cpus-per-task=4 \
         --mem=16G \

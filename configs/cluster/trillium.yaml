@@ -3,7 +3,7 @@
 # No MIG slicing — must request full GPUs (1 or 4)
 # Use Narval for throughput; Trillium for large-molecule or training jobs.
 
-account: def-aspuru
+account: rrg-aspuru
 gpus: 1                   # --gpus-per-node=1 (full H100)
 cpus_per_task: 12
 mem_gb: 64

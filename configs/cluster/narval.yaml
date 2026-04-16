@@ -10,7 +10,7 @@
 #
 # Interactive salloc has ~3hr wait (small pool). Use sbatch instead.
 
-account: def-aspuru
+account: rrg-aspuru
 gpus: "a100_2g.10gb:1"   # MIG slice: 10GB VRAM, 2/8 compute — plenty for HIP
 cpus_per_task: 4          # 4 cores: 1 for main loop, rest for torch/data
 mem_gb: 16                # Dataset + model + trajectory buffer
