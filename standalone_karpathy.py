@@ -14,7 +14,7 @@ import torch
 torch.manual_seed(42)
 
 # ---------------------------------------------------------------------------
-# Configuration. Change these paths for your cluster.
+# Configuration. Paths and hyperparameters
 # ---------------------------------------------------------------------------
 checkpoint_path = "path_to/hip_v2.ckpt"
 h5_path         = "path_to/transition1x.h5"
