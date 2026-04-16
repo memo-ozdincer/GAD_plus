@@ -1,14 +1,11 @@
-"""
-The most atomic way to find a transition state on a potential energy surface.
-This file is the complete algorithm.
-Everything else is just infrastructure.
+"""Standalone Eckart-projected GAD transition state search.
 
-Gentlest Ascent Dynamics (GAD) flips the force along the lowest Hessian
-eigenvector, ascending toward the saddle while descending everywhere else:
-
+GAD flips the force along the lowest Hessian eigenvector:
     F_GAD = F + 2(F · v₁)v₁
 
-One eigenvalue negative, small max force component — that's a transition state.
+Convergence: n_neg == 1 AND fmax < threshold.
+
+Dependencies: torch, torch_geometric, hip, transition1x
 """
 
 import os
@@ -19,16 +16,16 @@ torch.manual_seed(42)
 # ---------------------------------------------------------------------------
 # Configuration. Change these paths for your cluster.
 # ---------------------------------------------------------------------------
-checkpoint_path = "/lustre06/project/6033559/memoozd/models/hip_v2.ckpt"
-h5_path         = "/lustre06/project/6033559/memoozd/data/transition1x.h5"
+checkpoint_path = "path_to/hip_v2.ckpt"
+h5_path         = "path_to/transition1x.h5"
 split           = "train"
 device          = "cuda" if torch.cuda.is_available() else "cpu"
 
-n_samples       = 10       # molecules to optimize
+n_samples       = 300      # molecules to optimize
 noise           = 0.01     # Angstrom of Gaussian noise on starting geometry (0.01 = 10pm)
-dt              = 0.003    # Euler timestep — 0.003 is optimal, smaller is diminishing returns
+dt              = 0.003    # Euler timestep — 0.003 is optimal, smaller has diminishing returns
 n_steps         = 2000     # step budget — enough for dt=0.003
-force_threshold = 0.01     # eV/A, convergence on max |force component| (fmax, matches Sella)
+force_threshold = 0.01     # eV/A, convergence on max |force component| (fmax)
 max_atom_disp   = 0.35     # A, per-atom displacement cap per step (safety, rarely triggers)
 
 # ---------------------------------------------------------------------------
@@ -42,9 +39,7 @@ def masses_from_z(z, dev):
                         dtype=torch.float64, device=dev)
 
 # ---------------------------------------------------------------------------
-# Eckart projection — remove 6 translation/rotation modes from the Hessian.
-# Without this, eigenvalue counting is meaningless (ghost negative modes).
-# This single function is worth +68 percentage points of convergence.
+# Eckart projection — removes 6 translation/rotation modes from the Hessian
 # ---------------------------------------------------------------------------
 def eckart_projector(coords, masses):
     """P = I - B(BᵀB)⁻¹Bᵀ in mass-weighted space. Returns (3N, 3N)."""
@@ -72,9 +67,7 @@ def eckart_projector(coords, masses):
     return 0.5 * (P + P.T)
 
 # ---------------------------------------------------------------------------
-# Vibrational eigendecomposition — the reduced-basis approach.
-# Projects mass-weighted Hessian onto the vibrational subspace (3N-6 dims),
-# diagonalizes there. Every returned eigenvalue is a real vibration.
+# Vibrational eigendecomposition (reduced-basis, 3N-6 dims)
 # ---------------------------------------------------------------------------
 def vib_eig(hessian, coords, masses):
     """Returns (evals (M,), evecs (3N, M)) in mass-weighted vibrational space."""
@@ -107,12 +100,13 @@ def vib_eig(hessian, coords, masses):
     return evals, Q_vib @ evecs                        # lift back to 3N
 
 # ---------------------------------------------------------------------------
-# Projected GAD direction — the heart of the algorithm.
-# Projects gradient and guide vector through P, applies GAD flip, projects output.
-# Three projections prevent any translational/rotational leakage.
+# Projected GAD direction
 # ---------------------------------------------------------------------------
 def gad_direction(coords, forces, v, masses):
-    """Eckart-projected GAD: dq = P(-g + 2(g·v)v), dx = √m · dq."""
+    """Eckart-projected GAD: dq = P(-g + 2(g·v)v), dx = √m · dq.
+
+    Returns (N,3) GAD vector and (3N,) projected guide vector.
+    """
     c = coords.reshape(-1, 3).to(torch.float64)
     f = forces.reshape(-1).to(torch.float64)
     v = v.reshape(-1).to(torch.float64)
@@ -125,15 +119,23 @@ def gad_direction(coords, forces, v, masses):
     g = P @ (-f / sq)                                  # projected gradient in MW space
     vp = P @ v; vp = vp / (vp.norm() + 1e-12)         # projected, normalized guide vector
     dq = P @ (-g + 2 * torch.dot(vp, g) * vp)         # GAD formula: flip along v
-    return (sq * dq).reshape(N, 3).to(forces.dtype)
+    return (sq * dq).reshape(N, 3).to(forces.dtype), vp.to(forces.dtype)
 
 # ---------------------------------------------------------------------------
-# The search loop — Euler integration of GAD dynamics.
-# Each step depends only on the current geometry. No path history.
-# Converges when exactly one eigenvalue is negative and forces are small.
-# That's a transition state. Nothing more, nothing less.
+# GAD search loop (Euler integration, no path history)
 # ---------------------------------------------------------------------------
 def gad_search(predict_fn, coords, atomic_nums):
+    """Find an index-1 saddle point via Eckart-projected GAD.
+
+    Args:
+        predict_fn: (coords, atomic_nums, do_hessian=, require_grad=) -> dict
+                    with keys "energy", "forces", "hessian".
+        coords: (N, 3) starting geometry in Angstrom.
+        atomic_nums: (N,) atomic numbers.
+
+    Returns:
+        dict with: converged, coords, energy, n_neg, fmax, step.
+    """
     x = coords.detach().clone().to(torch.float32).reshape(-1, 3)
     m = masses_from_z(atomic_nums, x.device)
 
@@ -156,7 +158,8 @@ def gad_search(predict_fn, coords, atomic_nums):
         # Lowest eigenvector from current Hessian — no path history
         v1 = evecs[:, 0].to(device=f.device, dtype=f.dtype)
         v1 = v1 / (v1.norm() + 1e-12)
-        dx = dt * gad_direction(x, f, v1, m)
+        gad_vec, _ = gad_direction(x, f, v1, m)
+        dx = dt * gad_vec
 
         # Displacement cap
         d_max = float(dx.reshape(-1, 3).norm(dim=1).max())
@@ -168,8 +171,7 @@ def gad_search(predict_fn, coords, atomic_nums):
                 n_neg=n_neg, fmax=fmax, step=n_steps)
 
 # ---------------------------------------------------------------------------
-# Load HIP — the neural network potential that gives us analytical Hessians.
-# The monkey-patch lets us run inference without training dataset paths.
+# HIP calculator loader
 # ---------------------------------------------------------------------------
 def load_hip():
     from hip import path_config, training_module, inference_utils
@@ -197,8 +199,7 @@ def load_hip():
     return predict
 
 # ---------------------------------------------------------------------------
-# Load Transition1x — 9,561 organic reactions with known transition states.
-# Each sample has reactant, product, and TS geometries. We noise the TS.
+# Transition1x dataset loader
 # ---------------------------------------------------------------------------
 def load_dataset():
     from transition1x import Dataloader
@@ -218,7 +219,7 @@ def load_dataset():
     return samples
 
 # ---------------------------------------------------------------------------
-# Run it. Add noise, search, report.
+# Main
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     noise_pm = int(round(noise * 1000))

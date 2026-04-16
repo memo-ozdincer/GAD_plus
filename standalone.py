@@ -45,8 +45,8 @@ import torch
 # Configuration — edit these for different clusters
 # =============================================================================
 
-DEFAULT_CHECKPOINT = "/lustre06/project/6033559/memoozd/models/hip_v2.ckpt"
-DEFAULT_H5_PATH = "/lustre06/project/6033559/memoozd/data/transition1x.h5"
+DEFAULT_CHECKPOINT = "path_to/hip_v2.ckpt"
+DEFAULT_H5_PATH = "path_to/transition1x.h5"
 DEFAULT_SPLIT = "train"
 
 # Best-performing GAD configuration
@@ -219,7 +219,7 @@ def gad_search(
         dt: Euler timestep. 0.003 is optimal.
         n_steps: Step budget.
         force_threshold: Convergence threshold in eV/A.
-        force_criterion: "mean" (per-atom force norm) or "fmax" (max |component|, Sella-style).
+        force_criterion: "mean" (per-atom force norm) or "fmax" (max |component|, max abs component).
         max_atom_disp: Per-atom displacement cap (A).
 
     Returns:
@@ -394,12 +394,12 @@ if __name__ == "__main__":
     parser.add_argument("--start", choices=["noised_ts", "midpoint", "geodesic"], default="noised_ts",
                         help="Starting geometry: noised_ts (default), midpoint (R+P)/2, geodesic midpoint")
     parser.add_argument("--noise", type=float, default=0.01, help="Noise in Angstrom (0.01 = 10pm, only for noised_ts)")
-    parser.add_argument("--n-samples", type=int, default=10, help="Number of samples")
+    parser.add_argument("--n-samples", type=int, default=300, help="Number of samples")
     parser.add_argument("--dt", type=float, default=DEFAULT_DT, help=f"Timestep (default: {DEFAULT_DT})")
     parser.add_argument("--n-steps", type=int, default=DEFAULT_N_STEPS, help=f"Max steps (default: {DEFAULT_N_STEPS})")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for noise (default: 42)")
     parser.add_argument("--force-criterion", choices=["mean", "fmax"], default="fmax",
-                        help="Force metric: 'fmax' (max component, Sella-style) or 'mean' (per-atom norm)")
+                        help="Force metric: 'fmax' (max component, max abs component) or 'mean' (per-atom norm)")
     parser.add_argument("--force-threshold", type=float, default=DEFAULT_FORCE_THRESHOLD,
                         help=f"Force threshold in eV/A (default: {DEFAULT_FORCE_THRESHOLD})")
     parser.add_argument("--checkpoint", default=DEFAULT_CHECKPOINT)
