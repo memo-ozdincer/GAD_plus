@@ -8,12 +8,13 @@ eigenvector, ascending toward the saddle while descending everywhere else:
 
     F_GAD = F + 2(F · v₁)v₁
 
-One eigenvalue negative, forces near zero — that's a transition state.
+One eigenvalue negative, small max force component — that's a transition state.
 """
 
 import os
 import time
 import torch
+torch.manual_seed(42)
 
 # ---------------------------------------------------------------------------
 # Configuration. Change these paths for your cluster.
@@ -27,7 +28,7 @@ n_samples       = 10       # molecules to optimize
 noise           = 0.01     # Angstrom of Gaussian noise on starting geometry (0.01 = 10pm)
 dt              = 0.003    # Euler timestep — 0.003 is optimal, smaller is diminishing returns
 n_steps         = 2000     # step budget — enough for dt=0.003
-force_threshold = 0.01     # eV/A, convergence criterion on mean per-atom force norm
+force_threshold = 0.01     # eV/A, convergence on max |force component| (fmax, matches Sella)
 max_atom_disp   = 0.35     # A, per-atom displacement cap per step (safety, rarely triggers)
 
 # ---------------------------------------------------------------------------
@@ -83,7 +84,6 @@ def vib_eig(hessian, coords, masses):
     H_mw = inv_sq @ hessian.to(torch.float64).reshape(3*N, 3*N) @ inv_sq
 
     # Vibrational basis = null space of Eckart generators
-    P = eckart_projector(coords.to(torch.float64), masses)
     sq = torch.sqrt(masses); sq3 = sq.repeat_interleave(3)
     com = (coords.to(torch.float64) * masses[:, None]).sum(0) / masses.sum()
     r = coords.to(torch.float64) - com
@@ -125,7 +125,7 @@ def gad_direction(coords, forces, v, masses):
     g = P @ (-f / sq)                                  # projected gradient in MW space
     vp = P @ v; vp = vp / (vp.norm() + 1e-12)         # projected, normalized guide vector
     dq = P @ (-g + 2 * torch.dot(vp, g) * vp)         # GAD formula: flip along v
-    return (sq * dq).reshape(N, 3).to(forces.dtype), vp.to(forces.dtype)
+    return (sq * dq).reshape(N, 3).to(forces.dtype)
 
 # ---------------------------------------------------------------------------
 # The search loop — Euler integration of GAD dynamics.
@@ -138,38 +138,34 @@ def gad_search(predict_fn, coords, atomic_nums):
     m = masses_from_z(atomic_nums, x.device)
 
     for step in range(n_steps):
-        # Evaluate
         out = predict_fn(x, atomic_nums, do_hessian=True, require_grad=False)
         f = out["forces"]
         if f.dim() == 3: f = f[0]
         f = f.reshape(-1, 3)
         e = float(out["energy"].detach().reshape(-1)[0]) if isinstance(out["energy"], torch.Tensor) else float(out["energy"])
-        fn = float(f.norm(dim=1).mean())
+        fmax = float(f.reshape(-1).abs().max())
 
-        # Vibrational analysis
         evals, evecs = vib_eig(out["hessian"], x, m)
         n_neg = int((evals < 0).sum())
-        eig0 = float(evals[0]) if evals.numel() > 0 else 0.0
 
-        # Convergence: one negative eigenvalue + small forces = transition state
-        if n_neg == 1 and fn < force_threshold:
+        # Convergence: n_neg == 1 AND fmax < threshold
+        if n_neg == 1 and fmax < force_threshold:
             return dict(converged=True, coords=x.cpu(), energy=e,
-                        n_neg=n_neg, force_norm=fn, eig0=eig0, step=step)
+                        n_neg=n_neg, fmax=fmax, step=step)
 
-        # GAD step — always use the lowest eigenvector, fresh from the current Hessian
+        # Lowest eigenvector from current Hessian — no path history
         v1 = evecs[:, 0].to(device=f.device, dtype=f.dtype)
         v1 = v1 / (v1.norm() + 1e-12)
-        gad_vec, _ = gad_direction(x, f, v1, m)
+        dx = dt * gad_direction(x, f, v1, m)
 
-        # Euler integration with displacement cap
-        dx = dt * gad_vec
+        # Displacement cap
         d_max = float(dx.reshape(-1, 3).norm(dim=1).max())
         if d_max > max_atom_disp:
             dx = dx * (max_atom_disp / d_max)
         x = (x + dx).detach()
 
     return dict(converged=False, coords=x.cpu(), energy=e,
-                n_neg=n_neg, force_norm=fn, eig0=eig0, step=n_steps)
+                n_neg=n_neg, fmax=fmax, step=n_steps)
 
 # ---------------------------------------------------------------------------
 # Load HIP — the neural network potential that gives us analytical Hessians.
@@ -179,8 +175,7 @@ def load_hip():
     from hip import path_config, training_module, inference_utils
     orig = path_config.fix_dataset_path
     def lenient(p):
-        try: return orig(p)
-        except FileNotFoundError: return p
+        return orig(p) if os.path.exists(p) else p
     path_config.fix_dataset_path = lenient
     training_module.fix_dataset_path = lenient
     inference_utils.fix_dataset_path = lenient
@@ -212,17 +207,14 @@ def load_dataset():
     for mol in loader:
         if n_samples and len(samples) >= n_samples:
             break
-        try:
-            ts, rx = mol["transition_state"], mol["reactant"]
-            if len(ts["atomic_numbers"]) != len(rx["atomic_numbers"]):
-                continue
-            samples.append(dict(
-                z=torch.tensor(ts["atomic_numbers"], dtype=torch.long),
-                pos=torch.tensor(ts["positions"], dtype=torch.float32),
-                formula=ts.get("formula", "?"),
-            ))
-        except Exception:
+        ts, rx = mol["transition_state"], mol["reactant"]
+        if len(ts["atomic_numbers"]) != len(rx["atomic_numbers"]):
             continue
+        samples.append(dict(
+            z=torch.tensor(ts["atomic_numbers"], dtype=torch.long),
+            pos=torch.tensor(ts["positions"], dtype=torch.float32),
+            formula=ts.get("formula", "?"),
+        ))
     return samples
 
 # ---------------------------------------------------------------------------
@@ -230,16 +222,13 @@ def load_dataset():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     noise_pm = int(round(noise * 1000))
-    print(f"GAD transition state search | dt={dt} | steps={n_steps} | "
-          f"noise={noise_pm}pm | samples={n_samples} | device={device}")
-    print()
+    print(f"GAD | dt={dt} | steps={n_steps} | noise={noise_pm}pm | "
+          f"n={n_samples} | fmax<{force_threshold} | {device}")
 
     predict = load_hip()
     print("HIP loaded")
-
     samples = load_dataset()
-    print(f"Loaded {len(samples)} samples from Transition1x ({split})")
-    print()
+    print(f"{len(samples)} samples from Transition1x ({split})\n")
 
     n_conv = 0
     t0_all = time.time()
@@ -248,14 +237,12 @@ if __name__ == "__main__":
         start = s["pos"].to(device) + noise * torch.randn_like(s["pos"].to(device))
 
         t0 = time.time()
-        result = gad_search(predict, start, z)
+        r = gad_search(predict, start, z)
         wall = time.time() - t0
 
-        tag = "CONV" if result["converged"] else "FAIL"
-        if result["converged"]:
-            n_conv += 1
-        print(f"  [{i:3d}] {s['formula']:>12s} | {tag} | n_neg={result['n_neg']} "
-              f"| force={result['force_norm']:.4f} | step={result['step']:4d} | {wall:.1f}s")
+        tag = "CONV" if r["converged"] else "FAIL"
+        if r["converged"]: n_conv += 1
+        print(f"  [{i:3d}] {s['formula']:>12s} | {tag} | n_neg={r['n_neg']} "
+              f"| fmax={r['fmax']:.4f} | step={r['step']:4d} | {wall:.1f}s")
 
-    rate = 100 * n_conv / len(samples)
-    print(f"\n{n_conv}/{len(samples)} converged ({rate:.1f}%) in {time.time()-t0_all:.0f}s")
+    print(f"\n{n_conv}/{len(samples)} ({100*n_conv/len(samples):.1f}%) in {time.time()-t0_all:.0f}s")

@@ -957,17 +957,19 @@ Code: uses `NRGADPingPongConfig` with `one_way=True, one_way_threshold=2`. The N
 
 The Newton direction (H⁻¹g) is curvature-aware (larger steps along flat modes, smaller along steep), but the tight cap ensures each step moves at most 0.01Å total — preventing the overshoot into n_neg=0 that killed NR-GAD ping-pong.
 
-**Results (preliminary, still running):**
+**Results:**
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |--------|------|------|------|-------|-------|-------|
 | **gad_small_dt (baseline)** | **94.3** | **94.3** | **91.3** | **86.7** | **70.3** | **51.3** |
-| nr_then_gad_cap01 | 90.7* | 83.3* | 87.5* | 64.3* | 45.5* | 33.3* |
-| nr_then_gad_cap005 | 89.2* | 83.3* | 86.4* | 71.4* | 50.0* | 33.3* |
+| nr_then_gad_cap01 | 87.7 | 87.9* | 84.9* | 72.0* | 59.7* | 46.3* |
+| nr_then_gad_cap005 | 87.7 | 88.2* | 84.4* | 72.5* | 59.8* | 42.7* |
 
-*Preliminary (9-43 samples per cell, still running). Numbers may shift significantly with more data.
+*Still running (103-264 samples). 10pm complete (300/300). Quick test at 100pm (100 samples): both give 77.0%.
 
-**Early assessment:** Both variants are **worse than baseline** by 4-20pp. The tight displacement cap prevents overshoot (good) but also makes the NR steps so small they're effectively frozen — a Newton step capped at 0.01Å across a molecule with 10+ atoms gives ~0.002Å per coordinate, slower than GAD's ~0.005Å per atom. The trajectory wastes step budget crawling through the NR phase before handing off to GAD.
+**Assessment:** Both variants are **worse than baseline** by 7pp at 10pm and 10-15pp at 100pm. The tight displacement cap prevents overshoot (zero samples at n_neg=0) but also makes the NR steps so small they're effectively frozen — a Newton step capped at 0.01Å across a molecule with 10+ atoms gives ~0.002Å per coordinate, slower than GAD's ~0.005Å per atom. The trajectory wastes step budget crawling through the NR phase before handing off to GAD.
+
+The two cap values (0.01Å vs 0.005Å) give **nearly identical results** — both are already in the "frozen step" regime. The cap tightness doesn't matter once the steps are this small.
 
 **The fundamental tradeoff:** Newton's advantage is large, curvature-informed steps. A displacement cap kills exactly that advantage. A Newton step capped at 0.01Å is just an expensive way to compute a direction that gets scaled to nothing. The curvature information is preserved (the *direction* is still Newton-optimal) but the magnitude is forced to be the same as a gradient step, making the Hessian inversion overhead wasted compute.
 

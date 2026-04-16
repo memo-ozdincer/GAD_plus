@@ -154,19 +154,92 @@ One row per GAD step per sample. Used for trajectory plots and detailed analysis
 | **same_ts** | **bool** | **True if RMSD < 0.1A** |
 | final_n_neg / final_force_norm / final_energy / wall_time_s | various | Final state |
 
-### IRC Schema (9 columns)
+### IRC Schema (current scaled pipeline)
+
+The original 9-column IRC summary is now obsolete for the current
+`irc_validation_300/` pipeline. The current Parquet outputs are much richer and
+contain:
+
+#### Run metadata
 
 | Column | Type | Description |
 |--------|------|-------------|
+| run_id | string | Source trajectory run ID from `noise_survey_300` |
 | sample_id | int64 | Dataset index |
 | formula | string | Molecular formula |
-| noise_pm | int64 | Noise level of the converged TS |
-| **intended** | **bool** | **Both IRC endpoints match known R/P (RMSD < 0.3A)** |
-| **half_intended** | **bool** | **Only one endpoint matches** |
-| rmsd_reactant | double | Min RMSD from either IRC endpoint to known reactant |
-| rmsd_product | double | Min RMSD from either IRC endpoint to known product |
-| error | null | Error message (null if successful) |
-| wall_time_s | double | IRC wall time |
+| noise_pm | int64 | Noise level of the converged TS candidate |
+
+#### TS selection / screening
+
+| Column | Type | Description |
+|--------|------|-------------|
+| ts_pick_mode | string | Candidate selection mode, e.g. `best_nneg1` |
+| ts_force_criterion | string | Pre-IRC screening metric (`force_norm` or `fmax`) |
+| ts_force_threshold | double | Pre-IRC gate threshold |
+| candidate_step | int64 | Step chosen from the source trajectory |
+| candidate_n_neg_logged | int64 | Logged `n_neg` from the trajectory row |
+| ts_force_norm_recomputed | double | Recomputed force norm at selected TS |
+| ts_force_max_recomputed | double | Recomputed `fmax` at selected TS |
+| ts_n_neg_recomputed | int64 | Recomputed projected saddle order |
+| ts_quality_ok | bool | Whether the selected TS passed the initial gate |
+
+#### Optional TS refinement
+
+| Column | Type | Description |
+|--------|------|-------------|
+| refine_ts | bool | Whether refinement was enabled |
+| refine_steps | int64 | Refinement step budget |
+| refine_dt | double | Refinement timestep |
+| refine_force_criterion | string | Refinement gate metric |
+| refine_force_threshold | double | Post-refinement gate threshold |
+| refine_converged | bool | Whether refinement itself converged |
+| refine_total_steps | int64 | Steps used by refinement |
+| refined_force_norm | double | Force norm after refinement |
+| refined_force_max | double | `fmax` after refinement |
+| refined_n_neg | int64 | Projected saddle order after refinement |
+| refined_quality_ok | bool | Whether the refined TS passed the gate |
+
+#### IRC outcome labels
+
+| Column | Type | Description |
+|--------|------|-------------|
+| intended | bool | Both endpoints geometrically recover labeled R/P |
+| half_intended | bool | Only one endpoint geometrically matches |
+| topology_intended | bool | Both endpoints match by bond topology |
+| topology_half_intended | bool | Only one endpoint matches by topology |
+| error | string or null | `null` if IRC ran; e.g. `ts_quality_gate_failed` otherwise |
+| topology_error | string or null | Topology-specific warning/error |
+
+#### Endpoint metrics
+
+| Column | Type | Description |
+|--------|------|-------------|
+| rmsd_reactant | double | Best endpoint RMSD to labeled reactant |
+| rmsd_product | double | Best endpoint RMSD to labeled product |
+| forward_rmsd_reactant | double | Forward endpoint RMSD to reactant |
+| forward_rmsd_product | double | Forward endpoint RMSD to product |
+| reverse_rmsd_reactant | double | Reverse endpoint RMSD to reactant |
+| reverse_rmsd_product | double | Reverse endpoint RMSD to product |
+| forward_graph_matches_reactant | bool | Topology match flag |
+| forward_graph_matches_product | bool | Topology match flag |
+| reverse_graph_matches_reactant | bool | Topology match flag |
+| reverse_graph_matches_product | bool | Topology match flag |
+
+#### Coordinate payloads / viewer outputs
+
+| Column | Type | Description |
+|--------|------|-------------|
+| atomic_nums | list[int] | Atomic numbers for re-export / visualization |
+| ts_coords_flat | list[float] | Selected TS coordinates |
+| refined_ts_coords_flat | list[float] | Refined TS coordinates |
+| reactant_coords_flat | list[float] | Dataset reactant reference |
+| product_coords_flat | list[float] | Dataset product reference |
+| forward_coords_flat | list[float] | Final forward IRC endpoint |
+| reverse_coords_flat | list[float] | Final reverse IRC endpoint |
+| viewer_bundle_dir | string | Viewer bundle directory |
+| viewer_multi_xyz | string | Multi-frame XYZ path |
+| viewer_sequence_dir | string | Per-frame XYZ directory |
+| wall_time_s | double | Total per-row wall time |
 
 ---
 

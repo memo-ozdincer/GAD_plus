@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  15 APR 2026 12:19
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  15 APR 2026 13:24
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -508,11 +508,11 @@ t/m/n/10.95 Transition1x
 File: figures/fig_irc_refined_summary.png Graphic file (type png)
 <use figures/fig_irc_refined_summary.png>
 Package pdftex.def Info: figures/fig_irc_refined_summary.png  used on input lin
-e 76.
+e 77.
 (pdftex.def)             Requested size: 484.20988pt x 190.22656pt.
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 79.
+(caption)                particular \caption on input line 80.
 See the caption package documentation for explanation.
 
 [1
@@ -522,18 +522,18 @@ tex/updmap/pdftex.map}]
 <figures/fig_irc_refined_fmax.png, id=28, 975.645pt x 325.215pt>
 File: figures/fig_irc_refined_fmax.png Graphic file (type png)
 <use figures/fig_irc_refined_fmax.png>
-Package pdftex.def Info: figures/fig_irc_refined_fmax.png  used on input line 9
-8.
+Package pdftex.def Info: figures/fig_irc_refined_fmax.png  used on input line 1
+01.
 (pdftex.def)             Requested size: 484.20988pt x 161.4062pt.
 
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 101.
+(caption)                particular \caption on input line 104.
 See the caption package documentation for explanation.
 
 [2 <./figures/fig_irc_refined_summary.png> <./figures/fig_irc_refined_fmax.png>
 ]
-Overfull \hbox (392.55771pt too wide) in paragraph at lines 166--168
+Overfull \hbox (392.55771pt too wide) in paragraph at lines 174--176
 \OT1/cmr/m/n/10.95 The viewer bun-dles from the com-pleted re-fined run are al-
 ready avail-able un-der: \OT1/cmtt/m/n/10.95 /lustre07/scratch/memoozd/gadplus/
 runs/irc[]validation[]300/viewer[]noise[]*pm/viewer[]bundle/ 
@@ -547,7 +547,7 @@ Package rerunfilecheck Info: File `IRC_RESULTS_2026-04-15.out' has not changed.
 Here is how much of TeX's memory you used:
  10940 strings out of 480884
  170967 string characters out of 5900692
- 480323 words of memory out of 5000000
+ 478323 words of memory out of 5000000
  28040 multiletter control sequences out of 15000+600000
  410809 words of font info for 53 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
@@ -568,7 +568,7 @@ entoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10
 .pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/f
 onts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/soft.computecanada.ca/gentoo/2
 023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/cm-super/sfrm1095.pfb>
-Output written on IRC_RESULTS_2026-04-15.pdf (4 pages, 250597 bytes).
+Output written on IRC_RESULTS_2026-04-15.pdf (4 pages, 250960 bytes).
 PDF statistics:
  92 PDF objects out of 1000 (max. 8388607)
  71 compressed objects within 1 object stream
