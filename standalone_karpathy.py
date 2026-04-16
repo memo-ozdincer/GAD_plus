@@ -70,34 +70,53 @@ def eckart_projector(coords, masses):
 # Vibrational eigendecomposition (reduced-basis, 3N-6 dims)
 # ---------------------------------------------------------------------------
 def vib_eig(hessian, coords, masses):
-    """Returns (evals (M,), evecs (3N, M)) in mass-weighted vibrational space."""
+    """Vibrational eigenvalues and eigenvectors via reduced-basis projection.
+
+    H_mw = M^{-1/2} H M^{-1/2}           mass-weighted Hessian
+    B = [t1 t2 t3 r1 r2 r3]              6 Eckart generators (translation + rotation)
+    Q_vib = null(B)                       orthogonal complement, shape (3N, 3N-6)
+    H_red = Q_vib^T H_mw Q_vib           reduced Hessian in vibrational subspace
+    evals, evecs_red = eigh(H_red)        diagonalize
+    evecs_3N = Q_vib @ evecs_red          lift back to full 3N space
+
+    Returns (evals (M,), evecs (3N, M)) where M = 3N-6 (or 3N-5 for linear).
+    """
     N = coords.shape[0]
     m3 = masses.repeat_interleave(3)
+
+    # Mass-weight the Hessian: H_mw = M^{-1/2} H M^{-1/2}
     inv_sq = torch.diag(1.0 / torch.sqrt(m3))
     H_mw = inv_sq @ hessian.to(torch.float64).reshape(3*N, 3*N) @ inv_sq
 
-    # Vibrational basis = null space of Eckart generators
-    sq = torch.sqrt(masses); sq3 = sq.repeat_interleave(3)
+    # Build Eckart generators (same as eckart_projector) to find their null space
+    sq = torch.sqrt(masses)
+    sq3 = sq.repeat_interleave(3)
     com = (coords.to(torch.float64) * masses[:, None]).sum(0) / masses.sum()
     r = coords.to(torch.float64) - com
+
     B_cols = []
     for e in torch.eye(3, dtype=torch.float64, device=hessian.device):
-        c = sq3 * e.repeat(N); B_cols.append(c / c.norm())
-    rx, ry, rz = r[:,0], r[:,1], r[:,2]
-    for R in (torch.stack([torch.zeros_like(rx),-rz,ry],1),
-              torch.stack([rz,torch.zeros_like(ry),-rx],1),
-              torch.stack([-ry,rx,torch.zeros_like(rz)],1)):
-        c = (R*sq[:,None]).reshape(-1); B_cols.append(c/c.norm())
+        c = sq3 * e.repeat(N)
+        B_cols.append(c / c.norm())
+    rx, ry, rz = r[:, 0], r[:, 1], r[:, 2]
+    for R in (torch.stack([torch.zeros_like(rx), -rz, ry], 1),
+              torch.stack([rz, torch.zeros_like(ry), -rx], 1),
+              torch.stack([-ry, rx, torch.zeros_like(rz)], 1)):
+        c = (R * sq[:, None]).reshape(-1)
+        B_cols.append(c / c.norm())
     B = torch.stack(B_cols, 1)
+
+    # Q_vib = orthogonal complement of Eckart generators (3N, 3N-k)
     Q, R_ = torch.linalg.qr(B, mode="reduced")
     k = max(int((torch.diag(R_).abs() > 1e-6).sum().item()), 1)
     U, _, _ = torch.linalg.svd(Q[:, :k], full_matrices=True)
-    Q_vib = U[:, k:]                                  # (3N, 3N-k)
+    Q_vib = U[:, k:]
 
+    # Diagonalize the reduced (3N-k) x (3N-k) vibrational Hessian
     H_red = Q_vib.T @ H_mw @ Q_vib
-    H_red = 0.5 * (H_red + H_red.T)                   # symmetrize
+    H_red = 0.5 * (H_red + H_red.T)
     evals, evecs = torch.linalg.eigh(H_red)
-    return evals, Q_vib @ evecs                        # lift back to 3N
+    return evals, Q_vib @ evecs
 
 # ---------------------------------------------------------------------------
 # Projected GAD direction
@@ -210,7 +229,7 @@ def load_dataset():
             break
         ts, rx = mol["transition_state"], mol["reactant"]
         if len(ts["atomic_numbers"]) != len(rx["atomic_numbers"]):
-            continue
+            continue  # mismatched atom counts between reactant and TS
         samples.append(dict(
             z=torch.tensor(ts["atomic_numbers"], dtype=torch.long),
             pos=torch.tensor(ts["positions"], dtype=torch.float32),
@@ -224,26 +243,32 @@ def load_dataset():
 if __name__ == "__main__":
     noise_pm = int(round(noise * 1000))
     print(f"GAD | dt={dt} | steps={n_steps} | noise={noise_pm}pm | "
-          f"n={n_samples} | fmax<{force_threshold} | {device}")
+          f"n={n_samples} | fmax<{force_threshold} | {device}\n")
 
-    predict = load_hip()
+    predict_fn = load_hip()
     print("HIP loaded")
+
     samples = load_dataset()
     print(f"{len(samples)} samples from Transition1x ({split})\n")
 
-    n_conv = 0
-    t0_all = time.time()
-    for i, s in enumerate(samples):
-        z = s["z"].to(device)
-        start = s["pos"].to(device) + noise * torch.randn_like(s["pos"].to(device))
+    n_converged = 0
+    t_start = time.time()
+
+    for i, sample in enumerate(samples):
+        atomic_nums = sample["z"].to(device)
+        coords_ts = sample["pos"].to(device)
+        coords_noised = coords_ts + noise * torch.randn_like(coords_ts)
 
         t0 = time.time()
-        r = gad_search(predict, start, z)
+        result = gad_search(predict_fn, coords_noised, atomic_nums)
         wall = time.time() - t0
 
-        tag = "CONV" if r["converged"] else "FAIL"
-        if r["converged"]: n_conv += 1
-        print(f"  [{i:3d}] {s['formula']:>12s} | {tag} | n_neg={r['n_neg']} "
-              f"| fmax={r['fmax']:.4f} | step={r['step']:4d} | {wall:.1f}s")
+        if result["converged"]:
+            n_converged += 1
+        status = "CONV" if result["converged"] else "FAIL"
+        print(f"  [{i:3d}] {sample['formula']:>12s} | {status} | n_neg={result['n_neg']} "
+              f"| fmax={result['fmax']:.4f} | step={result['step']:4d} | {wall:.1f}s")
 
-    print(f"\n{n_conv}/{len(samples)} ({100*n_conv/len(samples):.1f}%) in {time.time()-t0_all:.0f}s")
+    rate = 100 * n_converged / len(samples)
+    print(f"\n{n_converged}/{len(samples)} converged ({rate:.1f}%) "
+          f"in {time.time() - t_start:.0f}s")
