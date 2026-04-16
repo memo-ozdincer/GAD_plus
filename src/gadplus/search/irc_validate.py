@@ -46,6 +46,16 @@ class IRCResult:
     forward_graph_matches_product: bool
     reverse_graph_matches_reactant: bool
     reverse_graph_matches_product: bool
+    # Endpoint spectral diagnostics (filled in when predict_fn is passed to
+    # score_endpoints). `n_neg_vib` is the count of negative eigenvalues in
+    # the Eckart-projected vibrational Hessian at the endpoint. A true
+    # minimum has n_neg_vib == 0. `min_vib_eig` is the smallest vibrational
+    # eigenvalue (signed) — negative values indicate the endpoint is still
+    # on a saddle or ridge.
+    forward_n_neg_vib: Optional[int] = None
+    reverse_n_neg_vib: Optional[int] = None
+    forward_min_vib_eig: Optional[float] = None
+    reverse_min_vib_eig: Optional[float] = None
     error: Optional[str] = None
     topology_error: Optional[str] = None
 
@@ -118,76 +128,64 @@ def _min_optional(a: Optional[float], b: Optional[float]) -> Optional[float]:
     return min(vals) if vals else None
 
 
-def run_irc_validation(
-    ts_coords: torch.Tensor,
+def _endpoint_spectral(
+    coords: np.ndarray,
     atomic_nums: torch.Tensor,
     predict_fn,
+) -> tuple[Optional[int], Optional[float]]:
+    """Count negative vibrational eigenvalues and return min eigenvalue
+    at an endpoint geometry. Returns ``(None, None)`` on failure so that a
+    bad HIP call doesn't propagate into the run.
+    """
+    from gadplus.projection import atomic_nums_to_symbols, vib_eig
+
+    try:
+        device = atomic_nums.device if hasattr(atomic_nums, "device") else "cpu"
+        coords_t = torch.tensor(
+            np.asarray(coords, dtype=float).reshape(-1, 3),
+            dtype=torch.float32, device=device,
+        )
+        out = predict_fn(coords_t, atomic_nums, do_hessian=True, require_grad=False)
+        hess = out["hessian"]
+        if isinstance(hess, torch.Tensor):
+            hess_t = hess.detach()
+        else:
+            hess_t = torch.tensor(hess)
+        atomsymbols = atomic_nums_to_symbols(atomic_nums)
+        evals_vib, _, _ = vib_eig(hess_t, coords_t, atomsymbols, purify=False)
+        n_neg = int((evals_vib < 0).sum().cpu().item())
+        min_eig = float(evals_vib[0].cpu().item())
+        return n_neg, min_eig
+    except Exception:
+        return None, None
+
+
+def score_endpoints(
+    forward_coords: Optional[np.ndarray],
+    reverse_coords: Optional[np.ndarray],
+    atomic_nums: torch.Tensor,
     reactant_coords: Optional[torch.Tensor] = None,
     product_coords: Optional[torch.Tensor] = None,
     rmsd_threshold: float = 0.3,
-    max_steps: int = 100,
+    error: Optional[str] = None,
+    predict_fn=None,
 ) -> IRCResult:
-    """Run IRC forward and backward from a converged TS.
+    """Score IRC endpoints against reference reactant/product geometries.
 
-    Args:
-        ts_coords: (N, 3) TS coordinates.
-        atomic_nums: (N,) atomic numbers.
-        predict_fn: PredictFn for energy/forces.
-        reactant_coords: (N, 3) reference reactant geometry.
-        product_coords: (N, 3) reference product geometry.
-        rmsd_threshold: RMSD threshold for matching endpoints.
-        max_steps: Maximum IRC steps per direction.
+    Applies two direction-agnostic tests in parallel:
+    - Kabsch+Hungarian RMSD match below `rmsd_threshold`.
+    - Element-labeled bond-graph isomorphism.
 
-    Returns:
-        IRCResult with validation status and final geometries.
+    If `predict_fn` is provided, also computes the Eckart-projected
+    vibrational eigenvalue spectrum at each endpoint — specifically
+    `n_neg_vib` (count of negative eigenvalues; 0 = true minimum) and
+    `min_vib_eig` (signed smallest eigenvalue). This distinguishes
+    "unintended because we landed at a different minimum" from
+    "unintended because IRC never reached a minimum".
+
+    Produces the full `IRCResult` used by the Parquet writer. Shared by
+    every IRC integrator in the codebase.
     """
-    try:
-        from sella import IRC
-    except ImportError:
-        return IRCResult(
-            intended=False, half_intended=False,
-            topology_intended=False, topology_half_intended=False,
-            forward_coords=None, reverse_coords=None,
-            rmsd_to_reactant=None, rmsd_to_product=None,
-            forward_rmsd_to_reactant=None,
-            forward_rmsd_to_product=None,
-            reverse_rmsd_to_reactant=None,
-            reverse_rmsd_to_product=None,
-            forward_graph_matches_reactant=False,
-            forward_graph_matches_product=False,
-            reverse_graph_matches_reactant=False,
-            reverse_graph_matches_product=False,
-            error="Sella not installed",
-        )
-
-    from gadplus.calculator.ase_adapter import HipASECalculator
-
-    # Build ASE Atoms from TS geometry
-    coords_np = ts_coords.detach().cpu().numpy().reshape(-1, 3)
-    nums = atomic_nums.detach().cpu().tolist()
-    symbols = [Z_TO_SYMBOL.get(int(z), "X") for z in nums]
-
-    atoms = Atoms(symbols=symbols, positions=coords_np)
-    atoms.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
-
-    optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4}
-
-    # Run IRC in both directions
-    endpoints = {}
-    for direction in ["forward", "reverse"]:
-        try:
-            atoms_copy = atoms.copy()
-            atoms_copy.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
-            irc = IRC(atoms=atoms_copy, **optimizer_kwargs)
-            irc.run(fmax=0.01, steps=max_steps, direction=direction)
-            endpoints[direction] = atoms_copy.positions.copy()
-        except Exception as e:
-            endpoints[direction] = None
-
-    forward_coords = endpoints.get("forward")
-    reverse_coords = endpoints.get("reverse")
-
-    # Compare endpoints to known reactant/product
     reactant_np = _to_numpy_coords(reactant_coords)
     product_np = _to_numpy_coords(product_coords)
 
@@ -211,7 +209,6 @@ def run_irc_validation(
     intended = found_reactant and found_product
     half_intended = (found_reactant or found_product) and not intended
 
-    # Topology-based matching (direction-agnostic: forward/reverse can swap)
     forward_graph_matches_reactant = False
     forward_graph_matches_product = False
     reverse_graph_matches_reactant = False
@@ -251,6 +248,20 @@ def run_irc_validation(
         and not topology_intended
     )
 
+    forward_n_neg = None
+    reverse_n_neg = None
+    forward_min_eig = None
+    reverse_min_eig = None
+    if predict_fn is not None:
+        if forward_coords is not None:
+            forward_n_neg, forward_min_eig = _endpoint_spectral(
+                forward_coords, atomic_nums, predict_fn,
+            )
+        if reverse_coords is not None:
+            reverse_n_neg, reverse_min_eig = _endpoint_spectral(
+                reverse_coords, atomic_nums, predict_fn,
+            )
+
     return IRCResult(
         intended=intended,
         half_intended=half_intended,
@@ -268,5 +279,71 @@ def run_irc_validation(
         forward_graph_matches_product=forward_graph_matches_product,
         reverse_graph_matches_reactant=reverse_graph_matches_reactant,
         reverse_graph_matches_product=reverse_graph_matches_product,
+        forward_n_neg_vib=forward_n_neg,
+        reverse_n_neg_vib=reverse_n_neg,
+        forward_min_vib_eig=forward_min_eig,
+        reverse_min_vib_eig=reverse_min_eig,
+        error=error,
         topology_error=topology_error,
+    )
+
+
+def run_irc_validation(
+    ts_coords: torch.Tensor,
+    atomic_nums: torch.Tensor,
+    predict_fn,
+    reactant_coords: Optional[torch.Tensor] = None,
+    product_coords: Optional[torch.Tensor] = None,
+    rmsd_threshold: float = 0.3,
+    max_steps: int = 100,
+) -> IRCResult:
+    """Baseline: vanilla Sella IRC with BFGS-updated Hessian, Cartesian coords.
+
+    Identical wiring to what the codebase has always used. Kept as the
+    control condition for comparison against `irc_sella_hip.run_irc_sella_hip`
+    and `irc_rigorous.run_irc_rigorous`.
+    """
+    try:
+        from sella import IRC
+    except ImportError:
+        return score_endpoints(
+            forward_coords=None,
+            reverse_coords=None,
+            atomic_nums=atomic_nums,
+            reactant_coords=reactant_coords,
+            product_coords=product_coords,
+            rmsd_threshold=rmsd_threshold,
+            error="Sella not installed",
+        )
+
+    from gadplus.calculator.ase_adapter import HipASECalculator
+
+    coords_np = ts_coords.detach().cpu().numpy().reshape(-1, 3)
+    nums = atomic_nums.detach().cpu().tolist()
+    symbols = [Z_TO_SYMBOL.get(int(z), "X") for z in nums]
+
+    atoms = Atoms(symbols=symbols, positions=coords_np)
+    atoms.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
+
+    optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4}
+
+    endpoints = {}
+    for direction in ["forward", "reverse"]:
+        try:
+            atoms_copy = atoms.copy()
+            atoms_copy.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
+            irc = IRC(atoms=atoms_copy, **optimizer_kwargs)
+            irc.run(fmax=0.01, steps=max_steps, direction=direction)
+            endpoints[direction] = atoms_copy.positions.copy()
+        except Exception:
+            endpoints[direction] = None
+
+    return score_endpoints(
+        forward_coords=endpoints.get("forward"),
+        reverse_coords=endpoints.get("reverse"),
+        atomic_nums=atomic_nums,
+        reactant_coords=reactant_coords,
+        product_coords=product_coords,
+        rmsd_threshold=rmsd_threshold,
+        predict_fn=predict_fn,
     )
