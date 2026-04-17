@@ -75,19 +75,20 @@ def _write_irc_viewer_bundle(
 
 def _load_ts_at_converged_step(
     survey_dir: str,
-    run_id: str,
+    method: str,
+    noise_pm: int,
     sample_id: int,
     converged_step: int,
 ) -> pd.DataFrame:
-    """Fetch the trajectory row at the exact converged_step. No filtering, no fallback."""
+    """Fetch the trajectory row at the exact converged_step. Narrow filename glob."""
     import duckdb
 
+    # traj files are named traj_<method>_<noise>pm_<hash>_<sample_id>.parquet
+    pattern = f"{survey_dir}/traj_{method}_{noise_pm}pm_*_{sample_id}.parquet"
     query = f"""
         SELECT step, coords_flat
-        FROM '{survey_dir}/traj_*.parquet'
-        WHERE run_id = '{run_id}'
-          AND sample_id = {sample_id}
-          AND step = {converged_step}
+        FROM '{pattern}'
+        WHERE step = {converged_step}
         LIMIT 1
     """
     return duckdb.execute(query).df()
@@ -112,6 +113,12 @@ def main():
         help="IRC integrator: sella_baseline (vanilla Sella + BFGS Hessian), "
              "sella_hip (Sella IRC + HIP MW+Eckart Hessian every step), "
              "rigorous (HIP predictor-corrector with K-step hold).",
+    )
+    parser.add_argument(
+        "--source-method",
+        type=str,
+        default="gad_dt003",
+        help="GAD method in the summary parquets to pull converged TS from.",
     )
     parser.add_argument(
         "--write-viewer-bundles",
@@ -159,15 +166,17 @@ def main():
     # ---- Find converged TS from noise survey ----
     import duckdb
 
+    # Narrow single-file read avoids O(N_files) Lustre metadata stalls on glob.
+    summary_path = f"{survey_dir}/summary_{args.source_method}_{args.noise_pm}pm.parquet"
     converged_df = duckdb.execute(f"""
-        SELECT sample_id, run_id, converged_step, final_force_norm, final_n_neg, formula
-        FROM '{survey_dir}/summary_*.parquet'
-        WHERE converged = true AND noise_pm = {args.noise_pm}
+        SELECT sample_id, method, converged_step, final_force_norm, final_n_neg, formula
+        FROM '{summary_path}'
+        WHERE converged = true
         ORDER BY converged_step ASC
         LIMIT {args.max_validate}
     """).df()
 
-    print(f"Found {len(converged_df)} converged TS at noise={args.noise_pm}pm")
+    print(f"Found {len(converged_df)} converged TS at noise={args.noise_pm}pm (source_method={args.source_method})")
     if len(converged_df) == 0:
         print("No converged TS to validate.")
         return
@@ -198,7 +207,8 @@ def main():
     results = []
     for _, row in converged_df.iterrows():
         sample_id = int(row["sample_id"])
-        run_id = row["run_id"]
+        source_method = row["method"]
+        run_id = f"{source_method}_{args.noise_pm}pm_s{sample_id}"  # synthetic id
         formula = row["formula"]
         conv_step = int(row["converged_step"])
 
@@ -207,7 +217,8 @@ def main():
         try:
             traj_df = _load_ts_at_converged_step(
                 survey_dir=survey_dir,
-                run_id=run_id,
+                method=source_method,
+                noise_pm=args.noise_pm,
                 sample_id=sample_id,
                 converged_step=conv_step,
             )

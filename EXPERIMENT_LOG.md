@@ -1024,6 +1024,51 @@ All use dt=0.005, 1000 steps, Eckart projection.
 
 ---
 
+## Round 5, Experiment 18: Full sella_hip IRC Validation on gad_dt003 TSs (2026-04-16)
+
+**Setup.** Full IRC validation of the best GAD variant (`gad_dt003`) at six noise levels: 10/30/50/100/150/200 pm × 300 samples each. TS candidates pulled naively from the GAD trajectory at the first step where `n_neg == 1 AND force_norm < 0.01` (no refinement, no gating). IRC integrator = `sella_hip`: Sella's IRC routine with HIP's analytical mass-weighted Eckart-projected Hessian injected after every inner kick, overwriting BFGS updates. Max 500 steps per direction.
+
+Primary metric: **TOPO-intended** (bond-graph isomorphism on both directions, element-labeled, direction-agnostic). Strict metric: RMSD-intended (<0.3 Å, Kabsch+Hungarian).
+
+**Data source.** `round2/summary_gad_dt003_{10,30,50}pm.parquet`, `round3/summary_gad_dt003_{100,150,200}pm.parquet`. The 200pm summary was missing from the original GAD sweep (259/300 trajs but no rollup) and was regenerated from the traj parquets — 143/259 GAD-converged. All other levels had the full 300.
+
+**Results.** 1462 IRC runs total, **zero errors**, ~30 min wall parallelized over 6 MIG slices.
+
+| Noise | n | TOPO-int% | RMSD-int% | wall_avg (s) |
+|-------|---|-----------|-----------|--------------|
+| 10pm  | 284 | **94.4** | 64.4 | 12.6 |
+| 30pm  | 283 | **94.3** | 64.3 | 12.4 |
+| 50pm  | 276 | **93.1** | 64.9 | 12.3 |
+| 100pm | 262 | **93.9** | 65.6 | 12.2 |
+| 150pm | 214 | **90.7** | 66.8 | 11.8 |
+| 200pm | 143 | **80.4** | 60.8 | 10.4 |
+| **all** | **1462** | **92.1** | **64.7** | 11.9 |
+
+**Key findings.**
+
+1. **TOPO-intended is nearly flat at ~93–94% through 100pm**, drops to 90.7% at 150pm, and cliffs to 80.4% at 200pm. Degradation only kicks in at 200pm.
+2. **Strict RMSD-intended is flat (64–67%) regardless of noise**, actually rising slightly from 10pm (64.4%) through 150pm (66.8%). The ~27pp gap to TOPO is not noise-driven; it's conformational or labeling-driven.
+3. **Endpoint vibrational quality is very high:** 87–90% of runs end with both endpoints at true minima ($n_{\text{neg,vib}}=0$). Only 0.5–1.8% end with neither endpoint at a minimum (genuine integrator failure).
+4. **Directional symmetry is near-perfect:** forward and reverse match labels at 93–97% each, with ≤3pp asymmetry. No directional bias from the HIP-injected Sella.
+5. **Systematic failures are labeling issues, not integrator issues.** 10 sample IDs fail TOPO at ≥5/6 noise levels. 8 of these land at valid minima on both sides — GAD found a real TS, IRC found two real minima, just not the T1x-labeled pair. Candidate formulas: C2H3N3O (sids 94/96/98/104), C2H3N3 (48), C2H3N5 (108), C2H4N2O2 (143), C2H4N4 (203). Two (258 C2H6O2, 265 C3H2N2O) are genuine ridge-stalls with `n_neg=1` on one endpoint.
+6. **5.8% of all runs are "valid-but-wrong minima"** — IRC reached real minima but not the labeled pair.
+7. **TS-side quality vs IRC outcome:** at low noise, TOPO-failing TSs have *sharper* saddles (median |eig0| ≈ 7 vs 3.5). At 150/200pm, failing TSs also had *longer* GAD convergence (cstep +50%). No clean TS-side filter predicts IRC failure.
+8. **Per-formula difficulty:** C2N2 (50% int, n=4) and C3H2N2O (60%, n=15) are hardest. Most formulas (10+) are 100% TOPO-intended. The common organic reactions in T1x are handled reliably.
+
+**Significance.** This is the first fully scored IRC validation on the flagship GAD method (`gad_dt003`), on the full 300-sample pool at all noise levels from 10 to 200pm. Prior IRC validations (`irc_validation/`) ran on a much smaller sample (30/noise). sella_hip is the production IRC integrator.
+
+**Artifacts.**
+- `IRC_RESULTS_2026-04-16.tex` / `.pdf` — 8-page writeup with all tables and figures.
+- `figures/fig_sella_{rates_vs_noise,endpoint_quality,rmsd_distributions,ts_quality_vs_outcome,systematic_failures,wall_time}.{pdf,png}`
+- `scripts/analyze_sella_deep.py` — produces all tables.
+- `scripts/figures_sella_irc.py` — produces all figures.
+- Raw IRC parquets: `/lustre07/scratch/memoozd/gadplus/runs/irc_sellahip_full/irc_validation_sella_hip_{10,30,50,100,150,200}pm.parquet`
+- Regenerated 200pm TS summary: `/lustre07/scratch/memoozd/gadplus/runs/round3/summary_gad_dt003_200pm.parquet`
+
+**Next.** Full rigorous (Hratchian–Schlegel predictor-corrector) IRC sweep in parallel — job 59464202, 6 tasks, ETA ~11h. Same 1462 TS set, direct head-to-head.
+
+---
+
 ## Experiments NOT Run
 
 | Experiment | Description | Why not run |
@@ -1121,3 +1166,6 @@ Round 4 descent→GAD: /lustre07/scratch/memoozd/gadplus/runs/round4/
 | Round 3 dt003 rerun | 58933021 | 2/3 complete (200pm partial 259/300) |
 | Round 4 descent→GAD | 59362083 | 4/6 complete (200pm ~238/300) |
 | Round 3 Sella 1000-step | 58937673 | 20/24 (internal 150/200pm timeout) |
+| Round 5 sella_hip IRC round2 | 59456280 | Complete (tasks 0/1/2) + 3/4 cancelled (Lustre hang, refixed) |
+| Round 5 sella_hip IRC round3 | 59456595 | Complete (100/150/200pm) |
+| Round 5 rigorous IRC full | 59464202 | Running (6 tasks, ETA ~11h) |
