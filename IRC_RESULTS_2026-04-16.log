@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  17 APR 2026 01:41
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  17 APR 2026 01:50
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -510,130 +510,124 @@ Overfull \hbox (28.52444pt too wide) in paragraph at lines 39--41
 /product us-ing element-aware Kab-sch+Hungarian
  []
 
-<figures/fig_sella_bars_topo.pdf, id=4, 644.33852pt x 357.49232pt>
+[1
+
+{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
+tex/updmap/pdftex.map}]
+<figures/fig_sella_bars_topo.pdf, id=26, 644.33852pt x 357.49232pt>
 File: figures/fig_sella_bars_topo.pdf Graphic file (type pdf)
 <use figures/fig_sella_bars_topo.pdf>
-Package pdftex.def Info: figures/fig_sella_bars_topo.pdf  used on input line 74
-.
+Package pdftex.def Info: figures/fig_sella_bars_topo.pdf  used on input line 10
+6.
 (pdftex.def)             Requested size: 435.78593pt x 241.78784pt.
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-<figures/fig_sella_bars_rmsd.pdf, id=5, 647.69481pt x 359.5155pt>
+<figures/fig_sella_bars_rmsd.pdf, id=27, 647.69481pt x 359.5155pt>
 File: figures/fig_sella_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_sella_bars_rmsd.pdf>
-Package pdftex.def Info: figures/fig_sella_bars_rmsd.pdf  used on input line 84
-.
+Package pdftex.def Info: figures/fig_sella_bars_rmsd.pdf  used on input line 13
+0.
 (pdftex.def)             Requested size: 435.78593pt x 241.88899pt.
+
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-<figures/fig_sella_bars_endpoint.pdf, id=6, 563.40486pt x 357.49232pt>
+[2 <./figures/fig_sella_bars_topo.pdf>]
+<figures/fig_sella_bars_endpoint.pdf, id=133, 563.40486pt x 357.49232pt>
 File: figures/fig_sella_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_sella_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_sella_bars_endpoint.pdf  used on input lin
-e 95.
+e 155.
 (pdftex.def)             Requested size: 435.78593pt x 276.52455pt.
+
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
 
-Overfull \hbox (2.21278pt too wide) in paragraph at lines 106--110
+Overfull \hbox (2.21278pt too wide) in paragraph at lines 163--167
 \OT1/cmr/m/n/10.95 For each IRC end-point we re-compute HIP's an-a-lytic Hes-si
 an, project out trans-la-tion/rotation (Eckart),
  []
 
-[1
-
-{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
-tex/updmap/pdftex.map}] [2 <./figures/fig_sella_bars_topo.pdf>]
-<figures/fig_sella_rmsd_distributions.pdf, id=132, 620.82881pt x 308.98613pt>
+[3 <./figures/fig_sella_bars_rmsd.pdf>]
+<figures/fig_sella_rmsd_distributions.pdf, id=246, 620.82881pt x 308.98613pt>
 File: figures/fig_sella_rmsd_distributions.pdf Graphic file (type pdf)
 <use figures/fig_sella_rmsd_distributions.pdf>
 Package pdftex.def Info: figures/fig_sella_rmsd_distributions.pdf  used on inpu
-t line 154.
+t line 211.
 (pdftex.def)             Requested size: 484.20988pt x 240.99406pt.
 
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-[3 <./figures/fig_sella_bars_rmsd.pdf>]
-Overfull \hbox (15.34978pt too wide) in paragraph at lines 190--206
+[4 <./figures/fig_sella_bars_endpoint.pdf>]
+Overfull \hbox (15.34978pt too wide) in paragraph at lines 247--263
  [] 
  []
 
-[4 <./figures/fig_sella_bars_endpoint.pdf>]
-<figures/fig_sella_systematic_failures.pdf, id=344, 533.96793pt x 294.69975pt>
+[5 <./figures/fig_sella_rmsd_distributions.pdf>]
+<figures/fig_sella_systematic_failures.pdf, id=410, 533.96793pt x 294.69975pt>
 File: figures/fig_sella_systematic_failures.pdf Graphic file (type pdf)
 <use figures/fig_sella_systematic_failures.pdf>
 Package pdftex.def Info: figures/fig_sella_systematic_failures.pdf  used on inp
-ut line 216.
+ut line 273.
 (pdftex.def)             Requested size: 387.36938pt x 213.80247pt.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-<figures/fig_sella_ts_quality_vs_outcome.pdf, id=345, 473.62257pt x 314.41403pt
+ [6 <./figures/fig_sella_systematic_failures.pdf>]
+<figures/fig_sella_ts_quality_vs_outcome.pdf, id=462, 473.62257pt x 314.41403pt
 >
 File: figures/fig_sella_ts_quality_vs_outcome.pdf Graphic file (type pdf)
 <use figures/fig_sella_ts_quality_vs_outcome.pdf>
 Package pdftex.def Info: figures/fig_sella_ts_quality_vs_outcome.pdf  used on i
-nput line 256.
+nput line 313.
 (pdftex.def)             Requested size: 484.20988pt x 321.46088pt.
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-[5 <./figures/fig_sella_rmsd_distributions.pdf>]
-<figures/fig_sella_wall_time.pdf, id=409, 468.03922pt x 279.32278pt>
+ [7 <./figures/fig_sella_ts_quality_vs_outcome.pdf>]
+<figures/fig_sella_wall_time.pdf, id=536, 468.03922pt x 279.32278pt>
 File: figures/fig_sella_wall_time.pdf Graphic file (type pdf)
 <use figures/fig_sella_wall_time.pdf>
-Package pdftex.def Info: figures/fig_sella_wall_time.pdf  used on input line 30
-5.
+Package pdftex.def Info: figures/fig_sella_wall_time.pdf  used on input line 36
+2.
 (pdftex.def)             Requested size: 484.20988pt x 288.97577pt.
 
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-[6 <./figures/fig_sella_systematic_failures.pdf>] [7 <./figures/fig_sella_ts_qu
-ality_vs_outcome.pdf>] [8 <./figures/fig_sella_wall_time.pdf>]
-(./IRC_RESULTS_2026-04-16.aux)
+[8] [9 <./figures/fig_sella_wall_time.pdf>] (./IRC_RESULTS_2026-04-16.aux)
 Package rerunfilecheck Info: File `IRC_RESULTS_2026-04-16.out' has not changed.
 
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 10988 strings out of 480884
- 172538 string characters out of 5900692
- 480336 words of memory out of 5000000
- 28071 multiletter control sequences out of 15000+600000
- 412563 words of font info for 59 fonts, out of 8000000 for 9000
+ 10996 strings out of 480884
+ 172621 string characters out of 5900692
+ 481336 words of memory out of 5000000
+ 28073 multiletter control sequences out of 15000+600000
+ 412899 words of font info for 61 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
- 71i,11n,74p,614b,448s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 71i,14n,74p,609b,436s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/font
 s/enc/dvips/cm-super/cm-super-ts1.enc}</cvmfs/soft.computecanada.ca/gentoo/2023
 /x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></cvm
 fs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1
 /public/amsfonts/cm/cmbx12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
--v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></cvmfs/soft
+-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></cvmfs/soft
 .computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public
-/amsfonts/cm/cmmi8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/
-share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></cvmfs/soft.computec
-anada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts
-/cm/cmr7.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texm
-f-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></cvmfs/soft.computecanada.ca/ge
-ntoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.
+/amsfonts/cm/cmmi10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr
+/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></cvmfs/soft.compute
+canada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmr10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></cvmfs/soft.computecanada.ca/
+gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.
 pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmsy7.pfb></cvmfs/soft.computecanada.ca/gentoo/202
-3/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></cvm
-fs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmti10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
--v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/soft
+nts/type1/public/amsfonts/cm/cmsy10.pfb></cvmfs/soft.computecanada.ca/gentoo/20
+23/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></cv
+mfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type
+1/public/amsfonts/cm/cmsy8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
+-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></cvmfs/soft
 .computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public
-/cm-super/sfrm1095.pfb>
-Output written on IRC_RESULTS_2026-04-16.pdf (8 pages, 326031 bytes).
+/amsfonts/cm/cmtt10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr
+/share/texmf-dist/fonts/type1/public/cm-super/sfrm1095.pfb>
+Output written on IRC_RESULTS_2026-04-16.pdf (9 pages, 340732 bytes).
 PDF statistics:
- 635 PDF objects out of 1000 (max. 8388607)
- 168 compressed objects within 2 object streams
- 31 named destinations out of 1000 (max. 500000)
+ 647 PDF objects out of 1000 (max. 8388607)
+ 178 compressed objects within 2 object streams
+ 36 named destinations out of 1000 (max. 500000)
  36 words of extra memory for PDF output out of 10000 (max. 10000000)
 

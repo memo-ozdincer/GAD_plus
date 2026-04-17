@@ -324,6 +324,9 @@ def main():
             # Legacy compatibility
             "converged": our_converged,
             "converged_step": steps_taken if our_converged else None,
+            # Coords for downstream IRC validation (added 2026-04-17)
+            "coords_flat": final_coords.detach().cpu().numpy().reshape(-1).astype(float).tolist(),
+            "atomic_nums": z.detach().cpu().numpy().astype(int).tolist(),
         })
 
     total_wall = time.time() - t_total

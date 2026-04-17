@@ -121,6 +121,13 @@ def main():
         help="GAD method in the summary parquets to pull converged TS from.",
     )
     parser.add_argument(
+        "--all-endpoints",
+        action="store_true",
+        default=False,
+        help="Ignore the converged filter; run IRC on every sample's final "
+             "trajectory coords (last step). IRC becomes the convergence criterion.",
+    )
+    parser.add_argument(
         "--write-viewer-bundles",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -168,13 +175,26 @@ def main():
 
     # Narrow single-file read avoids O(N_files) Lustre metadata stalls on glob.
     summary_path = f"{survey_dir}/summary_{args.source_method}_{args.noise_pm}pm.parquet"
-    converged_df = duckdb.execute(f"""
-        SELECT sample_id, method, converged_step, final_force_norm, final_n_neg, formula
-        FROM '{summary_path}'
-        WHERE converged = true
-        ORDER BY converged_step ASC
-        LIMIT {args.max_validate}
-    """).df()
+    if args.all_endpoints:
+        # IRC on every sample's final trajectory coords. No converged filter;
+        # fetch at step = total_steps - 1 for each sample.
+        converged_df = duckdb.execute(f"""
+            SELECT sample_id, method,
+                   CAST(total_steps - 1 AS DOUBLE) AS converged_step,
+                   final_force_norm, final_n_neg, formula, converged
+            FROM '{summary_path}'
+            ORDER BY sample_id ASC
+            LIMIT {args.max_validate}
+        """).df()
+    else:
+        converged_df = duckdb.execute(f"""
+            SELECT sample_id, method, converged_step, final_force_norm,
+                   final_n_neg, formula, true AS converged
+            FROM '{summary_path}'
+            WHERE converged = true
+            ORDER BY converged_step ASC
+            LIMIT {args.max_validate}
+        """).df()
 
     print(f"Found {len(converged_df)} converged TS at noise={args.noise_pm}pm (source_method={args.source_method})")
     if len(converged_df) == 0:
@@ -329,6 +349,7 @@ def main():
             "sample_id": sample_id,
             "formula": formula,
             "noise_pm": args.noise_pm,
+            "source_gad_converged": bool(row.get("converged", True)),
             "atomic_nums": z.detach().cpu().numpy().astype(int).tolist(),
             "converged_step": conv_step,
             "intended": irc_result.intended,
@@ -364,7 +385,8 @@ def main():
 
     # ---- Summary ----
     df = pd.DataFrame(results)
-    out_path = os.path.join(output_dir, f"irc_validation_{args.method}_{args.noise_pm}pm.parquet")
+    suffix = "_allendpoints" if args.all_endpoints else ""
+    out_path = os.path.join(output_dir, f"irc_validation_{args.method}{suffix}_{args.noise_pm}pm.parquet")
     df.to_parquet(out_path)
 
     n_intended = df["intended"].sum()

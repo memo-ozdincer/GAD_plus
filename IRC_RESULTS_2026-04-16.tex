@@ -69,36 +69,93 @@ all     & 1462 & \textbf{92.1} & 7.9 & \textbf{64.7} & 31.8 & 11.9 \\
 \end{tabular}
 \end{center}
 
+\paragraph{Notation for the three criteria.}
+Let $\mathbf{x}_f, \mathbf{x}_r$ be the IRC forward/reverse endpoint
+coordinates; $\mathbf{x}_R, \mathbf{x}_P$ the \texttt{Transition1x}-labeled
+reactant/product. All are $3N$-vectors for the same atom ordering/symbols.
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item $d^{a \to b}$ = element-labeled Kabsch$+$Hungarian RMSD between
+      $\mathbf{x}_a$ and $\mathbf{x}_b$. Computed for all four pairs:
+      $(f,R), (f,P), (r,R), (r,P)$.
+\item $g(\mathbf{x})$ = element-labeled bond graph from covalent-radius
+      heuristic. $g_a \cong g_b$ is graph isomorphism that preserves atom
+      labels. Computed for all four pairs.
+\item $n_{\text{neg}}(\mathbf{x})$ = number of negative eigenvalues of HIP's
+      analytic Hessian \emph{after} mass-weighting and projecting out the
+      6 translation/rotation Eckart modes. $n_{\text{neg}} = 0$ iff
+      $\mathbf{x}$ is at a true vibrational minimum.
+\end{itemize}
+
+\paragraph{Criterion 1 --- bond-graph topology.}
+\begin{align*}
+\texttt{TOPO-intended} &\;\equiv\;
+  (g_f \cong g_R \ \wedge\ g_r \cong g_P)\;\vee\;
+  (g_f \cong g_P \ \wedge\ g_r \cong g_R) \\
+\texttt{TOPO-half} &\;\equiv\;
+  \bigl(g_f \cong g_R \vee g_f \cong g_P \vee g_r \cong g_R \vee g_r \cong g_P\bigr)
+  \ \wedge\ \neg\,\texttt{TOPO-intended} \\
+\texttt{TOPO-unintended} &\;\equiv\;
+  \neg\,\texttt{TOPO-intended}\ \wedge\ \neg\,\texttt{TOPO-half}
+\end{align*}
+Direction-agnostic: the forward endpoint may land on either R or P.
+A single missing match anywhere is a ``half''; no matches at all is ``unintended''.
+
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_topo.pdf}
-\caption{\textbf{Bond-graph topology criterion.} Each bar is 100\% of the
-\texttt{gad\_dt003}-converged TSs at that noise level. Intended = both IRC
-directions match the labeled (reactant, product) pair by bond-graph
-isomorphism. Flat at $\sim$94\% through 100\,pm; steps down to 90.7\% at
-150\,pm; drops to 80.4\% at 200\,pm.}
+\caption{Topology criterion. Flat at $\sim$94\% through 100\,pm; steps down
+to 90.7\% at 150\,pm; drops to 80.4\% at 200\,pm. Denominator is the
+\texttt{gad\_dt003}-converged TS pool at each noise.}
 \end{figure}
+
+\paragraph{Criterion 2 --- strict RMSD ($<0.3$\,\AA).}
+\begin{align*}
+d_{\to R} &= \min(d^{f\to R},\ d^{r\to R}) \qquad
+d_{\to P} = \min(d^{f\to P},\ d^{r\to P}) \\
+\texttt{RMSD-intended} &\;\equiv\;
+  (d_{\to R} < 0.3~\text{\AA})\ \wedge\ (d_{\to P} < 0.3~\text{\AA}) \\
+\texttt{RMSD-half} &\;\equiv\;
+  \bigl((d_{\to R} < 0.3) \vee (d_{\to P} < 0.3)\bigr)
+  \ \wedge\ \neg\,\texttt{RMSD-intended} \\
+\texttt{RMSD-unintended} &\;\equiv\;
+  \neg\,\texttt{RMSD-intended}\ \wedge\ \neg\,\texttt{RMSD-half}
+\end{align*}
+Also direction-agnostic (we take the $\min$ over forward/reverse for each
+target). Note: RMSD-intended is strictly stronger than TOPO-intended ---
+any geometry close enough to match RMSD will also match bond graph.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_rmsd.pdf}
-\caption{\textbf{Strict RMSD criterion ($<0.3$\,\AA).} Same denominator,
-same three outcomes, same layout as the topology chart. RMSD-intended is
-roughly flat at 60--67\% across all noise levels, with the bulk of the gap
-to topology absorbed by the \emph{half-intended} tier. The noise level does
-not meaningfully shift the RMSD outcome distribution --- implying residual
-RMSD failures are conformational or labeling-driven, not noise-driven.}
+\caption{Strict RMSD criterion. Roughly flat at 60--67\% across noise
+levels; the gap to topology is absorbed mostly by the half-intended tier.}
 \end{figure}
+
+\paragraph{Criterion 3 --- endpoint vibrational quality.}
+\begin{align*}
+\texttt{both\_at\_minimum} &\;\equiv\;
+  \bigl(n_{\text{neg}}(\mathbf{x}_f) = 0\bigr)\ \wedge\
+  \bigl(n_{\text{neg}}(\mathbf{x}_r) = 0\bigr) \\
+\texttt{only\_one\_at\_minimum} &\;\equiv\;
+  \bigl(n_{\text{neg}}(\mathbf{x}_f) = 0\bigr)\ \oplus\
+  \bigl(n_{\text{neg}}(\mathbf{x}_r) = 0\bigr) \\
+\texttt{neither\_at\_minimum} &\;\equiv\;
+  \bigl(n_{\text{neg}}(\mathbf{x}_f) > 0\bigr)\ \wedge\
+  \bigl(n_{\text{neg}}(\mathbf{x}_r) > 0\bigr)
+\end{align*}
+This does not reference the labeled reactant/product --- it asks only
+whether the IRC integrator managed to descend to a real minimum on HIP's
+PES in each direction. ``neither at minimum'' is a \emph{ridge-stall}:
+the integrator halted while one or both endpoints still had a non-trivial
+unstable mode.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_endpoint.pdf}
-\caption{\textbf{Endpoint vibrational quality.} Same denominator. Bars show
-whether both IRC endpoints, only one, or neither ended at a true minimum
-($n_{\text{neg,vib}} = 0$ on Eckart-projected Hessian). Both-at-minimum rises
-gently from 87.7\% at 10\,pm to 89.5\% at 200\,pm. Ridge-stalls (neither)
-are 0.5--1.8\% across all levels --- a tight upper bound on integrator
-failure.}
+\caption{Endpoint vibrational quality. Both-at-minimum rises gently from
+87.7\% at 10\,pm to 89.5\% at 200\,pm. Ridge-stalls are 0.5--1.8\% ---
+a tight upper bound on pure integrator failure.}
 \end{figure}
 
 \section*{Endpoint Vibrational Quality}
