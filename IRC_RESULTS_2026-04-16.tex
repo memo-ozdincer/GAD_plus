@@ -71,13 +71,34 @@ all     & 1462 & \textbf{92.1} & 7.9 & \textbf{64.7} & 31.8 & 11.9 \\
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_sella_rates_vs_noise.pdf}
-\caption{IRC validation rates vs.\ starting TS noise. Topology success is nearly
-flat at $\sim$93--94\% through 100\,pm, steps down to 90.7\% at 150\,pm, and
-drops to 80.4\% at 200\,pm. Strict RMSD-intended is roughly \emph{flat or
-slightly rising} through 150\,pm (64--67\%) before dropping at 200\,pm ---
-implying the strict-RMSD failures are not noise-driven; they are
-conformational or labeling-driven.}
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_topo.pdf}
+\caption{\textbf{Bond-graph topology criterion.} Each bar is 100\% of the
+\texttt{gad\_dt003}-converged TSs at that noise level. Intended = both IRC
+directions match the labeled (reactant, product) pair by bond-graph
+isomorphism. Flat at $\sim$94\% through 100\,pm; steps down to 90.7\% at
+150\,pm; drops to 80.4\% at 200\,pm.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_rmsd.pdf}
+\caption{\textbf{Strict RMSD criterion ($<0.3$\,\AA).} Same denominator,
+same three outcomes, same layout as the topology chart. RMSD-intended is
+roughly flat at 60--67\% across all noise levels, with the bulk of the gap
+to topology absorbed by the \emph{half-intended} tier. The noise level does
+not meaningfully shift the RMSD outcome distribution --- implying residual
+RMSD failures are conformational or labeling-driven, not noise-driven.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_endpoint.pdf}
+\caption{\textbf{Endpoint vibrational quality.} Same denominator. Bars show
+whether both IRC endpoints, only one, or neither ended at a true minimum
+($n_{\text{neg,vib}} = 0$ on Eckart-projected Hessian). Both-at-minimum rises
+gently from 87.7\% at 10\,pm to 89.5\% at 200\,pm. Ridge-stalls (neither)
+are 0.5--1.8\% across all levels --- a tight upper bound on integrator
+failure.}
 \end{figure}
 
 \section*{Endpoint Vibrational Quality}
@@ -102,15 +123,6 @@ Noise & fwd at min\% & rev at min\% & both at min\% & neither at min\% & any-dir
 \multicolumn{6}{l}{\small $^\dagger$forward or reverse matched \emph{some} label by bond graph.}
 \end{tabular}
 \end{center}
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_sella_endpoint_quality.pdf}
-\caption{Fraction of IRC endpoints classified by vibrational quality. Both
-endpoints are true minima in 87--90\% of runs across all noise levels.
-``neither at minimum'' (integrator stalled on a ridge) is 0.5--1.8\% ---
-a tight upper bound on genuine IRC failure.}
-\end{figure}
 
 \section*{Topology vs RMSD Gap}
 
