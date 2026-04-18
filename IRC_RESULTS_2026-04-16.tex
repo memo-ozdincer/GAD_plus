@@ -104,9 +104,12 @@ A single missing match anywhere is a ``half''; no matches at all is ``unintended
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_topo.pdf}
-\caption{Topology criterion. Flat at $\sim$94\% through 100\,pm; steps down
-to 90.7\% at 150\,pm; drops to 80.4\% at 200\,pm. Denominator is the
-\texttt{gad\_dt003}-converged TS pool at each noise.}
+\caption{\textbf{\texttt{sella\_hip} IRC on \texttt{gad\_dt003} converged
+TSs --- bond-graph topology criterion.} Denominator = \texttt{gad\_dt003}
+converged TSs at each noise level; intended = forward$+$reverse
+endpoints match the labeled (R, P) pair by element-labeled bond-graph
+isomorphism. Flat at $\sim$94\% through 100\,pm; steps down to 90.7\% at
+150\,pm; drops to 80.4\% at 200\,pm.}
 \end{figure}
 
 \paragraph{Criterion 2 --- strict RMSD ($<0.3$\,\AA).}
@@ -128,8 +131,12 @@ any geometry close enough to match RMSD will also match bond graph.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_rmsd.pdf}
-\caption{Strict RMSD criterion. Roughly flat at 60--67\% across noise
-levels; the gap to topology is absorbed mostly by the half-intended tier.}
+\caption{\textbf{\texttt{sella\_hip} IRC on \texttt{gad\_dt003} converged
+TSs --- strict RMSD criterion ($<0.3$\,\AA).} Same denominator as above;
+intended = both endpoints match the labeled (R, P) pair by
+Kabsch$+$Hungarian RMSD below 0.3\,\AA. Roughly flat at 60--67\% across
+noise levels; the gap to topology is absorbed mostly by the
+half-intended tier.}
 \end{figure}
 
 \paragraph{Criterion 3 --- endpoint vibrational quality.}
@@ -153,9 +160,12 @@ unstable mode.
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/fig_sella_bars_endpoint.pdf}
-\caption{Endpoint vibrational quality. Both-at-minimum rises gently from
-87.7\% at 10\,pm to 89.5\% at 200\,pm. Ridge-stalls are 0.5--1.8\% ---
-a tight upper bound on pure integrator failure.}
+\caption{\textbf{\texttt{sella\_hip} IRC on \texttt{gad\_dt003} converged
+TSs --- endpoint vibrational quality.} Same denominator; bars show the
+number of IRC endpoints at a true vibrational minimum ($n_{\text{neg,vib}}
+= 0$ on the Eckart-projected Hessian at the endpoint). Both-at-minimum
+rises gently from 87.7\% at 10\,pm to 89.5\% at 200\,pm. Ridge-stalls
+are 0.5--1.8\% --- a tight upper bound on pure integrator failure.}
 \end{figure}
 
 \section*{Endpoint Vibrational Quality}
@@ -364,6 +374,217 @@ Noise & mean & 50\% & 90\% & 99\% & max \\
 direction). Typical completion is 5--15\,s; the long tail reflects hard
 cases where Sella's inner loops hit the 500-step ceiling.}
 \end{figure}
+
+\section*{Addendum A --- Rigorous predictor-corrector IRC on the same TSs}
+
+The \texttt{rigorous} integrator (Hratchian--Schlegel EulerPC-style
+predictor-corrector with Eckart projection of gradient and Hessian every
+step, K$=$2 hold, adaptive arc-length, initial kick along the lowest
+\emph{vibrational} eigenvector) was run on the same $n=1462$
+\texttt{gad\_dt003}-converged TS set as the headline \texttt{sella\_hip}
+sweep. Same criteria, same scoring. Wall time $\approx$116\,s/sample
+(10$\times$ slower than \texttt{sella\_hip}).
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+Noise & $n$ & TOPO-int\% & RMSD-int\% & vs.\ sella\_hip TOPO & wall$_{avg}$ (s) \\
+\midrule
+10\,pm  & 284 & 50.7 & 34.2 & $-43.7$\,pp & 115.6 \\
+30\,pm  & 283 & 50.9 & 34.6 & $-43.4$\,pp & 116.4 \\
+50\,pm  & 276 & 51.4 & 35.5 & $-41.7$\,pp & 117.7 \\
+100\,pm & 262 & 52.7 & 37.4 & $-41.2$\,pp & 116.8 \\
+150\,pm & 214 & 51.9 & 40.2 & $-38.8$\,pp & 117.4 \\
+200\,pm & 143 & 55.9 & 46.9 & $-24.5$\,pp & 115.0 \\
+\midrule
+all     & 1462 & \textbf{51.9} & \textbf{37.2} & $-40.2$\,pp & 116.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_rigorous_bars_topo.pdf}
+\caption{\textbf{\texttt{rigorous} IRC on \texttt{gad\_dt003} converged
+TSs --- bond-graph topology criterion.} Same denominator and same
+definition of \emph{intended} as the \texttt{sella\_hip} headline charts.
+Note the inverted noise dependence: success rate rises slowly with
+noise, from 50.7\% at 10\,pm to 55.9\% at 200\,pm. \texttt{sella\_hip}
+does the opposite (94.4\%$\to$80.4\%).}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_rigorous_bars_rmsd.pdf}
+\caption{\textbf{\texttt{rigorous} IRC on \texttt{gad\_dt003} converged
+TSs --- strict RMSD criterion ($<0.3$\,\AA).} Same denominator; intended
+$\equiv$ both endpoints within 0.3\,\AA\ RMSD of the labeled (R, P).}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_rigorous_bars_endpoint.pdf}
+\caption{\textbf{\texttt{rigorous} IRC on \texttt{gad\_dt003} converged
+TSs --- endpoint vibrational quality.} Same denominator. The
+``unintended'' bars from the topology chart are \emph{not} ridge-stalls
+--- rigorous reaches real minima at comparable rates to
+\texttt{sella\_hip}, just wrong ones.}
+\end{figure}
+
+\textbf{Interpretation.} Rigorous reaches valid minima in most runs
+(endpoint-minimum rate is comparable to \texttt{sella\_hip}), so the
+underperformance is not integrator instability. It's a
+\emph{wrong-basin} failure: the predictor-corrector descends to a
+different real minimum than the one \texttt{sella\_hip} descends to.
+The inverted noise dependence (more success at higher noise) suggests
+the initial-kick direction or the step-size policy is biased near soft
+saddles where it matters most. Investigation deferred to backburner.
+
+\section*{Addendum B --- IRC on \emph{all} GAD endpoints (no convergence filter)}
+
+The headline sweep restricts to TSs that pass the local gate
+($n_{\text{neg}}=1 \wedge \|\mathbf{F}\|<0.01$). Dropping that filter
+and running \texttt{sella\_hip} IRC on the final-step coordinates of
+\emph{every} gad\_dt003 trajectory (converged or not) tests whether the
+local gate is actually doing meaningful work and gives a preview of
+``IRC-as-convergence-criterion''.
+
+\begin{center}
+\begin{tabular}{rrrrrrr}
+\toprule
+Noise & $n$ & TOPO-int\% & RMSD-int\% & TOPO (conv.\ only)\% & $\Delta$TOPO & wall$_{avg}$ (s) \\
+\midrule
+10\,pm  & 300 & 92.7 & 62.0 & 94.4 & $-1.7$\,pp & 13.7 \\
+30\,pm  & 300 & 92.7 & 61.3 & 94.3 & $-1.6$\,pp & 13.9 \\
+50\,pm  & 300 & 89.7 & 60.7 & 93.1 & $-3.4$\,pp & 14.1 \\
+100\,pm & 300 & 86.3 & 58.7 & 93.9 & $-7.6$\,pp & 15.5 \\
+150\,pm & 300 & 69.7 & 49.3 & 90.7 & $-21.0$\,pp & 17.2 \\
+200\,pm & 259 & 47.9 & 34.4 & 80.4 & $-32.5$\,pp & 18.5 \\
+\midrule
+all     & 1759 & 79.3 & 55.0 & 92.1 & $-12.8$\,pp & 15.2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_allep_bars_topo.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} \texttt{gad\_dt003}
+sample endpoints --- bond-graph topology criterion.} Denominator = full
+300 samples per noise level (259 at 200\,pm, since only 259 GAD
+trajectories existed there). No local-gate filter applied. Same
+intended/half/unintended definition as the headline charts.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_allep_bars_rmsd.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} \texttt{gad\_dt003}
+sample endpoints --- strict RMSD criterion ($<0.3$\,\AA).} Same
+denominator; same definition of intended as the headline RMSD chart.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_allep_bars_endpoint.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} \texttt{gad\_dt003}
+sample endpoints --- endpoint vibrational quality.} Same denominator;
+both / one / neither endpoint at a true minimum ($n_{\text{neg,vib}} = 0$).}
+\end{figure}
+
+\textbf{Interpretation of the gate's marginal value.}
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item At low noise (10--50\,pm) the gate barely moves the needle:
+      dropping it loses 1.7--3.4\,pp of topology success. GAD converges
+      almost every sample, and even non-converged tails are close enough
+      to a real TS that IRC still finds the right minima.
+\item The gate's value ramps steeply with noise: at 100\,pm it saves
+      7.6\,pp, at 150\,pm 21\,pp, at 200\,pm \textbf{32.5\,pp}. Samples
+      where GAD failed to converge at high noise are genuinely stuck on
+      bad parts of the PES, and IRC from them doesn't recover.
+\item This calibrates the proposed ``IRC-as-convergence-criterion''
+      direction: at low noise the local gate and an IRC gate will
+      disagree on $\sim$2\% of samples; at high noise they'll disagree
+      on nearly a third.
+\end{itemize}
+
+\section*{Addendum C --- sella\_hip IRC on Sella-optimized TSs}
+
+Head-to-head: applying the same sella\_hip IRC to TSs found by Sella's
+own optimizer (\texttt{sella\_cartesian\_eckart\_fmax0p01}, 1000 steps,
+same noise seeds and same 300-sample universe as gad\_dt003) instead of
+GAD-found TSs.
+
+\textbf{Implementation note.} A naive rerun returned trivial halts ---
+Sella's IRC inherits ASE's ``check convergence before first step'' pattern,
+and the Sella-refined TSs already satisfy ``fmax $<$ 0.01'' (Sella's default
+IRC halt threshold). A monkey-patch was added to
+\texttt{src/gadplus/search/irc\_sella\_hip.py::\_force\_first\_kick} that
+returns \texttt{False} from every convergence check until \texttt{step()}
+has run at least once. The IRC integrator itself is unchanged.
+
+\begin{center}
+\begin{tabular}{rrrrrrr}
+\toprule
+Noise & $n$ & TOPO-int\% & RMSD-int\% & TOPO vs.\ GAD & $n$ vs.\ GAD & wall$_{avg}$ (s) \\
+\midrule
+10\,pm  & 284 & 94.4 & 64.8 & $+0.0$\,pp & $\pm$0   & 12.4 \\
+30\,pm  & 283 & 93.6 & 64.3 & $-0.7$\,pp & $\pm$0   & 12.6 \\
+50\,pm  & 274 & 94.2 & 65.3 & $+1.1$\,pp & $-2$     & 12.6 \\
+100\,pm & 236 & 92.8 & 63.1 & $-1.1$\,pp & $-26$    & 12.7 \\
+150\,pm & 159 & 86.8 & 59.7 & $-3.9$\,pp & $-55$    & 12.7 \\
+200\,pm &  83 & 81.9 & 61.4 & $+1.5$\,pp & $-60$    & 11.6 \\
+\midrule
+all     & 1319 & \textbf{92.2} & 63.7 & $+0.1$\,pp & $-143$ & 12.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_bars_topo.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on Sella-optimized TSs --- bond-graph
+topology criterion.} Denominator = \texttt{sella\_cartesian\_eckart\_fmax0p01}
+converged TSs at each noise level. Same definition of \emph{intended} as
+the headline chart (direction-agnostic bond-graph match on both sides).}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_bars_rmsd.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on Sella-optimized TSs --- strict
+RMSD criterion ($<0.3$\,\AA).}}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_bars_endpoint.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on Sella-optimized TSs --- endpoint
+vibrational quality.}}
+\end{figure}
+
+\textbf{Interpretation.}
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \textbf{Per-TS IRC-quality is essentially identical.} GAD and Sella
+      both produce TSs that pass the topology criterion at 92\% overall
+      with the same sella\_hip IRC integrator. Once you restrict to
+      converged TSs, \emph{which} optimizer found them is not the
+      bottleneck --- the bottleneck is whether IRC resolves to the
+      labeled (R,P) pair.
+\item \textbf{The difference is how many TSs each optimizer finds.}
+      Sella converges on 284 samples at 10\,pm (same as GAD) but only
+      83 at 200\,pm (GAD: 143, i.e.\ $+60$ more TSs). Sella's optimizer
+      gives up at high noise where GAD keeps finding saddles.
+      Multiplying rates by sample counts: at 200\,pm,
+      Sella delivers $0.819 \times 83 = 68$ topology-valid
+      reactions; GAD delivers $0.804 \times 143 = 115$. GAD is strictly
+      better in absolute yield at high noise.
+\item \textbf{Wall-time parity.} Sella's TS refinement is typically a few
+      steps per sample (1--5\,s) vs GAD's $\sim$100--1000 steps
+      (10--100\,s). At low noise, the total (TS + IRC) favors Sella by
+      $\sim$2$\times$; at high noise, GAD's robustness dominates the
+      tradeoff.
+\end{itemize}
 
 \section*{Summary and Implications}
 

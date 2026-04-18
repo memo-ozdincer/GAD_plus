@@ -87,10 +87,6 @@ def stacked_bars(
     ax.set_xlabel("starting TS noise")
     ax.set_ylabel("fraction of IRC runs (%)")
     ax.set_ylim(0, 108)
-    ax.set_title(title, fontsize=12, pad=14)
-    if subtitle:
-        ax.text(0.5, 1.02, subtitle, transform=ax.transAxes,
-                ha="center", va="bottom", fontsize=9.5, style="italic", color="#555555")
     ax.legend(loc="lower right", fontsize=10, framealpha=0.9)
     ax.grid(axis="y", alpha=0.3)
     save(fig, name)
@@ -143,13 +139,6 @@ def endpoint_quality_bars(irc: pd.DataFrame) -> None:
     ax.set_xlabel("starting TS noise")
     ax.set_ylabel("fraction of IRC runs (%)")
     ax.set_ylim(0, 108)
-    ax.set_title("sella_hip IRC endpoint vibrational quality",
-                 fontsize=12, pad=14)
-    ax.text(0.5, 1.02,
-            "denominator = gad_dt003 converged TSs; endpoint is a true minimum iff "
-            r"$n_{\mathrm{neg,vib}} = 0$ on Eckart-projected Hessian",
-            transform=ax.transAxes, ha="center", va="bottom",
-            fontsize=9.5, style="italic", color="#555555")
     ax.legend(loc="lower right", fontsize=10, framealpha=0.9)
     ax.grid(axis="y", alpha=0.3)
     save(fig, "fig_sella_bars_endpoint")

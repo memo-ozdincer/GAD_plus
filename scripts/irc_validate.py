@@ -128,6 +128,16 @@ def main():
              "trajectory coords (last step). IRC becomes the convergence criterion.",
     )
     parser.add_argument(
+        "--coords-source",
+        type=str,
+        default="traj",
+        choices=["traj", "summary"],
+        help="Where to read TS coords from. 'traj' (default) = narrow glob on "
+             "traj_<method>_<noise>pm_*_<sid>.parquet at step=converged_step. "
+             "'summary' = read coords_flat column directly from the summary "
+             "parquet (used for Sella-found TSs that have coords logged).",
+    )
+    parser.add_argument(
         "--write-viewer-bundles",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -175,13 +185,14 @@ def main():
 
     # Narrow single-file read avoids O(N_files) Lustre metadata stalls on glob.
     summary_path = f"{survey_dir}/summary_{args.source_method}_{args.noise_pm}pm.parquet"
+    extra_cols = ", coords_flat" if args.coords_source == "summary" else ""
     if args.all_endpoints:
         # IRC on every sample's final trajectory coords. No converged filter;
         # fetch at step = total_steps - 1 for each sample.
         converged_df = duckdb.execute(f"""
             SELECT sample_id, method,
                    CAST(total_steps - 1 AS DOUBLE) AS converged_step,
-                   final_force_norm, final_n_neg, formula, converged
+                   final_force_norm, final_n_neg, formula, converged {extra_cols}
             FROM '{summary_path}'
             ORDER BY sample_id ASC
             LIMIT {args.max_validate}
@@ -189,7 +200,7 @@ def main():
     else:
         converged_df = duckdb.execute(f"""
             SELECT sample_id, method, converged_step, final_force_norm,
-                   final_n_neg, formula, true AS converged
+                   final_n_neg, formula, true AS converged {extra_cols}
             FROM '{summary_path}'
             WHERE converged = true
             ORDER BY converged_step ASC
@@ -235,13 +246,17 @@ def main():
         print(f"\n--- Validating sample {sample_id} ({formula}), converged_step={conv_step} ---")
 
         try:
-            traj_df = _load_ts_at_converged_step(
-                survey_dir=survey_dir,
-                method=source_method,
-                noise_pm=args.noise_pm,
-                sample_id=sample_id,
-                converged_step=conv_step,
-            )
+            if args.coords_source == "summary":
+                # Coords are embedded in the summary row itself.
+                traj_df = pd.DataFrame([{"step": conv_step, "coords_flat": row["coords_flat"]}])
+            else:
+                traj_df = _load_ts_at_converged_step(
+                    survey_dir=survey_dir,
+                    method=source_method,
+                    noise_pm=args.noise_pm,
+                    sample_id=sample_id,
+                    converged_step=conv_step,
+                )
         except Exception as e:
             print(f"  Error reading trajectory: {e}")
             results.append({

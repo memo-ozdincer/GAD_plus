@@ -63,6 +63,46 @@ class HipSellaCalculator(Calculator):
         self.results["forces"] = np.asarray(forces).reshape(-1, 3)
 
 
+def _force_first_kick(irc):
+    """Monkey-patch IRC so the first convergence check is bypassed.
+
+    ASE's ``Optimizer.irun`` checks ``gradient_converged`` on the starting
+    geometry *before* calling ``step()`` — and for Sella's IRC the first
+    ``step()`` call contains the kick off the saddle. When the starting
+    point is a TS already satisfying ``fmax < halt_threshold`` (e.g. a
+    TS refined with Sella's own optimizer at matching fmax), the
+    pre-kick check trivially passes and IRC returns immediately without
+    ever kicking. This patch forces at least one ``step()`` call by
+    returning ``False`` from every convergence check until ``step()``
+    has run once.
+    """
+    has_stepped = {"v": False}
+    orig_step = irc.step
+    orig_converged = irc.converged
+    orig_grad_conv = getattr(irc, "gradient_converged", None)
+
+    def patched_step(*args, **kwargs):
+        has_stepped["v"] = True
+        return orig_step(*args, **kwargs)
+
+    def patched_converged(*args, **kwargs):
+        if not has_stepped["v"]:
+            return False
+        return orig_converged(*args, **kwargs)
+
+    def patched_grad_conv(*args, **kwargs):
+        if not has_stepped["v"]:
+            return False
+        if orig_grad_conv is not None:
+            return orig_grad_conv(*args, **kwargs)
+        return orig_converged(*args, **kwargs)
+
+    irc.step = patched_step
+    irc.converged = patched_converged
+    if orig_grad_conv is not None:
+        irc.gradient_converged = patched_grad_conv
+
+
 def _make_mw_eckart_hessian_function(calc: HipSellaCalculator):
     """Return a callable(atoms)->(3N,3N) Cartesian Hessian that has been
     mass-weighted, Eckart-projected (TR modes removed), and un-mass-weighted
@@ -161,6 +201,7 @@ def run_irc_sella_hip(
                 hessian_function=hess_fn,
             )
             _force_hessian_every_kick(irc.pes)
+            _force_first_kick(irc)
             irc.run(fmax=fmax, steps=max_steps, direction=direction)
             endpoints[direction] = atoms.positions.copy()
         except Exception:
