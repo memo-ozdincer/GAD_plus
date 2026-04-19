@@ -9,6 +9,15 @@
 \usepackage{hyperref}
 \usepackage{subcaption}
 \usepackage{float}
+\usepackage{placeins}
+% Allow more aggressive float placement
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.7}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{3}
+\setcounter{totalnumber}{6}
 
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0em}
@@ -169,7 +178,7 @@ final geometry) confirm the TS is chemically correct?
 
 \subsection*{GAD}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \centering
@@ -205,9 +214,10 @@ but the IRC rate actually drops \emph{slower} than the gate --- at
 69.7\% chemically correct. GAD's ``failures'' are often TSs that are
 almost-good-enough and IRC confirms.
 
+\FloatBarrier
 \subsection*{Sella}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \centering
@@ -242,9 +252,10 @@ tightly or falls \emph{below} it at high noise --- 49\% IRC-TOPO at
 150\,pm (vs 49.7\% gate), 24\% IRC-TOPO at 200\,pm (vs 25.7\% gate).
 When Sella gives up, it gives up on genuinely stuck samples.
 
+\FloatBarrier
 \subsection*{Head-to-head comparison}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \centering
@@ -269,6 +280,7 @@ When Sella gives up, it gives up on genuinely stuck samples.
 
 \newpage
 % =================================================================
+\FloatBarrier
 \section{The Gate-vs-IRC Sample Overlap}
 % =================================================================
 
@@ -276,7 +288,7 @@ When Sella gives up, it gives up on genuinely stuck samples.
 the same sample?} We cross every sample against two independent
 booleans: local-gate-passed and IRC-TOPO-intended.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \includegraphics[width=\textwidth]{figures/fig_gate_vs_irc_gad.pdf}
@@ -327,10 +339,11 @@ twice as many samples recover a valid TS under GAD.
 
 \newpage
 % =================================================================
+\FloatBarrier
 \section{Compute costs}
 % =================================================================
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_walltime_steps.pdf}
 \caption{\textbf{Median wall time (left) and median step count (right)
@@ -339,7 +352,7 @@ sample at low noise (flatter regions of PES, Sella converges in
 $\sim$100 steps) but the ratio shrinks at high noise.}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_step_distributions.pdf}
 \caption{\textbf{Step-count distributions per sample, by noise level.}
@@ -350,6 +363,7 @@ distribution at every noise.}
 
 \newpage
 % =================================================================
+\FloatBarrier
 \section{Supplements and raw data}
 % =================================================================
 
@@ -379,9 +393,10 @@ Sella conv.\% uses $n_{\text{neg}}=1 \wedge f_{\max}<0.01$. The
 run was 259/300 due to timeout; 41 samples never ran, treated as
 non-converged in the 300 denominator).
 
+\FloatBarrier
 \subsection{Strict RMSD criterion ($<0.3$\,\AA)}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \includegraphics[width=\textwidth]{figures/fig_sella_allep_bars_rmsd.pdf}
@@ -398,9 +413,10 @@ than topology; $\sim$30\,pp gap to TOPO, absorbed mostly by ``half-intended''
 (same chemistry, different conformer).}
 \end{figure}
 
+\FloatBarrier
 \subsection{Endpoint vibrational quality}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \includegraphics[width=\textwidth]{figures/fig_sella_allep_bars_endpoint.pdf}
@@ -421,13 +437,14 @@ minimum.}
 \end{figure}
 
 \newpage
+\FloatBarrier
 \subsection{IRC on \emph{converged-only} TSs (the ``high number'' view)}
 
 Filtering the IRC to only the samples that passed the local gate
 recovers the previously-reported 92\% TOPO. This view was the original
 headline before we widened to all-endpoints.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \includegraphics[width=\textwidth]{figures/fig_sella_bars_topo.pdf}
@@ -463,6 +480,7 @@ all     & 1462 & 92.1 & 64.7 & 1319 & 92.2 & 63.7 \\
 \end{tabular}
 \end{center}
 
+\FloatBarrier
 \subsection{Wall time percentiles}
 
 \begin{center}
