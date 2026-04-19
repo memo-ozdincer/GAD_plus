@@ -586,6 +586,103 @@ vibrational quality.}}
       tradeoff.
 \end{itemize}
 
+\section*{Addendum D --- sella\_hip IRC on \emph{all} Sella endpoints (no convergence filter)}
+
+Parallel to Addendum B (all GAD endpoints): drop Sella's own convergence
+filter and run sella\_hip IRC on the final-step coords of every
+\texttt{sella\_cartesian\_eckart\_fmax0p01} run, converged or not.
+Denominator is the full 300-sample universe at each noise level.
+
+\begin{center}
+\begin{tabular}{rrrrrrr}
+\toprule
+Noise & $n$ & TOPO-int\% & RMSD-int\% & TOPO (Sella conv.)\% & $\Delta$TOPO vs conv.\ & wall$_{avg}$ (s) \\
+\midrule
+10\,pm  & 300 & 92.3 & 61.7 & 94.4 & $-2.1$\,pp  & 13.4 \\
+30\,pm  & 300 & 92.0 & 61.7 & 93.6 & $-1.6$\,pp  & 13.5 \\
+50\,pm  & 300 & 89.3 & 60.3 & 94.2 & $-4.9$\,pp  & 14.7 \\
+100\,pm & 300 & 75.7 & 50.3 & 92.8 & $-17.1$\,pp & 17.3 \\
+150\,pm & 300 & 49.0 & 33.0 & 86.8 & $-37.8$\,pp & 17.2 \\
+200\,pm & 300 & 24.0 & 17.0 & 81.9 & $-57.9$\,pp & 20.8 \\
+\midrule
+all     & 1800 & \textbf{70.4} & 47.5 & 92.2 & $-21.8$\,pp & 16.2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_allep_bars_topo.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} Sella-optimized
+endpoints --- bond-graph topology criterion.} Denominator = full 300
+samples at each noise level. Same definition of \emph{intended}.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_allep_bars_rmsd.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} Sella-optimized
+endpoints --- strict RMSD criterion ($<0.3$\,\AA).}}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig_sella_onsella_allep_bars_endpoint.pdf}
+\caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} Sella-optimized
+endpoints --- endpoint vibrational quality.}}
+\end{figure}
+
+\textbf{Sella's local gate is critical at high noise.} The TOPO drop
+from the converged subset to the full 300-sample pool mirrors what we
+saw for GAD in Addendum B, but \emph{stronger}:
+
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+Noise & GAD $\Delta$TOPO & Sella $\Delta$TOPO & GAD conv.\ rate & Sella conv.\ rate \\
+\midrule
+10\,pm  & $-1.7$\,pp  & $-2.1$\,pp  & 94.7\% & 94.7\% \\
+30\,pm  & $-1.6$\,pp  & $-1.6$\,pp  & 94.3\% & 94.3\% \\
+50\,pm  & $-3.4$\,pp  & $-4.9$\,pp  & 92.0\% & 91.3\% \\
+100\,pm & $-7.6$\,pp  & $-17.1$\,pp & 87.3\% & 78.7\% \\
+150\,pm & $-21.0$\,pp & $-37.8$\,pp & 71.3\% & 53.0\% \\
+200\,pm & $-32.5$\,pp & $-57.9$\,pp & 47.7\% & 27.7\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two things are happening in tandem: (1) Sella's convergence rate drops
+much more steeply with noise than GAD's (47.7\% vs 27.7\% at 200\,pm),
+and (2) the unconverged Sella tail is \emph{further} from real TSs
+than the unconverged GAD tail (Sella $\Delta$TOPO is nearly 2$\times$
+GAD's at high noise). The Sella optimizer either finds the TS or stalls
+far from it; GAD degrades more gracefully.
+
+\section*{The Four-Cell Matrix --- Headline Comparison}
+
+Combining all four IRC experiments in one place:
+
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+TS source, filter & $n$ & TOPO-int\% & RMSD-int\% & avg wall (s) & error\% \\
+\midrule
+gad\_dt003, converged only   & 1462 & 92.1 & 64.7 & 11.9 & 0.0 \\
+gad\_dt003, all endpoints    & 1759 & 79.3 & 55.0 & 15.2 & 0.0 \\
+Sella cart+eckart, converged & 1319 & 92.2 & 63.7 & 12.5 & 0.0 \\
+Sella cart+eckart, all endpoints & 1800 & 70.4 & 47.5 & 16.2 & 0.0 \\
+\midrule
+rigorous IRC on gad\_dt003 converged & 1462 & 51.9 & 37.2 & 116.5 & 0.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Per-TS quality is a tie (GAD and Sella both land at $\sim$92\%
+topology); the difference is robustness at high noise --- GAD converges
+on more samples and the samples it fails to converge on are closer
+to valid TSs. The rigorous IRC integrator is the clear outlier; see
+Addendum A for details.
+
 \section*{Summary and Implications}
 
 \begin{itemize}[leftmargin=1.5em]
