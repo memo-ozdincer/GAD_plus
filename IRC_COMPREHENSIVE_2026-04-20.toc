@@ -1,0 +1,22 @@
+\contentsline {section}{\numberline {1}Methodology}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Dataset and noise}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}The five methods}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}IRC validation}{2}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Main Results: Convergence Rates}{3}{section.2}%
+\contentsline {paragraph}{Rank-ordering is strictly preserved across noise.}{3}{section*.3}%
+\contentsline {subsection}{\numberline {2.1}The role of Eckart projection}{4}{subsection.2.1}%
+\contentsline {paragraph}{Interpretation.}{4}{section*.5}%
+\contentsline {subsection}{\numberline {2.2}Sella's coordinate-system dilemma}{4}{subsection.2.2}%
+\contentsline {paragraph}{Why does internal hurt here?}{4}{section*.7}%
+\contentsline {section}{\numberline {3}Compute costs}{5}{section.3}%
+\contentsline {paragraph}{Cross-over point $\approx $100\,pm.}{6}{section*.9}%
+\contentsline {section}{\numberline {4}IRC Validation (existing data)}{7}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Available IRC results}{7}{subsection.4.1}%
+\contentsline {paragraph}{Per-converged-TS IRC success is tied between GAD and Sella ($\sim $92\% TOPO).}{7}{section*.10}%
+\contentsline {paragraph}{Sella 2000-step is not re-validated yet.}{7}{section*.11}%
+\contentsline {paragraph}{Rigorous IRC is a sanity check, not a comparison.}{7}{section*.12}%
+\contentsline {subsection}{\numberline {4.2}Pending IRC runs}{7}{subsection.4.2}%
+\contentsline {section}{\numberline {5}Synthesis}{8}{section.5}%
+\contentsline {subsection}{\numberline {5.1}What the numbers say}{8}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Deliverables that unlocked this analysis}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Data locations}{8}{subsection.5.3}%

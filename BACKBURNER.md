@@ -1,5 +1,25 @@
 # Backburner
 
+## Currently running (2026-04-17, late afternoon)
+
+Three arrays submitted simultaneously (rrg-aspuru, parallel dispatch):
+
+| Job | Contents | Tasks | Wallclock budget |
+|---|---|---|---|
+| **59607720** | GAD 200pm refill (gad_dt003, 300 samples, 2000 steps) | 1 | 8h |
+| **59607721** | GAD no-Eckart sweep (gad_dt003_no_eckart, fmax<0.01, 6 noise × 300) | 6 | 12h |
+| **59607722** | Sella at 2000 steps with coords (internal + cart+eckart, 6 noise each) | 12 | 8h |
+
+Output dirs: `gad_no_eckart/`, `sella_2000/`, `round3/` (for 200pm GAD).
+
+Post-completion: run `sella_hip --all-endpoints` IRC on each new TS set (3 more arrays, ~1h each in parallel).
+
+Going-forward convergence criterion for GAD: `n_neg==1 ∧ fmax<0.01` (matches Sella, fair comparison). Historical gad_dt003 data keeps its old `n_neg==1 ∧ force_norm<0.01` gate; we can retroactively compute fmax from traj parquets if needed.
+
+---
+
+
+
 Deferred items. Move into `EXPERIMENT_LOG.md` / `HANDOFF_*.md` when picked up.
 
 ---

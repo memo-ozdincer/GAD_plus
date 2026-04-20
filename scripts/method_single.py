@@ -121,6 +121,18 @@ METHOD_CONFIGS = {
     ),
     # A2: Smaller fixed dt
     "gad_dt003": dict(runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35),
+    # New 2026-04-17: gad_dt003 without Eckart projection (use raw Hessian eigvec for GAD dynamics).
+    # Convergence uses fmax (matches Sella's criterion for fair comparison).
+    "gad_dt003_no_eckart": dict(
+        runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35,
+        use_projection=False,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    # gad_dt003 with the new fmax-based criterion (same dynamics as gad_dt003, different gate)
+    "gad_dt003_fmax": dict(
+        runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
     # A3: Clamping extremes
     "gad_no_clamp": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=999.0),
     # A4: Adaptive dt with floor fix
@@ -343,7 +355,7 @@ def main():
             n_steps=args.n_steps,
             dt=mcfg["dt"],
             k_track=mcfg["k_track"],
-            use_projection=True,
+            use_projection=mcfg.get("use_projection", True),
             use_adaptive_dt=mcfg.get("adaptive", False),
             dt_min=mcfg.get("dt_min", 1e-4),
             dt_max=mcfg.get("dt_max", 0.05),

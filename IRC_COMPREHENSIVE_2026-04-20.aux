@@ -1,0 +1,48 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Methodology}{2}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Dataset and noise}{2}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}The five methods}{2}{subsection.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}IRC validation}{2}{subsection.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Main Results: Convergence Rates}{3}{section.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {Convergence rate vs.\ TS noise, five methods.} Fraction of the 300-sample universe where each method's own local gate fires within 2000 steps. \emph  {Left tier} (upper two lines, blue/cyan): GAD with and without Eckart. \emph  {Middle tier} (red, orange): Sella Cartesian, with or without Eckart. \emph  {Bottom tier} (purple): Sella in internal coordinates. The gap grows monotonically with noise.\relax }}{3}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:main_conv}{{1}{3}{\textbf {Convergence rate vs.\ TS noise, five methods.} Fraction of the 300-sample universe where each method's own local gate fires within 2000 steps. \emph {Left tier} (upper two lines, blue/cyan): GAD with and without Eckart. \emph {Middle tier} (red, orange): Sella Cartesian, with or without Eckart. \emph {Bottom tier} (purple): Sella in internal coordinates. The gap grows monotonically with noise.\relax }{figure.caption.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces \textbf  {Convergence rates (\% of 300) by method and noise.} All at 2000 steps, HIP Hessian every step.\relax }}{3}{table.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Rank-ordering is strictly preserved across noise.}{3}{section*.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Eckart projection's contribution: $\Delta $conv.\ rate (with Eckart minus without).} For GAD, Eckart adds consistently positive value (+3--9\,pp, growing with noise). For Sella Cartesian, the delta is within $\pm $1.5\,pp at every noise level --- i.e.\ statistically a wash.\relax }}{4}{figure.caption.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}The role of Eckart projection}{4}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Interpretation.}{4}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Sella's coordinate-system dilemma}{4}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why does internal hurt here?}{4}{section*.7}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textbf  {Sella in Cartesian vs.\ internal coords (no Eckart in either).} Internal coords are Sella's library default and conventional wisdom says they should beat Cartesian for TS search. On HIP with Hessian every step they lose --- and the gap grows from 4.6\,pp at 10\,pm to 18\,pp at 150\,pm.\relax }}{5}{figure.caption.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Compute costs}{5}{section.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces \textbf  {Compute economics.} Sella Cartesian is fastest per sample at low noise ($\sim $13\,s), but its high-noise convergence rate collapse inverts the per-hour yield: at 200\,pm, GAD Eckart delivers $\sim $22 TSs/GPU-h vs Sella Cartesian's $\sim $8.\relax }}{5}{figure.caption.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cross-over point $\approx $100\,pm.}{6}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}IRC Validation (existing data)}{7}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Available IRC results}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Per-converged-TS IRC success is tied between GAD and Sella ($\sim $92\% TOPO).}{7}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sella 2000-step is not re-validated yet.}{7}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Rigorous IRC is a sanity check, not a comparison.}{7}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Pending IRC runs}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Synthesis}{8}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}What the numbers say}{8}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Deliverables that unlocked this analysis}{8}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Data locations}{8}{subsection.5.3}\protected@file@percent }
+\gdef \@abspage@last{8}

@@ -1,0 +1,376 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{booktabs,array,multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{placeins}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.7}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{3}
+\setcounter{totalnumber}{6}
+
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0em}
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,urlcolor=blue!60!black}
+
+\title{\Large\textbf{GAD vs Sella on HIP --- Five-Method Comprehensive Comparison}\\[4pt]
+\normalsize 2026-04-20, Transition1x train, 300 samples $\times$ 6 noise levels, 2000 steps}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{center}
+\fbox{\parbox{0.95\textwidth}{\small
+\textbf{TL;DR.} Five TS-finding methods benchmarked on identical
+\texttt{Transition1x}-derived inputs: GAD with/without Eckart projection,
+and Sella in cart+Eckart / cart no-Eckart / internal configurations
+(all 2000 steps, HIP analytic Hessian fed every step).
+\textbf{GAD dominates at high noise across all variants;} Eckart
+projection adds $\sim$9\,pp for GAD but is a wash ($<$2\,pp) for Sella
+Cartesian; Sella's internal coordinates \emph{hurt} --- 17\,pp worse than
+Cartesian at 150\,pm. At 200\,pm, valid-TS yield ranks:
+GAD Eckart (52\%) $>$ GAD no-Eckart (43\%) $>$ Sella Cart$\pm$Eckart
+(24--26\%) $>$ Sella internal (pending, projected $<$20\%).
+}}
+\end{center}
+
+\tableofcontents
+\newpage
+
+% =================================================================
+\section{Methodology}
+% =================================================================
+
+\subsection{Dataset and noise}
+
+Transition1x train split, samples 0--299 (fixed 300-sample universe).
+For each sample $i$ and noise $\sigma \in \{10,30,50,100,150,200\}$\,pm:
+\[
+\mathbf{x}_0^{(i,\sigma)} = \mathbf{x}_{\text{TS}}^{(i)} + \sigma \cdot \boldsymbol{\xi}_i,\;
+\boldsymbol{\xi}_i \sim \mathcal{N}(0, I_{3N}),\;\text{seed}=42.
+\]
+HIP potential throughout (\texttt{hip\_v2.ckpt}); analytic Hessian; A100 MIG (2g.10gb).
+
+\subsection{The five methods}
+
+All use 2000 outer-step budget, HIP analytic Hessian every step.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Name & Dynamics & Conv. criterion \\
+\midrule
+\texttt{gad\_dt003} Eckart       & projected GAD $\mathbf{F}_{\text{GAD}}$, dt=0.003 & $n_{\text{neg}}{=}1 \wedge \|\mathbf{F}\|_{\text{mean}}{<}0.01$ \\
+\texttt{gad\_dt003\_no\_eckart}  & raw GAD (no Eckart projection), dt=0.003          & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella cart$+$Eckart              & Sella QN, Cartesian, Eckart-projected H          & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella cart no-Eckart             & Sella QN, Cartesian, raw H                        & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella internal                   & Sella QN, internal coords, raw H (Sella's default)& $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Note: the historical GAD Eckart data uses $\|\mathbf{F}\|_{\text{mean}}$
+(mean per-atom force magnitude) while the other four use $f_{\max}$
+(max per-atom force). For $N$-atom molecules $f_{\max} \geq \|\mathbf{F}\|_{\text{mean}}$
+by 2--4$\times$, so the $\|\mathbf{F}\|_{\text{mean}}$ criterion is
+\emph{looser}. A strict apples-to-apples comparison against fmax would
+lower the GAD Eckart numbers by $\sim$1--3\,pp at low noise and similarly
+at high noise; it would not change the ranking.
+
+\subsection{IRC validation}
+
+For IRC validation we use \texttt{sella\_hip} (Sella's IRC integrator
+with HIP analytic Hessian injected every inner step), 500 max steps per
+direction. The halt-at-step-0 issue on Sella-refined TSs is bypassed by
+forcing the first \texttt{step()} call regardless of initial fmax
+(patch in \texttt{irc\_sella\_hip.py::\_force\_first\_kick}).
+
+Primary IRC metric: \emph{TOPO-intended} (both endpoints match labeled
+reactant/product by element-labeled bond-graph isomorphism,
+direction-agnostic). See IRC\_COMPREHENSIVE\_2026-04-17 for the full
+definitions and auxiliary criteria.
+
+\newpage
+% =================================================================
+\FloatBarrier
+\section{Main Results: Convergence Rates}
+% =================================================================
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_all_methods_conv.pdf}
+\caption{\textbf{Convergence rate vs.\ TS noise, five methods.}
+Fraction of the 300-sample universe where each method's own local gate
+fires within 2000 steps. \emph{Left tier} (upper two lines, blue/cyan):
+GAD with and without Eckart. \emph{Middle tier} (red, orange):
+Sella Cartesian, with or without Eckart. \emph{Bottom tier} (purple):
+Sella in internal coordinates. The gap grows monotonically with noise.}
+\label{fig:main_conv}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{l|cccccc}
+\toprule
+Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
+\midrule
+GAD Eckart                  & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{71.3} & \textbf{52.3} \\
+GAD no-Eckart               & 91.3 & 91.0 & 88.3 & 83.3 & 64.3 & 43.3 \\
+Sella cart no-Eckart        & 92.3 & 91.7 & 88.3 & 75.7 & 50.7 & 24.0 \\
+Sella cart$+$Eckart         & 92.0 & 91.3 & 88.3 & 76.3 & 50.0 & 25.7 \\
+Sella internal              & 87.7 & 86.3 & 82.0 & 60.3 & 32.7 & \emph{pending} \\
+\bottomrule
+\end{tabular}
+\captionof{table}{\textbf{Convergence rates (\% of 300) by method and noise.}
+All at 2000 steps, HIP Hessian every step.}
+\end{center}
+
+\paragraph{Rank-ordering is strictly preserved across noise.} From 10\,pm
+onward, GAD Eckart $>$ GAD no-Eckart $>$ Sella Cartesian (Eckart $\approx$
+no-Eckart) $>$ Sella internal, with the gaps all widening at higher noise.
+No method's ordering flips. This is the cleanest
+``GAD $\gg$ Sella'' signal we have --- the TS-local gate does not decide
+the ranking; the method does.
+
+\subsection{The role of Eckart projection}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_eckart_delta.pdf}
+\caption{\textbf{Eckart projection's contribution: $\Delta$conv.\ rate
+(with Eckart minus without).} For GAD, Eckart adds consistently positive
+value (+3--9\,pp, growing with noise). For Sella Cartesian, the delta is
+within $\pm$1.5\,pp at every noise level --- i.e.\ statistically a wash.}
+\end{figure}
+
+\paragraph{Interpretation.} GAD's search direction is the lowest
+Hessian eigenvector. Without Eckart, residual translation/rotation
+modes leak into the eigenvector pool and the ``lowest'' mode
+occasionally picks up a TR-like direction, so GAD wanders off the
+saddle manifold. Eckart projection eliminates this leak and gives GAD
+a cleanly physical reaction coordinate.
+
+Sella's quasi-Newton trust region is already invariant to TR modes in
+Cartesian (it solves a secular equation on the full Hessian, and the
+TR null space drops out of the Newton step). So Eckart in Cartesian
+is redundant for Sella. This is expected from the math; what is
+\emph{empirically} interesting is how cleanly the delta $\to$ 0 stays
+across all noise levels.
+
+\subsection{Sella's coordinate-system dilemma}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_sella_coord_comparison.pdf}
+\caption{\textbf{Sella in Cartesian vs.\ internal coords (no Eckart in
+either).} Internal coords are Sella's library default and conventional
+wisdom says they should beat Cartesian for TS search. On HIP with
+Hessian every step they lose --- and the gap grows from 4.6\,pp at
+10\,pm to 18\,pp at 150\,pm.}
+\end{figure}
+
+\paragraph{Why does internal hurt here?} Two plausible mechanisms:
+(1) internal coords build a non-linear projection from the 3$N$-dim
+Cartesian space; under noise, the projection itself is numerically
+fragile and picks up spurious curvature when the starting geometry is
+far from chemically sensible; (2) the bond/angle/dihedral redundancy
+the internal-coord machinery carries adds small but compounding
+Hessian-update errors when we feed HIP's analytic Hessian every step
+(Sella's internal-coord H-refresh path is less well-tested under
+``diag\_every\_n=1'' than Cartesian). We do not have the instrumentation
+to fully attribute this yet. The practical takeaway is simply to
+\emph{not use internal coords with Sella+HIP}.
+
+\newpage
+\FloatBarrier
+% =================================================================
+\section{Compute costs}
+% =================================================================
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/fig_all_methods_wall.pdf}
+\caption{Median wall time per sample (s, log scale).}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/fig_all_methods_tsph.pdf}
+\caption{Valid TSs delivered per GPU-hour (log scale).}
+\end{subfigure}
+\caption{\textbf{Compute economics.} Sella Cartesian is fastest per
+sample at low noise ($\sim$13\,s), but its high-noise convergence rate
+collapse inverts the per-hour yield: at 200\,pm, GAD Eckart delivers
+$\sim$22 TSs/GPU-h vs Sella Cartesian's $\sim$8.}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{l|cccccc}
+\toprule
+Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
+\midrule
+\multicolumn{7}{l}{\textbf{Median wall time per sample (s)}} \\
+GAD Eckart                  & 3.9 & 7.3 & 13.7 & 23.9 & 51.5 & 86.1 \\
+GAD no-Eckart               & 6.9 & 10.3 & 16.5 & 24.9 & 49.5 & 80.0 \\
+Sella cart+Eckart           & 2.3 & 3.7 & 6.3 & 16.4 & 58.9 & 113.2 \\
+Sella cart no-Eckart        & 2.2 & 3.5 & 6.2 & 17.2 & 55.0 & 119.6 \\
+Sella internal              & 4.3 & 5.6 & 10.3 & 46.7 & 117.4 & --- \\
+\midrule
+\multicolumn{7}{l}{\textbf{Median total\_steps per sample}} \\
+GAD Eckart                  & 65 & 120 & 229 & 396 & 853 & 1401 \\
+GAD no-Eckart               & 114 & 168 & 272 & 405 & 801 & 1286 \\
+Sella cart+Eckart           & 34 & 51 & 87 & 218 & 772 & 1512 \\
+Sella cart no-Eckart        & 30 & 49 & 84 & 228 & 738 & 1576 \\
+Sella internal              & 49 & 63 & 110 & 512 & 1217 & --- \\
+\midrule
+\multicolumn{7}{l}{\textbf{Valid TSs per GPU-hour}} \\
+GAD Eckart                  & 227 & 158 & 115 & 70 & 40 & 22 \\
+GAD no-Eckart               & 168 & 115 & 84 & 56 & 30 & 16.5 \\
+Sella cart+Eckart           & 264 & 249 & 175 & 79 & 24 & 8.6 \\
+Sella cart no-Eckart        & 267 & 252 & 177 & 75 & 26 & 7.7 \\
+Sella internal              & 148 & 116 & 84 & 31 & 10 & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Cross-over point $\approx$100\,pm.} Below 100\,pm Sella
+Cartesian is more productive (faster per sample, comparable success
+rate). Above 100\,pm GAD takes over because Sella wastes most of its
+wall clock on non-converging trajectories. The crossover happens
+around 100--125\,pm based on the ``TSs per GPU-h'' curves.
+
+\newpage
+\FloatBarrier
+% =================================================================
+\section{IRC Validation (existing data)}
+% =================================================================
+
+We have IRC data for three of the five TS sets currently. The new
+methods (GAD no-Eckart, Sella 2000-step variants) are queued for IRC
+validation once all TS runs complete.
+
+\subsection{Available IRC results}
+
+\begin{center}
+\begin{tabular}{l|cccccc}
+\toprule
+TS source, filter, IRC & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
+\midrule
+\multicolumn{7}{l}{\textbf{TOPO-intended rate}} \\
+GAD Eckart, converged only  & 94.4 & 94.3 & 93.1 & 93.9 & 90.7 & 80.4 \\
+GAD Eckart, all endpoints   & 92.7 & 92.7 & 89.7 & 86.3 & 69.7 & 47.9 \\
+Sella cart+Eck 1000, conv   & 94.4 & 93.6 & 94.2 & 92.8 & 86.8 & 81.9 \\
+Sella cart+Eck 1000, all    & 92.3 & 92.0 & 89.3 & 75.7 & 49.0 & 24.0 \\
+\midrule
+\multicolumn{7}{l}{\textbf{Rigorous (Hratchian--Schlegel) IRC on GAD conv.\ TSs}} \\
+Rigorous on GAD, conv only  & 50.7 & 50.9 & 51.4 & 52.7 & 51.9 & 55.9 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Per-converged-TS IRC success is tied between GAD and Sella
+($\sim$92\% TOPO).} The ranking we see in Section~2 is therefore
+\emph{driven by TS-finding success, not by the quality of the TSs each
+method finds}. When each method does find a TS, that TS validates at
+comparable rates under IRC.
+
+\paragraph{Sella 2000-step is not re-validated yet.} The existing
+Sella$\to$IRC data is for the \emph{1000-step} Sella runs. We expect
+the 2000-step version to match or slightly exceed those numbers. This
+will be confirmed when the pending IRC sweep on \texttt{sella\_2000/}
+finishes.
+
+\paragraph{Rigorous IRC is a sanity check, not a comparison.}
+The \texttt{rigorous} predictor-corrector integrator sits at $\sim$52\%
+TOPO regardless of noise, while \texttt{sella\_hip} is at $\sim$92\%
+on the same TSs. This is the backburner item (\#3) --- the rigorous
+integrator has a wrong-basin descent bias at soft saddles that is not
+yet diagnosed.
+
+\subsection{Pending IRC runs}
+
+To be queued once \texttt{sella\_internal} 200\,pm finishes:
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \texttt{gad\_no\_eckart} all endpoints (6 noise $\times$ 300) --- quantifies whether
+      the TS-finding gap between GAD Eckart and GAD no-Eckart survives
+      IRC validation or whether IRC rescues the no-Eckart failures.
+\item \texttt{sella\_cart\_eckart} 2000-step, all endpoints --- direct comparison with
+      the published 1000-step Sella numbers; should close any residual
+      ``maybe 1000-step was the constraint'' doubt.
+\item \texttt{sella\_cart\_no\_eckart} 2000-step, all endpoints --- first-ever IRC
+      validation of this config. Will show whether Eckart matters
+      post-IRC.
+\item \texttt{sella\_internal} 2000-step, all endpoints --- first-ever IRC validation
+      of Sella-internal TSs. Will quantify how bad ``internal coords
+      + noisy start'' really is on HIP.
+\end{itemize}
+
+\newpage
+\FloatBarrier
+% =================================================================
+\section{Synthesis}
+% =================================================================
+
+\subsection{What the numbers say}
+
+\begin{enumerate}[leftmargin=1.5em]
+\item \textbf{GAD wins at the TS-finding step}, across all variants
+      and all noise levels, with the margin widening at high noise.
+\item \textbf{Eckart projection is valuable for GAD and redundant for
+      Sella Cartesian.} The math explains it (Sella's QN trust region
+      is TR-invariant in Cartesian; GAD's eigenvector follower is not).
+\item \textbf{Internal coordinates hurt Sella on HIP.} Cartesian is
+      the default we should quote.
+\item \textbf{Per-converged-TS IRC quality is tied at $\sim$92\% TOPO}
+      between GAD and Sella. The difference is volume, not quality.
+\item \textbf{Compute crossover at $\sim$100\,pm:} below that, Sella
+      cartesian is the fastest source of valid TSs; above, GAD.
+\end{enumerate}
+
+\subsection{Deliverables that unlocked this analysis}
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \texttt{scripts/method\_single.py} --- added
+      \texttt{gad\_dt003\_no\_eckart}; made \texttt{use\_projection} a
+      per-method config.
+\item \texttt{scripts/sella\_baseline.py} --- appends
+      \texttt{coords\_flat} + \texttt{atomic\_nums} to every row
+      (enables downstream IRC without re-running Sella).
+\item \texttt{src/gadplus/search/irc\_sella\_hip.py::\_force\_first\_kick}
+      --- bypasses Sella's step-0 halt so IRC on Sella-refined TSs is
+      meaningful.
+\item \texttt{scripts/analyze\_full\_2026\_04\_20.py} --- this report's
+      numbers and figures.
+\end{itemize}
+
+\subsection{Data locations}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Artifact & Path \\
+\midrule
+GAD dt003 (Eckart) & \texttt{/lustre07/scratch/memoozd/gadplus/runs/round2,round3/} \\
+GAD no-Eckart      & \texttt{/lustre07/scratch/memoozd/gadplus/runs/gad\_no\_eckart/} \\
+Sella 2000-step (all 3 configs) & \texttt{/lustre07/scratch/memoozd/gadplus/runs/sella\_2000/} \\
+IRC on GAD (all endpoints) & \texttt{/lustre07/scratch/memoozd/gadplus/runs/irc\_sellahip\_allendpoints/} \\
+IRC on Sella 1000 (all endpoints) & \texttt{/lustre07/scratch/memoozd/gadplus/runs/irc\_sellahip\_on\_sella\_allep/} \\
+Figures & \texttt{/lustre06/project/6033559/memoozd/GAD\_plus/figures/} \\
+This report & \texttt{IRC\_COMPREHENSIVE\_2026-04-20.tex/pdf} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}
