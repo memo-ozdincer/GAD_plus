@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  20 APR 2026 11:58
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  20 APR 2026 14:37
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -568,7 +568,7 @@ GAD
 
 {/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
 tex/updmap/pdftex.map}] [2]
-<figures/fig_all_methods_conv.pdf, id=84, 531.40408pt x 351.94737pt>
+<figures/fig_all_methods_conv.pdf, id=99, 531.40408pt x 351.94737pt>
 File: figures/fig_all_methods_conv.pdf Graphic file (type pdf)
 <use figures/fig_all_methods_conv.pdf>
 Package pdftex.def Info: figures/fig_all_methods_conv.pdf  used on input line 1
@@ -580,26 +580,26 @@ Package caption Warning: The option `hypcap=true' will be ignored for this
 (caption)                particular \caption on input line 136.
 See the caption package documentation for explanation.
 
-<figures/fig_eckart_delta.pdf, id=85, 490.63298pt x 324.12343pt>
+<figures/fig_eckart_delta.pdf, id=100, 490.63298pt x 324.12343pt>
 File: figures/fig_eckart_delta.pdf Graphic file (type pdf)
 <use figures/fig_eckart_delta.pdf>
 Package pdftex.def Info: figures/fig_eckart_delta.pdf  used on input line 150.
 (pdftex.def)             Requested size: 417.72285pt x 275.95625pt.
 [3 <./figures/fig_all_methods_conv.pdf>]
-<figures/fig_sella_coord_comparison.pdf, id=139, 503.39943pt x 324.12343pt>
+<figures/fig_sella_coord_comparison.pdf, id=154, 503.39943pt x 324.12343pt>
 File: figures/fig_sella_coord_comparison.pdf Graphic file (type pdf)
 <use figures/fig_sella_coord_comparison.pdf>
 Package pdftex.def Info: figures/fig_sella_coord_comparison.pdf  used on input 
 line 175.
 (pdftex.def)             Requested size: 417.72285pt x 268.96796pt.
  [4 <./figures/fig_eckart_delta.pdf>]
-<figures/fig_all_methods_wall.pdf, id=192, 530.32191pt x 324.12343pt>
+<figures/fig_all_methods_wall.pdf, id=207, 530.32191pt x 324.12343pt>
 File: figures/fig_all_methods_wall.pdf Graphic file (type pdf)
 <use figures/fig_all_methods_wall.pdf>
 Package pdftex.def Info: figures/fig_all_methods_wall.pdf  used on input line 2
 04.
 (pdftex.def)             Requested size: 240.80591pt x 147.17468pt.
-<figures/fig_all_methods_tsph.pdf, id=193, 530.32191pt x 324.12343pt>
+<figures/fig_all_methods_tsph.pdf, id=208, 530.32191pt x 324.12343pt>
 File: figures/fig_all_methods_tsph.pdf Graphic file (type pdf)
 <use figures/fig_all_methods_tsph.pdf>
 Package pdftex.def Info: figures/fig_all_methods_tsph.pdf  used on input line 2
@@ -618,10 +618,10 @@ anged.
 (rerunfilecheck)             Checksum: E1AB90E84E9C7526E424607419072115;2457.
  ) 
 Here is how much of TeX's memory you used:
- 11737 strings out of 480884
- 182208 string characters out of 5900692
+ 11739 strings out of 480884
+ 182244 string characters out of 5900692
  482790 words of memory out of 5000000
- 28767 multiletter control sequences out of 15000+600000
+ 28769 multiletter control sequences out of 15000+600000
  418206 words of font info for 82 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
  71i,11n,74p,591b,525s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -646,14 +646,7 @@ e1/public/amsfonts/cm/cmti10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-
 64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/so
 ft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/publ
 ic/cm-super/sfrm1095.pfb>
-Output written on IRC_COMPREHENSIVE_2026-04-20.pdf (8 pages, 249435 bytes).
-PDF statistics:
- 406 PDF objects out of 1000 (max. 8388607)
- 185 compressed objects within 2 object streams
- 42 named destinations out of 1000 (max. 500000)
- 146 words of extra memory for PDF output out of 10000 (max. 10000000)
-
-_2026-04-20.pdf (8 pages, 250573 bytes).
+Output written on IRC_COMPREHENSIVE_2026-04-20.pdf (8 pages, 250573 bytes).
 PDF statistics:
  421 PDF objects out of 1000 (max. 8388607)
  200 compressed objects within 2 object streams
