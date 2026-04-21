@@ -15,8 +15,8 @@
 \contentsline {section}{\numberline {4}Gate vs IRC Sample Overlap}{9}{section.4}%
 \contentsline {section}{\numberline {5}Compute Costs}{10}{section.5}%
 \contentsline {section}{\numberline {6}Appendix}{11}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Per-method bar charts: RMSD and endpoint vibrational quality}{11}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}All-three-classes line charts (cluttered, appendix only)}{13}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}Sella IRC halt-at-step-0 fix}{14}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}Data locations}{14}{subsection.6.4}%
-\contentsline {subsection}{\numberline {6.5}Open items}{14}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.1}Per-method bar charts: RMSD and endpoint vibrational quality}{12}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}All-three-classes line charts (cluttered, appendix only)}{14}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Sella IRC halt-at-step-0 fix}{15}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Data locations}{15}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Open items}{15}{subsection.6.5}%
