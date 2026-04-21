@@ -119,14 +119,14 @@ Every endpoint pair is scored against the labeled
 See the 2026-04-17 report for the full boolean formulas.
 
 \newpage
-\FloatBarrier
+\clearpage
 % =================================================================
 \section{Main Results}
 % =================================================================
 
 \subsection{Five-method comparisons (headline)}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_cmp_conv_5methods.pdf}
@@ -205,7 +205,7 @@ level. The ``Eckart is the main unlock'' story from Round~1 was dominated
 by step-budget effects (see §\ref{sec:eckart_deep}).
 
 \newpage
-\FloatBarrier
+\clearpage
 \subsection{Per-method breakdown: local gate + IRC side-by-side}
 
 For each method we show the raw convergence-rate line chart (method's
@@ -213,7 +213,7 @@ native gate) next to the IRC-TOPO proportional stacked bar chart
 (intended / half / unintended). Denominator is always 300 samples per
 noise cell (\emph{not} converged-only).
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_method_gad_eckart_conv_line.pdf}
@@ -230,7 +230,7 @@ Right: \texttt{sella\_hip} IRC TOPO outcome on every sample's final geometry.
 Labels on bars are percentages of the 300-sample universe.}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_method_gad_no_eckart_conv_line.pdf}
@@ -245,7 +245,7 @@ Labels on bars are percentages of the 300-sample universe.}
 Eckart projection removed from dynamics; local gate uses fmax.}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_method_sella_carte_2k_conv_line.pdf}
@@ -259,7 +259,7 @@ Eckart projection removed from dynamics; local gate uses fmax.}
 \caption{\textbf{Sella cartesian + Eckart, 2000 steps, HIP Hessian every step.}}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_method_sella_cart_2k_conv_line.pdf}
@@ -273,7 +273,7 @@ Eckart projection removed from dynamics; local gate uses fmax.}
 \caption{\textbf{Sella cartesian, no Eckart, 2000 steps, HIP Hessian every step.}}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.495\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_method_sella_int_2k_conv_line.pdf}
@@ -290,7 +290,7 @@ intrinsically), 2000 steps, HIP Hessian every step.}
 \end{figure}
 
 \newpage
-\FloatBarrier
+\clearpage
 % =================================================================
 \section{The Eckart Story (re-examined)}
 \label{sec:eckart_deep}
@@ -356,7 +356,7 @@ is \textbf{``projected dynamics + enough steps''}, not ``Eckart is
 magic''.
 
 \newpage
-\FloatBarrier
+\clearpage
 % =================================================================
 \section{Gate vs IRC Sample Overlap}
 % =================================================================
@@ -365,7 +365,7 @@ For each method and noise level, every sample falls into one of four
 quadrants: \{local gate pass, IRC TOPO pass\}. This quantifies whether
 a method's ``converged'' label agrees with IRC's verdict.
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_gate_vs_irc_gad_eckart.pdf}
@@ -401,7 +401,7 @@ for Sella and internal; stays small for GAD.}
 \end{figure}
 
 \newpage
-\FloatBarrier
+\clearpage
 % =================================================================
 \section{Compute Costs}
 % =================================================================
@@ -445,14 +445,14 @@ dominates per-hour yield.
 \section{Appendix}
 % =================================================================
 
-\FloatBarrier
+\clearpage
 \subsection{Per-method bar charts: RMSD and endpoint vibrational quality}
 
 Three criteria per method: TOPO (already shown in §2.2), strict RMSD
 ($<0.3$\,\AA), endpoint vibrational quality (both / one / neither at
 vibrational minimum).
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_sella_allep_bars_rmsd.pdf}
@@ -482,7 +482,7 @@ vibrational minimum).
 Denominator = 300 samples per cell.}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
 \includegraphics[width=\textwidth]{figures/fig_sella_allep_bars_endpoint.pdf}
@@ -514,13 +514,13 @@ neither IRC endpoint reaches a true minimum
 \end{figure}
 
 \newpage
-\FloatBarrier
+\clearpage
 \subsection{All-three-classes line charts (cluttered, appendix only)}
 
 The main narrative uses ``intended only'' lines for readability. For
 completeness, the ``intended + half + unintended'' breakdown per method:
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_cmp_irc_topo_all_classes_5methods.pdf}
 \caption{\textbf{IRC TOPO outcomes --- all three classes, all five
@@ -529,14 +529,14 @@ dotted = unintended. Cluttered on purpose; see §2.1 for the uncluttered
 headline view.}
 \end{figure}
 
-\begin{figure}[!htbp]
+\\begin{figure}[H]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf}
 \caption{\textbf{IRC strict-RMSD outcomes --- all three classes, all
 five methods.} Same layout, RMSD criterion ($<0.3$\,\AA).}
 \end{figure}
 
-\FloatBarrier
+\clearpage
 \subsection{Sella IRC halt-at-step-0 fix}
 
 Initial Sella$\to$IRC runs on Sella-refined TSs returned trivial
