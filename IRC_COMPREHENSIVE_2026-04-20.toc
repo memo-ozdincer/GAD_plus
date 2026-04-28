@@ -1,22 +1,23 @@
-\contentsline {section}{\numberline {1}Methodology}{2}{section.1}%
-\contentsline {subsection}{\numberline {1.1}Dataset and noise}{2}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}The five methods}{2}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}IRC validation}{2}{subsection.1.3}%
-\contentsline {section}{\numberline {2}Main Results}{3}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Five-method comparisons (headline)}{3}{subsection.2.1}%
-\contentsline {paragraph}{Observation 1: IRC rescues a handful of non-converged samples for GAD.}{3}{section*.3}%
-\contentsline {paragraph}{Observation 2: Sella's IRC rate drops \emph {below} its local gate at mid-high noise.}{4}{section*.4}%
-\contentsline {paragraph}{Observation 3: Eckart matters much less than Round\nobreakspace {}1 reported.}{4}{section*.5}%
-\contentsline {subsection}{\numberline {2.2}Per-method breakdown: local gate + IRC side-by-side}{5}{subsection.2.2}%
-\contentsline {section}{\numberline {3}The Eckart Story (re-examined)}{8}{section.3}%
-\contentsline {paragraph}{Constant $\sim $1.33$\times $ ratio across noise.}{8}{section*.11}%
-\contentsline {paragraph}{Why Round\nobreakspace {}1 looked catastrophic for no-Eckart.}{8}{section*.12}%
-\contentsline {paragraph}{Corrected narrative.}{8}{section*.13}%
-\contentsline {section}{\numberline {4}Gate vs IRC Sample Overlap}{9}{section.4}%
-\contentsline {section}{\numberline {5}Compute Costs}{10}{section.5}%
-\contentsline {section}{\numberline {6}Appendix}{11}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Per-method bar charts: RMSD and endpoint vibrational quality}{12}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}All-three-classes line charts (cluttered, appendix only)}{14}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}Sella IRC halt-at-step-0 fix}{15}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}Data locations}{15}{subsection.6.4}%
-\contentsline {subsection}{\numberline {6.5}Open items}{15}{subsection.6.5}%
+\contentsline {section}{\numberline {1}Methodology}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Dataset and noise}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}The five methods}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}IRC validation}{4}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Main Results}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Five-method comparisons (headline)}{5}{subsection.2.1}%
+\contentsline {paragraph}{Observation 1: IRC rescues a handful of non-converged samples for GAD.}{6}{section*.4}%
+\contentsline {paragraph}{Observation 2: Sella's IRC rate drops \emph {below} its local gate at mid-high noise.}{6}{section*.5}%
+\contentsline {paragraph}{Observation 3: Eckart matters much less than Round\nobreakspace {}1 reported.}{6}{section*.6}%
+\contentsline {subsection}{\numberline {2.2}Per-method breakdown: local gate + IRC side-by-side}{7}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Eckart vs no-Eckart --- Brief Note (full deep-dive in Appendix)}{10}{section.3}%
+\contentsline {section}{\numberline {4}Gate vs IRC Sample Overlap}{11}{section.4}%
+\contentsline {section}{\numberline {5}Compute Costs}{12}{section.5}%
+\contentsline {section}{\numberline {6}Appendix}{13}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Per-method bar charts: RMSD and endpoint vibrational quality}{14}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}All-three-classes line charts (cluttered, appendix only)}{16}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Deep dive: Eckart vs no-Eckart}{17}{subsection.6.3}%
+\contentsline {paragraph}{Setup.}{17}{section*.17}%
+\contentsline {subsection}{\numberline {6.4}$f_{\qopname \relax m{max}}$ vs $\|\mathbf {F}\|_{\text {mean}}$ gate --- brief comparison}{23}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Backfill: IRC on \texttt {gad\_dt002} and \texttt {gad\_projected} (2026-04-28)}{24}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Sella IRC halt-at-step-0 fix}{25}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}Data locations}{25}{subsection.6.7}%
+\contentsline {subsection}{\numberline {6.8}Open items}{25}{subsection.6.8}%

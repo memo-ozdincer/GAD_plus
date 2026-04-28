@@ -1,22 +1,22 @@
-\contentsline {section}{\numberline {1}Methodology}{2}{section.1}%
-\contentsline {subsection}{\numberline {1.1}Dataset and noise}{2}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}GAD (gad\_dt003)}{2}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}Sella (cartesian + Eckart)}{2}{subsection.1.3}%
-\contentsline {subsection}{\numberline {1.4}IRC (sella\_hip)}{2}{subsection.1.4}%
-\contentsline {subsection}{\numberline {1.5}IRC validation criteria}{3}{subsection.1.5}%
-\contentsline {section}{\numberline {2}Main Results}{4}{section.2}%
-\contentsline {section}{\numberline {3}The Gate-vs-IRC Sample Overlap}{6}{section.3}%
-\contentsline {section}{\numberline {4}Compute costs}{7}{section.4}%
-\contentsline {section}{\numberline {5}Supplements and raw data}{8}{section.5}%
-\contentsline {subsection}{\numberline {5.1}Raw convergence and IRC-TOPO numbers}{8}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Strict RMSD criterion ($<0.3$\,\r A)}{8}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Endpoint vibrational quality}{8}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}IRC on \emph {converged-only} TSs (the ``high number'' view)}{9}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}Wall time percentiles}{10}{subsection.5.5}%
-\contentsline {subsection}{\numberline {5.6}``GAD degrades gracefully, Sella stalls''}{10}{subsection.5.6}%
-\contentsline {subsection}{\numberline {5.7}Systematic-failure samples (GAD, converged-only analysis)}{10}{subsection.5.7}%
-\contentsline {subsection}{\numberline {5.8}Per-formula difficulty (GAD converged-only IRC)}{11}{subsection.5.8}%
-\contentsline {subsection}{\numberline {5.9}Rigorous (Hratchian--Schlegel predictor-corrector) IRC --- the counter-example}{11}{subsection.5.9}%
-\contentsline {subsection}{\numberline {5.10}Mention-only: other GAD variants}{11}{subsection.5.10}%
-\contentsline {subsection}{\numberline {5.11}Sella IRC halt-at-step-0 fix}{12}{subsection.5.11}%
-\contentsline {subsection}{\numberline {5.12}Artifact inventory}{12}{subsection.5.12}%
+\contentsline {section}{\numberline {1}Methodology}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Dataset and noise}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}GAD (gad\_dt003)}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Sella (cartesian + Eckart)}{3}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}IRC (sella\_hip)}{3}{subsection.1.4}%
+\contentsline {subsection}{\numberline {1.5}IRC validation criteria}{4}{subsection.1.5}%
+\contentsline {section}{\numberline {2}Main Results}{5}{section.2}%
+\contentsline {section}{\numberline {3}The Gate-vs-IRC Sample Overlap}{7}{section.3}%
+\contentsline {section}{\numberline {4}Compute costs}{8}{section.4}%
+\contentsline {section}{\numberline {5}Supplements and raw data}{9}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Raw convergence and IRC-TOPO numbers}{9}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Strict RMSD criterion ($<0.3$\,\r A)}{9}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Endpoint vibrational quality}{9}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}IRC on \emph {converged-only} TSs (the ``high number'' view)}{10}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Wall time percentiles}{11}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.6}``GAD degrades gracefully, Sella stalls''}{11}{subsection.5.6}%
+\contentsline {subsection}{\numberline {5.7}Systematic-failure samples (GAD, converged-only analysis)}{11}{subsection.5.7}%
+\contentsline {subsection}{\numberline {5.8}Per-formula difficulty (GAD converged-only IRC)}{12}{subsection.5.8}%
+\contentsline {subsection}{\numberline {5.9}Rigorous (Hratchian--Schlegel predictor-corrector) IRC --- the counter-example}{12}{subsection.5.9}%
+\contentsline {subsection}{\numberline {5.10}Mention-only: other GAD variants}{12}{subsection.5.10}%
+\contentsline {subsection}{\numberline {5.11}Sella IRC halt-at-step-0 fix}{13}{subsection.5.11}%
+\contentsline {subsection}{\numberline {5.12}Artifact inventory}{13}{subsection.5.12}%

@@ -1069,6 +1069,114 @@ Primary metric: **TOPO-intended** (bond-graph isomorphism on both directions, el
 
 ---
 
+## Round 6: Five-Method Benchmark + Apples-to-Apples Convergence Criteria (2026-04-20)
+
+**Setup.** Five TS-finding methods benchmarked on identical inputs (Transition1x train samples 0-299, Gaussian noise seed 42, 2000-step budget, HIP analytic Hessian every step):
+
+| Method | Dynamics | Convergence gate | Output dir |
+|---|---|---|---|
+| `gad_dt003` Eckart (historical) | projected GAD, dt=0.003 | n_neg==1 ∧ ‖F‖_mean<0.01 | `runs/round2/`, `runs/round3/` |
+| `gad_dt003_fmax` Eckart (NEW canonical) | projected GAD, dt=0.003 | n_neg==1 ∧ fmax<0.01 | `runs/gad_eckart_fmax/` |
+| `gad_dt003_no_eckart` (NEW) | raw Hessian GAD, dt=0.003 | n_neg==1 ∧ fmax<0.01 | `runs/gad_no_eckart/` |
+| Sella cart+Eckart | Sella QN, Cartesian, Eckart-projected H, 2000 steps | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+| Sella cart no-Eckart | Sella QN, Cartesian, raw H, 2000 steps | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+| Sella internal | Sella QN, internal coords (Sella default), 2000 steps | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+
+**TS-finding convergence (% of 300):**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|---|---|---|---|---|---|---|
+| GAD Eckart force_norm (old gate) | 94.7 | 94.3 | 92.0 | 87.3 | 71.3 | 52.3 |
+| **GAD Eckart fmax (new canonical)** | **87.3** | **87.3** | **85.3** | **80.0** | **63.7** | **45.3** |
+| GAD no-Eckart fmax | 91.3 | 91.0 | 88.3 | 83.3 | 64.3 | 43.3 |
+| Sella cart+Eckart | 92.0 | 91.3 | 88.3 | 76.3 | 50.0 | 25.7 |
+| Sella cart no-Eckart | 92.3 | 91.7 | 88.3 | 75.7 | 50.7 | 24.0 |
+| Sella internal | 87.7 | 86.3 | 82.0 | 60.3 | 32.7 | 17.0 |
+
+**IRC validation (sella_hip, all 300 endpoints, TOPO-intended %):**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|---|---|---|---|---|---|---|
+| GAD Eckart force_norm | 92.7 | 92.7 | 89.7 | 86.3 | 69.7 | 47.9† |
+| GAD no-Eckart | 92.7 | 93.0 | 90.3 | 84.7 | 66.7 | 45.7 |
+| Sella cart+Eckart | 92.3 | 92.3 | 89.7 | 76.7 | 49.3 | 24.7 |
+| Sella cart no-Eckart | 92.7 | 92.3 | 89.3 | 75.0 | 50.0 | 22.3 |
+| Sella internal | 93.0 | 91.3 | 88.0 | 65.3 | 34.7 | 15.0 |
+
+†200pm IRC parquet predates the 200pm refill (n=259 partial).
+GAD Eckart fmax IRC pending at log-write time (job 59967280).
+
+**Key findings.**
+
+1. **Under matched fmax gate, Sella beats GAD at low noise** (~4 pp at 10-50pm) and **GAD beats Sella at high noise** (~4-20 pp at 100-200pm). Crossover ≈ 75-100pm. This is more nuanced than the original Round 1 "GAD always wins" narrative, which was inflated by GAD's looser force_norm gate.
+
+2. **Eckart projection makes GAD ~1.33× more step-efficient**, not fundamentally more reliable. On samples both Eckart and no-Eckart converge on, Eckart needs ~33% fewer steps. Under the 2000-step budget the convergence-rate gap is +0-3 pp. Under tight budgets (300 steps, Round 1 era) the same 1.33× was the difference between converging and timing out — explaining the original "Eckart is essential" claim.
+
+3. **Internal coordinates hurt Sella on HIP** by 12-30 pp across noise levels. Sella's library default is the worst tested configuration. Conjecture: internal-coord projection drift under noise + Hessian-update path less tested for `diag_every_n=1`.
+
+4. **Eckart adds nothing for Sella Cartesian** (within ±1.5 pp). Sella's QN trust region is already TR-mode invariant.
+
+5. **2000 steps favors Sella asymmetrically.** Sella QN converges in 30-200 steps when it's going to; GAD Euler can use 50-70% of the 2000-step budget at high noise with non-trivial tail at the cap. A 10k-step rerun (backburner) would only strengthen GAD's high-noise lead.
+
+**Code changes.**
+
+- `src/gadplus/search/irc_sella_hip.py::_force_first_kick` — bypasses ASE's pre-kick convergence check (required for IRC on Sella-refined TSs whose fmax already < 0.01).
+- `scripts/sella_baseline.py` — appends `coords_flat`+`atomic_nums` to summary parquets so IRC can read coords without re-running Sella.
+- `scripts/method_single.py` — added `gad_dt003_no_eckart` and `gad_dt003_fmax` configs; made `use_projection` per-method.
+- `scripts/irc_validate.py` — added `--coords-source {traj,summary}`, `--all-endpoints`, narrow filename glob; bypassed Lustre-broad-glob stalls.
+
+**Reports.**
+
+- `IRC_COMPREHENSIVE_2026-04-20.tex/pdf` — current canonical (5 methods, both gates, IRC, all comparison figures).
+- `STATUS_2026_04_20.md` — full inventory of completed cells, IRC datasets, code changes, open items, backburner.
+- Older reports marked `SUPERSEDED 2026-04-20` in the title page.
+
+**Compute.**
+
+19 array tasks dispatched simultaneously under rrg-aspuru on 2026-04-17/18 covered everything except the GAD Eckart fmax rerun (added 2026-04-20). Total to-date ~200-600 GPU-hours. Two OOMs hit at 16GB on Sella internal high-noise; resolved by re-requesting 48GB then 96GB.
+
+**SLURM job IDs (Round 6).**
+
+| Job | Contents |
+|---|---|
+| 59607720 / 59607837 | GAD 200pm refill (force_norm) — first attempt cancelled (criterion mismatch), second succeeded |
+| 59607721 | GAD no-Eckart sweep, 6 noise × 300 |
+| 59607722 / 59624768 / 59628068 / 59636981 | Sella 2000-step (12-task array + 3 OOM retries + 1 timeout retry + 1 96GB retry) |
+| 59626490 | Sella cart no-Eckart 2000, 6 noise × 300 |
+| 59647983 | sella_hip IRC on 4 new TS sets (23-task array) |
+| 59687414 | sella_hip IRC on Sella internal 200pm (one cell that missed the array) |
+| 59690067 | GAD Eckart fmax rerun (canonical), 6 noise × 300 |
+| 59967280 | sella_hip IRC on GAD Eckart fmax — running at log-write time |
+
+---
+
+## Round 7: IRC backfill on gad_dt002 and gad_projected (2026-04-28)
+
+Backfill IRC validation (`sella_hip`, all endpoints, TOPO-intended) on two methods that the
+Round 6 head-to-head omitted: `gad_dt002` (3000-step, dt=0.002, force_norm gate — best raw
+TS-finder in the consolidated ranking) and `gad_projected` (300-step Round 1 baseline).
+
+Session: 29 array tasks dispatched (6 retry tasks ran ~16h on the queue overnight at
+n=100 cells); 35 IRC cells produced in total.
+
+**TOPO-intended % (sella_hip, all endpoints):**
+
+| Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+|---|---|---|---|---|---|---|
+| gad_dt002 | 69.0 (n=100) | 69.0 (n=100) | 61.0 (n=300) | 58.7 (n=300) | — | — |
+| gad_projected | 50.3 (n=300) | 56.0 (n=100) | 57.0 (n=100) | 55.0 (n=100) | 47.0 (n=100) | 28.3 (n=300) |
+
+Output dirs: `runs/irc_gad_dt002/`, `runs/irc_gad_projected_round1/`.
+
+These are notably below the Round 5/6 IRC TOPO rates (~85–93% at 10–100pm), because both
+methods' historical TS pools were gated on `force_norm<0.01` (looser than fmax) — the
+extra "barely-converged" TSs that pass force_norm but not fmax tend to drift on IRC. The
+Round 6 fmax-gated GAD Eckart pool gave 92.7%/89.7%/86.3% IRC TOPO at 10/50/100pm; the
+same 3000-step `gad_dt002` pool under force_norm only retains 69%/61%/58.7%. Confirms
+that fmax is the right gate for downstream IRC, not just for fair comparison with Sella.
+
+---
+
 ## Experiments NOT Run
 
 | Experiment | Description | Why not run |

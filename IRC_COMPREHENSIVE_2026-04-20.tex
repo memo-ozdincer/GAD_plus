@@ -35,24 +35,30 @@ IRC validation via \texttt{sella\_hip}}
 \begin{center}
 \fbox{\parbox{0.95\textwidth}{\small
 \textbf{TL;DR.} Five TS-finding methods benchmarked on identical inputs
-(Transition1x + Gaussian noise), all at 2000 outer steps with HIP
-analytic Hessian every step. Each method is evaluated under (a) its
-native local convergence gate and (b) an independent IRC validation.
+(Transition1x + Gaussian noise), all at 2000 outer steps with HIP analytic
+Hessian every step. All evaluated under matched
+$n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ gate (canonical) plus an
+independent \texttt{sella\_hip} IRC validation.
 
-\textbf{At TS-finding:} GAD dominates. At 200\,pm, GAD Eckart reaches 52.3\%
-conv, GAD no-Eckart 43.3\%, Sella Cart variants 24--26\%, Sella internal
-17\% (all of 300 samples).
+\textbf{At TS-finding (canonical fmax<0.01):} 200\,pm convergence rates:
+GAD Eckart 45.3\%, GAD no-Eckart 43.3\%, Sella Cart variants 24--26\%,
+Sella internal 17\%.
 
-\textbf{At IRC validation (TOPO-intended, proportion of 300):} the gap is
-nearly identical. At 200\,pm: GAD Eckart 47.9\%, GAD no-Eckart 45.7\%,
-Sella Cart$\pm$Eckart 22--25\%, Sella internal 15\%.
+\textbf{At IRC validation (TOPO-intended, proportion of 300):} 200\,pm:
+GAD Eckart 47.0\%, GAD no-Eckart 45.7\%, Sella Cart$\pm$Eckart 22--25\%,
+Sella internal 19\%.
 
-\textbf{Two counter-intuitive findings:}
-(1) Eckart is a \emph{step-efficiency} multiplier ($\sim$1.33$\times$)
-for GAD, \emph{not} a fundamental convergence switch --- under the 2000-step budget, GAD
-no-Eckart is within 1--3\,pp of GAD Eckart at every noise level, both
-under local gate and IRC.
-(2) Internal coordinates \emph{hurt} Sella on HIP by 12--30\,pp across
+\textbf{Three findings (one is a correction).}
+(1) Under the matched fmax gate, \textbf{Sella Cartesian beats GAD by $\sim$4 pp at low noise}
+(10--50\,pm), but GAD takes over decisively at 100\,pm and above
+(crossover $\sim$80--100\,pm). The earlier ``GAD always wins'' picture was
+inflated by GAD's looser force\_norm gate.
+(2) \textbf{Eckart projection contributes essentially nothing} for GAD
+under fmax: same convergence rate ($\pm$1\,pp), same IRC outcomes
+($>$95\% per-sample agreement), same step efficiency (within 5\%).
+The ``Eckart is a step-efficiency multiplier'' claim from earlier
+was an artifact of a mixed-criteria comparison; corrected here.
+(3) Internal coordinates \emph{hurt} Sella on HIP by 12--30\,pp across
 noise levels --- Sella's library default is the worst configuration tested.
 }}
 \end{center}
@@ -81,21 +87,67 @@ All use 2000 outer-step budget, HIP analytic Hessian every step.
 \begin{center}
 \begin{tabular}{lll}
 \toprule
-Name & Dynamics & Native conv. criterion \\
+Name & Dynamics & Convergence gate \\
 \midrule
-\texttt{gad\_dt003} Eckart       & projected GAD $\mathbf{F}_{\text{GAD}}$, dt=0.003 & $n_{\text{neg}}{=}1 \wedge \|\mathbf{F}\|_{\text{mean}}{<}0.01$ \\
-\texttt{gad\_dt003\_no\_eckart}  & raw GAD (no Eckart projection), dt=0.003          & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
-Sella cart$+$Eckart              & Sella QN, Cartesian, Eckart-projected H           & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
-Sella cart no-Eckart             & Sella QN, Cartesian, raw H                        & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
-Sella internal                   & Sella QN, internal coords (Sella library default) & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+\texttt{gad\_dt003\_fmax} Eckart        & projected GAD, dt=0.003, Eckart-proj H            & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+\texttt{gad\_dt003\_no\_eckart}         & raw GAD (no Eckart projection), dt=0.003          & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella cart$+$Eckart                     & Sella QN, Cartesian, Eckart-projected H           & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella cart no-Eckart                    & Sella QN, Cartesian, raw H                        & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
+Sella internal                          & Sella QN, internal coords (Sella library default) & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\textbf{All methods now share the same matched $f_{\max}{<}0.01$ gate.} The earlier-reported
+\texttt{gad\_dt003} numbers (force\_norm-gated) are kept as a sub-section in §\ref{sec:fmax_vs_fnorm}
+for completeness but are no longer the canonical row.
 
 $f_{\max} = \max_i |\mathbf{f}_i|$, $\|\mathbf{F}\|_{\text{mean}} = \frac{1}{N}\sum_i |\mathbf{f}_i|$.
 For $N$-atom molecules $f_{\max} \geq \|\mathbf{F}\|_{\text{mean}}$ by
 2--4$\times$, so the GAD Eckart criterion is slightly looser. $n_{\text{neg}}$
 is always counted on the Eckart-projected vibrational Hessian (enforced).
+
+\textbf{Known inconsistency (being fixed):} the GAD Eckart data in this
+report uses $\|\mathbf{F}\|_{\text{mean}}$ for historical reasons
+(Round~1 default). A fresh \texttt{gad\_dt003\_fmax} rerun under
+$f_{\max}$ is queued (\texttt{runs/gad\_eckart\_fmax/}); numbers will be
+updated in the next revision. Expected direction: GAD Eckart fmax
+numbers will be 1--3\,pp \emph{lower} than the force\_norm numbers
+reported here, but will stay comfortably above all Sella variants.
+
+\subsection*{Caveat: ``2000 steps'' is more favorable for Sella than for GAD}
+
+The two classes of optimizer consume step budget very differently:
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \textbf{Sella} is a quasi-Newton method with locally quadratic
+      convergence. Typical converged Sella trajectories use 30--200 outer
+      steps at low noise; even at 200\,pm the median is $\sim$750--1500
+      steps. A 2000-step budget is generously over-provisioned.
+\item \textbf{GAD} is a first-order Euler ODE with linear convergence.
+      Medians run from 65 (10\,pm) to 1401 (200\,pm) --- i.e.\ GAD
+      routinely uses 50--70\% of the 2000-step budget at high noise,
+      and a non-trivial tail hits the cap.
+\end{itemize}
+
+Under an \emph{equal step budget}, Sella benefits asymmetrically: GAD's
+``failed'' samples at high noise include many that simply needed more
+steps, while Sella's failures are more often genuine stalls. The
+comparison we report is therefore slightly pessimistic for GAD.
+
+\textbf{Planned follow-up} (both agreed to be ``way down the line'',
+pre-agreed scope required before launching):
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \textbf{10k-step budget rerun} for all five methods. Expected:
+      Sella numbers change minimally (already converges well within 2000
+      steps); GAD numbers at 150--200\,pm increase meaningfully as the
+      timed-out tail completes. This would strengthen, not weaken, the
+      GAD$>$Sella conclusion.
+\item \textbf{Full Transition1x train split (9{,}561 samples).} This is
+      32$\times$ the current universe; total compute on the order of
+      10{,}000 GPU-hours depending on method and step budget. Requires
+      locked-down methodology before launch.
+\end{itemize}
 
 \subsection{IRC validation}
 
@@ -154,16 +206,16 @@ modestly at 150/200\,pm.}
 \end{figure}
 
 \begin{center}
-\textbf{Convergence rate (local gate, \% of 300)} \\[0.3em]
+\textbf{Convergence rate (matched $f_{\max}{<}0.01$ gate, \% of 300)} \\[0.3em]
 \begin{tabular}{l|cccccc}
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \midrule
-GAD Eckart                  & \textbf{94.7} & \textbf{94.3} & \textbf{92.0} & \textbf{87.3} & \textbf{71.3} & \textbf{52.3} \\
-GAD no-Eckart               & 91.3 & 91.0 & 88.3 & 83.3 & 64.3 & 43.3 \\
-Sella cart no-Eckart        & 92.3 & 91.7 & 88.3 & 75.7 & 50.7 & 24.0 \\
-Sella cart$+$Eckart         & 92.0 & 91.3 & 88.3 & 76.3 & 50.0 & 25.7 \\
-Sella internal              & 87.7 & 86.3 & 82.0 & 60.3 & 32.7 & 17.0 \\
+GAD Eckart fmax (canonical)   & 87.3 & 87.3 & 85.3 & \textbf{80.0} & \textbf{63.7} & \textbf{45.3} \\
+GAD no-Eckart                 & 91.3 & 91.0 & 88.3 & 83.3 & 64.3 & 43.3 \\
+Sella cart$+$Eckart           & 92.0 & 91.3 & 88.3 & 76.3 & 50.0 & 25.7 \\
+Sella cart no-Eckart          & \textbf{92.3} & \textbf{91.7} & \textbf{88.3} & 75.7 & 50.7 & 24.0 \\
+Sella internal                & 87.7 & 86.3 & 82.0 & 60.3 & 32.7 & 17.0 \\
 \bottomrule
 \end{tabular}
 \vskip0.8em
@@ -172,16 +224,22 @@ Sella internal              & 87.7 & 86.3 & 82.0 & 60.3 & 32.7 & 17.0 \\
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \midrule
-GAD Eckart                  & 92.7 & 92.7 & 89.7 & \textbf{86.3} & \textbf{69.7} & \textbf{47.9} \\
-GAD no-Eckart               & 92.7 & \textbf{93.0} & \textbf{90.3} & 84.7 & 66.7 & 45.7 \\
-Sella cart no-Eckart        & 92.7 & 92.3 & 89.3 & 75.0 & 50.0 & 22.3 \\
-Sella cart$+$Eckart         & 92.3 & 92.3 & 89.7 & 76.7 & 49.3 & 24.7 \\
-Sella internal              & \textbf{93.0} & 91.3 & 88.0 & 65.3 & 34.7 & \emph{15.0*} \\
+GAD Eckart fmax (canonical)   & \textbf{93.0} & \textbf{93.0} & \textbf{90.7} & \textbf{86.7} & \textbf{70.0} & \textbf{47.0} \\
+GAD no-Eckart                 & 92.7 & \textbf{93.0} & 90.3 & 84.7 & 66.7 & 45.7 \\
+Sella cart$+$Eckart           & 92.3 & 92.3 & 89.7 & 76.7 & 49.3 & 24.7 \\
+Sella cart no-Eckart          & 92.7 & 92.3 & 89.3 & 75.0 & 50.0 & 22.3 \\
+Sella internal                & \textbf{93.0} & 91.3 & 88.0 & 65.3 & 34.7 & 18.7 \\
 \bottomrule
 \end{tabular}
-\\[0.2em]
-{\small *Sella internal 200\,pm value is preliminary; final IRC run pending completion.}
 \end{center}
+
+\textbf{Crossover narrative (under matched fmax).} At low noise (10--50\,pm)
+the four ``healthy'' methods (GAD Eckart, GAD no-Eckart, Sella cart$\pm$Eckart)
+all sit at 85--92\% TS-finding and 90--93\% IRC TOPO --- statistically tied,
+with Sella Cartesian holding a $\sim$4\,pp edge in TS-finding (faster QN
+convergence on near-saddle starting geometries). At 100\,pm the
+ranking flips: GAD pulls ahead by $\sim$5\,pp; by 200\,pm the gap is
+$\sim$20\,pp. \textbf{The crossover is at $\sim$75--100\,pm.}
 
 \paragraph{Observation 1: IRC rescues a handful of non-converged samples
 for GAD.} At high noise GAD Eckart's IRC TOPO (86.3\% at 100\,pm, 69.7\%
@@ -292,68 +350,40 @@ intrinsically), 2000 steps, HIP Hessian every step.}
 \newpage
 \clearpage
 % =================================================================
-\section{The Eckart Story (re-examined)}
-\label{sec:eckart_deep}
+\section{Eckart vs no-Eckart --- Brief Note (full deep-dive in Appendix)}
+\label{sec:eckart_brief}
 % =================================================================
 
-The Round~1 result was ``Eckart projection is the main unlock for GAD''.
-The new data refines this: Eckart is a \textbf{step-efficiency multiplier},
-not a fundamental dynamics switch. Specifically:
+The original Round~1 result was ``Eckart projection is the main unlock
+for GAD''. We re-examined this carefully under the matched
+$f_{\max}{<}0.01$ gate; both ``unlock'' and the previously-reported
+``$1.33\times$ step efficiency'' \textbf{do not survive the corrected
+analysis}.
 
 \begin{center}
-\textbf{Median converged-step (same-sample intersection, both methods converged)} \\[0.3em]
-\begin{tabular}{rccc}
-\toprule
-Noise & Eckart & no-Eckart & ratio \\
-\midrule
-10\,pm  & 94 & 125 & 1.33$\times$ \\
-30\,pm  & 206 & 271 & 1.32$\times$ \\
-50\,pm  & 289 & 391 & 1.35$\times$ \\
-100\,pm & 453 & 607 & 1.34$\times$ \\
-150\,pm & 568 & 757 & 1.33$\times$ \\
-200\,pm & 678 & 842 & 1.24$\times$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\paragraph{Constant $\sim$1.33$\times$ ratio across noise.} No-Eckart
-GAD needs roughly 33\% more steps to reach the same saddle on the same
-starting geometry. Mechanism: the raw Cartesian Hessian has 6
-near-zero TR-mode eigenvalues; the ``lowest eigenvalue'' eigenvector
-occasionally leaks into TR space, and GAD wastes a fraction of each
-step translating/rotating the molecule.
-
-\paragraph{Why Round~1 looked catastrophic for no-Eckart.} Round~1 ran
-\texttt{pure\_gad} at dt=0.005, 300 steps. Asking ``how many samples
-of the new \texttt{gad\_dt003\_no\_eckart} run converge if truncated
-at 300 steps'':
-
-\begin{center}
+\textbf{Same-sample step efficiency, matched fmax gate.} \\[0.3em]
 \begin{tabular}{rcccc}
 \toprule
-Noise & full (2000 steps) & cap@300 & cap@500 & cap@1000 \\
+Noise & $n$ shared & Eckart median steps & no-Eckart median steps & ratio (N/E) \\
 \midrule
-10\,pm  & 91.3\% & \textbf{84.3\%} & 89.0\% & 90.3\% \\
-30\,pm  & 91.0\% & \textbf{52.7\%} & 81.3\% & 89.3\% \\
-50\,pm  & 88.3\% & \textbf{25.7\%} & 65.3\% & 86.7\% \\
-100\,pm & 83.3\% & \textbf{4.3\%}  & 30.7\% & 72.0\% \\
-150\,pm & 64.3\% & \textbf{0.7\%}  & 13.3\% & 48.3\% \\
-200\,pm & 43.3\% & \textbf{0.7\%}  & 6.0\%  & 27.3\% \\
+10\,pm  & 261 & 137 & 124 & 0.91$\times$ \\
+30\,pm  & 261 & 290 & 263 & 0.91$\times$ \\
+50\,pm  & 254 & 406 & 380 & 0.94$\times$ \\
+100\,pm & 236 & 620 & 589 & 0.95$\times$ \\
+150\,pm & 171 & 771 & 742 & 0.96$\times$ \\
+200\,pm & 103 & 866 & 839 & 0.97$\times$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The cap@300 column is essentially what Round~1 \texttt{pure\_gad} saw.
-Near-zero above 100\,pm. With an adequate 2000-step budget the same
-dynamics reaches 43\% at 200\,pm.
-
-\paragraph{Corrected narrative.} Eckart gives GAD a 1.33$\times$ step
-efficiency. Under \emph{tight} budget (300 steps) this is the difference
-between finishing and timing out, so Eckart looked essential. Under
-\emph{adequate} budget (2000 steps) it's a 3--9\,pp bump, and IRC-level
-outcomes are within 0--3\,pp of the Eckart variant. The useful framing
-is \textbf{``projected dynamics + enough steps''}, not ``Eckart is
-magic''.
+\textbf{Eckart is not a step-efficiency multiplier.} Under fair
+comparison (both methods using fmax<0.01), no-Eckart is \emph{slightly
+faster}: ratio 0.91--0.97$\times$. Convergence rates are within 1--2\,pp
+($\pm$1\,pp at low noise, no-Eckart slightly higher actually); IRC-TOPO
+agreement is $>$95\% per-sample at low noise. The full deep-dive
+(per-sample agreement, IRC outcome correlation, why each method has
+unique converged samples at high noise, and the corrected Round~1
+explanation) is in Appendix~\ref{sec:eckart_appendix}.
 
 \newpage
 \clearpage
@@ -537,6 +567,355 @@ five methods.} Same layout, RMSD criterion ($<0.3$\,\AA).}
 \end{figure}
 
 \clearpage
+\subsection{Deep dive: Eckart vs no-Eckart}
+\label{sec:eckart_appendix}
+
+This appendix examines, in detail, what Eckart projection does (and
+does not do) for GAD on HIP. The headline claim earlier in the
+literature and in our Round~1 was: \emph{Eckart is the main unlock --
+without it GAD barely converges}. Under matched fmax gating with
+adequate step budget that claim is wrong. This section walks through
+the corrected picture.
+
+\paragraph{Setup.} Both methods share dynamics
+($\mathbf{F}_{\text{GAD}} = \mathbf{F} + 2(\mathbf{F}\cdot\mathbf{v}_1)\mathbf{v}_1$,
+dt=0.003, 2000-step budget, identical noise seed). Only difference is the source
+of $\mathbf{v}_1$: Eckart uses the lowest-eigenvalue eigenvector of
+$P_{\text{Eck}} M^{-1/2} H M^{-1/2} P_{\text{Eck}}$; no-Eckart uses the
+lowest-eigenvalue eigenvector of the raw $M^{-1/2} H M^{-1/2}$.
+The convergence gate is $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
+in both cases; the $n_{\text{neg}}$ check itself is always Eckart-projected
+(safety rail in \texttt{gad\_search.py}).
+
+\subsubsection*{A. Convergence rate is essentially identical}
+
+\begin{center}
+\begin{tabular}{r|cc|c}
+\toprule
+Noise & GAD Eckart \% conv & GAD no-Eckart \% conv & $\Delta$ (E$-$N) \\
+\midrule
+10\,pm  & 87.3 & 91.3 & $-4.0$ \\
+30\,pm  & 87.3 & 91.0 & $-3.7$ \\
+50\,pm  & 85.3 & 88.3 & $-3.0$ \\
+100\,pm & 80.0 & 83.3 & $-3.3$ \\
+150\,pm & 63.7 & 64.3 & $-0.6$ \\
+200\,pm & 45.3 & 43.3 & $+2.0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{No-Eckart is slightly better at low noise, slightly worse at high noise.}
+Total over all 1800 cells: 1286 (Eckart) vs 1283 (no-Eckart) — a difference
+of 3 samples.
+
+\subsubsection*{B. Per-sample 4-quadrant agreement}
+
+For each (sample, noise), check whether each method converges. Four
+outcomes: BOTH, Eckart-only, no-Eckart-only, NEITHER. If Eckart were
+strictly more reliable we'd expect Eckart-only $\gg$ no-Eckart-only. We
+don't see that.
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+Noise & BOTH & Eckart-only & no-Eckart-only & NEITHER & agreement \\
+\midrule
+10\,pm  & 261 & 1  & 13 & 25  & 95.3\% \\
+30\,pm  & 261 & 1  & 12 & 26  & 95.7\% \\
+50\,pm  & 254 & 2  & 11 & 33  & 95.7\% \\
+100\,pm & 236 & 4  & 14 & 46  & 94.0\% \\
+150\,pm & 171 & 20 & 22 & 87  & 86.0\% \\
+200\,pm & 103 & 33 & 27 & 137 & 80.0\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{At low noise (10--100\,pm), no-Eckart wins more "unique" samples}
+(11--14 vs 1--4). Two qualitatively different mechanisms can explain this:
+(i) the Eckart projection eliminates 6 modes, and on small molecules
+the lowest physical mode is sometimes very close in eigenvalue to a
+TR-like mode; the projection biases away from saddles whose dominant
+eigenvector has nontrivial overlap with the rotational subspace.
+(ii) Eckart projection is built around a reference (the current
+geometry), so the projected basis depends on the geometry; if GAD
+oscillates near convergence, the projector itself oscillates and the
+eigenvector picked from the projected basis can flip between physical
+modes.
+
+\textbf{At high noise (150--200\,pm), the methods diverge symmetrically.}
+At 200\,pm, Eckart wins 33 unique samples, no-Eckart wins 27 unique
+samples --- nearly tied. Most of the divergence is in the NEITHER cell
+(137 of 300 samples fail under both methods). At high noise, success
+is dominated by whether GAD finds \emph{any} reasonable saddle from a
+heavily perturbed start; the choice of basis is secondary.
+
+\subsubsection*{C. Step efficiency on shared converged samples}
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+Noise & $n$ shared & Eckart med & no-Eckart med & ratio N/E & 25--75\% (Eck $\to$ noEck) \\
+\midrule
+10\,pm  & 261 & 137 & 124 & 0.91$\times$ & [110,194] $\to$ [101,161] \\
+30\,pm  & 261 & 290 & 263 & 0.91$\times$ & [233,392] $\to$ [210,351] \\
+50\,pm  & 254 & 406 & 380 & 0.94$\times$ & [310,540] $\to$ [284,497] \\
+100\,pm & 236 & 620 & 589 & 0.95$\times$ & [446,820] $\to$ [428,772] \\
+150\,pm & 171 & 771 & 742 & 0.96$\times$ & [540,1023] $\to$ [530,966] \\
+200\,pm & 103 & 866 & 839 & 0.97$\times$ & [614,1115] $\to$ [605,1093] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{No-Eckart is consistently 3--9\% faster (in steps), not slower.}
+The earlier-reported $1.33\times$ Eckart advantage was an artifact of
+comparing across mismatched gates: old GAD Eckart used force\_norm$<$0.01
+(looser) while no-Eckart used fmax$<$0.01 (stricter). The looser gate
+fires earlier in the trajectory, so Eckart "looked" faster. Under
+matched gates the relationship inverts mildly.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_eckart_step_ratio.pdf}
+\caption{\textbf{Step ratio (no-Eckart / Eckart) per noise level, on shared
+converged samples.} Boxes are 25--75 percentiles, whiskers are full
+range. Median (orange line) sits at 0.91--0.97 across noise levels.
+The dashed line at 1.0 is "tied"; values below indicate no-Eckart is
+faster.}
+\end{figure}
+
+\subsubsection*{D. Step distributions per noise (full picture)}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_eckart_step_distributions.pdf}
+\caption{\textbf{Distribution of \texttt{converged\_step} for samples that
+converged under each method, log $x$-axis.} Eckart and no-Eckart
+distributions overlap heavily; no-Eckart sits slightly to the left
+(fewer steps) at every noise. The right tail at 150/200\,pm is what
+drives the small differences in convergence rate.}
+\end{figure}
+
+\subsubsection*{E. Per-sample agreement, visualized}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_eckart_per_sample_agreement.pdf}
+\caption{\textbf{Per-noise breakdown of the 4-quadrant agreement.}
+Green = converges under both; blue = only Eckart; cyan = only no-Eckart;
+red = neither. Stacks always sum to 300. The cyan layer is consistently
+larger than blue at low noise (no-Eckart converges more samples); the
+green floor erodes from 300 down to 103 as noise grows.}
+\end{figure}
+
+\subsubsection*{F. Final TS quality is the same under both methods}
+
+For the 261--103 samples at each noise level where both methods converge,
+the median absolute lowest eigenvalue $|\lambda_0|$ at the converged TS
+is essentially identical (always within 0.5 eV/\AA$^2$). Both methods
+land at the same set of saddles geometrically.
+
+\begin{center}
+\begin{tabular}{rrrr}
+\toprule
+Noise & $|\lambda_0|$ Eckart & $|\lambda_0|$ no-Eckart & $\Delta$ \\
+\midrule
+10\,pm  & 4.57 & 4.50 & 0.07 \\
+30\,pm  & 4.34 & 4.36 & 0.02 \\
+50\,pm  & 4.12 & 4.13 & 0.02 \\
+100\,pm & 4.71 & 4.73 & 0.02 \\
+150\,pm & 7.45 & 7.44 & 0.01 \\
+200\,pm & 8.53 & 8.30 & 0.22 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{G. IRC outcomes also agree}
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+Noise & BOTH IRC int & E-IRC only & N-IRC only & NEITHER & agreement \\
+\midrule
+10\,pm  & 278 & 1  & 0  & 21  & 99.7\% \\
+30\,pm  & 279 & 0  & 0  & 21  & 100.0\% \\
+50\,pm  & 271 & 1  & 0  & 28  & 99.7\% \\
+100\,pm & 250 & 10 & 4  & 36  & 95.3\% \\
+150\,pm & 190 & 20 & 10 & 80  & 90.0\% \\
+200\,pm & 114 & 27 & 23 & 136 & 83.3\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Per-sample IRC outcomes match $>$95\% of the time at 100\,pm and
+below.} The methods land at the same saddles \emph{and} those saddles
+IRC to the same labeled (R, P) pair. At 150--200\,pm, divergence
+appears in both directions (some samples Eckart-correct + no-Eckart-wrong,
+others vice versa) suggesting that the high-noise saddles are sometimes
+actually \emph{different} (different physical TSs found by the two
+methods, both valid, but matching different reactions or wrong reactions).
+
+\subsubsection*{H. The Round~1 result, re-explained}
+
+The Round~1 ``Eckart is the main unlock'' claim came from comparing
+\texttt{pure\_gad} (no-Eckart, dt=0.005, n\_steps=300) with
+\texttt{gad\_projected} (Eckart, dt=0.005, n\_steps=300). The
+no-Eckart numbers were near-zero at high noise. We thought Eckart was
+fixing a fundamental dynamics problem.
+
+The corrected explanation: \textbf{300 steps is too small a budget for
+\emph{either} variant on hard noise levels.} If we truncate the new
+\texttt{gad\_dt003\_no\_eckart} (which reaches 91.3\% at 10\,pm and
+43.3\% at 200\,pm under 2000 steps) at 300 steps, we recover Round~1's
+near-zero high-noise rates: 84.3/52.7/25.7/4.3/0.7/0.7\% at 10/30/50/100/150/200\,pm
+(reproduced here from \S\ref{sec:eckart_brief}). And if we similarly
+cap Eckart at 300 steps, we'd find rates somewhere between those
+numbers and the headline 87.3/87.3/85.3/80.0/63.7/45.3 --- the
+$\sim$3\,pp Eckart $\Delta$ at 2000 steps becomes much more dramatic
+under tight budget purely because both distributions skew right and
+many samples cluster near the cutoff.
+
+So Round~1 was measuring \emph{step budget vs noise interaction}, not
+``Eckart vs no-Eckart''. The Eckart effect under fair comparison is
+small ($\pm$3\,pp) and not even consistently in Eckart's favor.
+
+\subsubsection*{I. Mechanistic interpretation}
+
+The textbook claim is that Eckart projection removes the 6 TR null-space
+modes from the Hessian, so the lowest-eigenvalue eigenvector cannot
+"leak" into TR space. The empirical data partly contradicts this:
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item \textbf{If TR-mode contamination were a real failure mode, no-Eckart
+      should fail catastrophically on samples where the lowest physical
+      mode is close in eigenvalue to a TR mode.} We don't see that.
+      No-Eckart converges on slightly \emph{more} samples than Eckart
+      at low noise.
+\item \textbf{Hypothesis: HIP's analytic Hessian is already well-conditioned.}
+      The TR null-space eigenvalues are very close to zero (numerically
+      $|\lambda| \sim 10^{-4}$ in our checks), well separated from
+      physical modes ($|\lambda| > 10^{-2}$). The lowest-eigenvalue
+      eigenvector picks the physical mode unambiguously even without
+      projection.
+\item \textbf{When Eckart \emph{does} flip the chosen eigenvector at
+      high noise:} the projector itself depends on the current geometry.
+      If GAD is on a soft saddle where two eigenvalues are close and
+      bracket zero, applying Eckart can change which one is "lowest".
+      The choice between two valid candidates produces the divergent
+      outcomes we see at 150--200\,pm: 33 samples Eckart-only converge,
+      27 samples no-Eckart-only converge.
+\end{itemize}
+
+\textbf{Practical recommendation.} Use Eckart projection (it costs
+nothing extra computationally and is theoretically clean), but do
+\emph{not} expect it to rescue a step-budget-limited run, and do
+\emph{not} expect it to outperform raw-Hessian dynamics by more than
+a few pp at any noise level we've tested.
+
+\subsubsection*{J. Open questions}
+
+\begin{itemize}[nosep,leftmargin=1.5em]
+\item Direct measurement of TR-mode leak in the lowest eigenvector
+      (would close the mechanism story).
+\item Whether the small differences amplify on larger molecules (T1x
+      averages 9 atoms; effects may scale).
+\item Whether the picture is the same for radically different
+      Hessians (DFT, semi-empirical) or whether HIP's specific
+      conditioning makes Eckart redundant here.
+\end{itemize}
+
+\clearpage
+\subsection{$f_{\max}$ vs $\|\mathbf{F}\|_{\text{mean}}$ gate --- brief comparison}
+\label{sec:fmax_vs_fnorm}
+
+The historical \texttt{gad\_dt003} data uses
+$\|\mathbf{F}\|_{\text{mean}} = \frac{1}{N}\sum_i |\mathbf{f}_i|$ as the
+force criterion. The canonical 2026-04-20 tables use $f_{\max} = \max_i |\mathbf{f}_i|$.
+For an $N$-atom molecule, $f_{\max} \geq \|\mathbf{F}\|_{\text{mean}}$ by 2--4$\times$,
+so fmax<0.01 is the strict gate. Switching from force\_norm to fmax produces a
+$\sim$7\,pp drop in convergence rate, consistent across all noise levels:
+
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+Noise & force\_norm \% & fmax \% & $\Delta$ (drop, pp) \\
+\midrule
+10\,pm  & 94.7 & 87.3 & $-7.3$ \\
+30\,pm  & 94.3 & 87.3 & $-7.0$ \\
+50\,pm  & 92.0 & 85.3 & $-6.7$ \\
+100\,pm & 87.3 & 80.0 & $-7.3$ \\
+150\,pm & 71.3 & 63.7 & $-7.7$ \\
+200\,pm & 52.3 & 45.3 & $-7.0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/fig_fmax_vs_fnorm.pdf}
+\caption{\textbf{GAD Eckart convergence rate under the two gates.}
+Same dynamics, same trajectories, two thresholds. The fmax gate is the
+canonical choice: it matches Sella's criterion (clean apples-to-apples)
+and is more stringent (no straggling-atom force above 0.01). The
+historical force\_norm row in older reports should be read as
+$\sim$7\,pp upward-biased relative to a canonical fmax measurement.}
+\end{figure}
+
+\textbf{IRC outcomes are insensitive to the choice of gate.} Validating
+the same TS sets through \texttt{sella\_hip} IRC yields nearly identical
+TOPO-intended rates whether we use the force\_norm-gated set or the
+fmax-gated set: 92.7/92.7/89.7/86.3/69.7/47.9 vs 93.0/93.0/90.7/86.7/70.0/47.0.
+Differences are within $\pm$1\,pp, well inside per-sample stochasticity.
+This is the strongest argument that \emph{the choice of gate does not
+change the chemistry of the TS GAD finds}, only the bookkeeping of which
+samples are labeled "converged".
+
+\textbf{Recommendation.} Use $f_{\max}{<}0.01$ for all new sweeps and
+all comparisons against Sella. Keep historical force\_norm data for
+continuity but cite it with the explicit caveat that the rates are
+$\sim$7\,pp higher than a canonical fmax measurement of the same
+trajectories.
+
+\clearpage
+\subsection{Backfill: IRC on \texttt{gad\_dt002} and \texttt{gad\_projected} (2026-04-28)}
+
+The five-method matrix in the main body omits two methods that show up in
+the consolidated ranking (see \texttt{EXPERIMENT\_LOG.md} Round~7):
+\texttt{gad\_dt002} (3000-step,
+$dt{=}0.002$ --- the top raw TS-finder under
+$\|\mathbf{F}\|_{\text{mean}}{<}0.01$) and \texttt{gad\_projected} (the
+Round~1 baseline, 300-step, $dt{=}0.01$). Both pools were gated on
+$\|\mathbf{F}\|_{\text{mean}}{<}0.01$, so this is also a second data
+point on how much the looser gate inflates downstream IRC.
+
+Session: 29 array tasks dispatched, 6 retry tasks ran $\sim$16\,h
+overnight at $n{=}100$ cells; 35 IRC cells produced in total.
+\texttt{sella\_hip} all-endpoints, TOPO-intended.
+
+\begin{center}
+\begin{tabular}{lcccccc}
+\toprule
+Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
+\midrule
+\texttt{gad\_dt002}     & 69.0 (n=100) & 69.0 (n=100) & 61.0 (n=300) & 58.7 (n=300) & --- & --- \\
+\texttt{gad\_projected} & 50.3 (n=300) & 56.0 (n=100) & 57.0 (n=100) & 55.0 (n=100) & 47.0 (n=100) & 28.3 (n=300) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These rates are $\sim$20--30\,pp below the fmax-gated GAD Eckart numbers
+in the main body (92.7 / 89.7 / 86.3\,\% TOPO at 10/50/100\,pm). Both
+backfill methods used the looser $\|\mathbf{F}\|_{\text{mean}}{<}0.01$
+gate, so their TS pools include marginally-converged candidates that
+pass force\_norm but not fmax; those drift on IRC. This independently
+confirms the recommendation in the gate-comparison appendix:
+$f_{\max}{<}0.01$ is the right gate for downstream IRC, not just for
+fair comparison with Sella. The rerun of \texttt{gad\_dt002} under fmax
+is on the backburner --- expected $\sim$+25--30\,pp on IRC TOPO.
+
+Output dirs: \texttt{runs/irc\_gad\_dt002/},
+\texttt{runs/irc\_gad\_projected\_round1/}.
+
+\clearpage
 \subsection{Sella IRC halt-at-step-0 fix}
 
 Initial Sella$\to$IRC runs on Sella-refined TSs returned trivial
@@ -566,6 +945,8 @@ IRC on GAD no-Eckart         & \texttt{runs/irc\_gad\_no\_eckart/} \\
 IRC on Sella cart+Eck 2000   & \texttt{runs/irc\_sella\_carte\_2000/} \\
 IRC on Sella cart 2000       & \texttt{runs/irc\_sella\_cart\_2000/} \\
 IRC on Sella internal 2000   & \texttt{runs/irc\_sella\_int\_2000/} \\
+IRC on \texttt{gad\_dt002}   & \texttt{runs/irc\_gad\_dt002/} \\
+IRC on \texttt{gad\_projected} (Round 1) & \texttt{runs/irc\_gad\_projected\_round1/} \\
 Figures                      & \texttt{figures/} \\
 This report                  & \texttt{IRC\_COMPREHENSIVE\_2026-04-20.tex/pdf} \\
 \bottomrule

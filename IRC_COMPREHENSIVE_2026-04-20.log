@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  21 APR 2026 16:48
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021 Gentoo Linux) (preloaded format=pdflatex 2023.8.23)  28 APR 2026 03:06
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -553,316 +553,436 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 33.
 (/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/tex/la
 tex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-) (./IRC_COMPREHENSIVE_2026-04-20.toc)
+) (./IRC_COMPREHENSIVE_2026-04-20.toc [1
+
+{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
+tex/updmap/pdftex.map}])
 \tf@toc=\write4
 \openout4 = `IRC_COMPREHENSIVE_2026-04-20.toc'.
 
- [1
+ [2]
+Overfull \hbox (9.85213pt too wide) in paragraph at lines 110--117
+\OT1/cmr/m/n/10.95 rea-sons (Round 1 de-fault). A fresh \OT1/cmtt/m/n/10.95 gad
+[]dt003[]fmax \OT1/cmr/m/n/10.95 re-run un-der $\OML/cmm/m/it/10.95 f[]$ \OT1/c
+mr/m/n/10.95 is queued (\OT1/cmtt/m/n/10.95 runs/gad[]eckart[]fmax/\OT1/cmr/m/n
+/10.95 );
+ []
 
-{/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/var/lib/texmf/fonts/map/pdf
-tex/updmap/pdftex.map}] [2]
-<figures/fig_cmp_conv_5methods.pdf, id=106, 559.40868pt x 335.25299pt>
+[3] [4]
+<figures/fig_cmp_conv_5methods.pdf, id=132, 559.40868pt x 335.25299pt>
 File: figures/fig_cmp_conv_5methods.pdf Graphic file (type pdf)
 <use figures/fig_cmp_conv_5methods.pdf>
 Package pdftex.def Info: figures/fig_cmp_conv_5methods.pdf  used on input line 
-132.
+184.
 (pdftex.def)             Requested size: 243.25798pt x 145.78271pt.
-<figures/fig_cmp_irc_topo_5methods.pdf, id=107, 559.40868pt x 335.25299pt>
+<figures/fig_cmp_irc_topo_5methods.pdf, id=133, 559.40868pt x 335.25299pt>
 File: figures/fig_cmp_irc_topo_5methods.pdf Graphic file (type pdf)
 <use figures/fig_cmp_irc_topo_5methods.pdf>
 Package pdftex.def Info: figures/fig_cmp_irc_topo_5methods.pdf  used on input l
-ine 140.
+ine 192.
 (pdftex.def)             Requested size: 243.25798pt x 145.78271pt.
- [3
+ [5
 
  <./figures/fig_cmp_conv_5methods.pdf> <./figures/fig_cmp_irc_topo_5methods.pdf
->] [4]
-<figures/fig_method_gad_eckart_conv_line.pdf, id=221, 404.513pt x 296.29948pt>
+>]
+
+LaTeX Warning: Reference `sec:eckart_deep' on page 6 undefined on input line 26
+3.
+
+[6]
+<figures/fig_method_gad_eckart_conv_line.pdf, id=246, 404.513pt x 296.29948pt>
 File: figures/fig_method_gad_eckart_conv_line.pdf Graphic file (type pdf)
 <use figures/fig_method_gad_eckart_conv_line.pdf>
 Package pdftex.def Info: figures/fig_method_gad_eckart_conv_line.pdf  used on i
-nput line 219.
+nput line 277.
 (pdftex.def)             Requested size: 243.25798pt x 178.18796pt.
-<figures/fig_method_gad_eckart_irc_bars_topo.pdf, id=222, 402.58278pt x 296.299
+<figures/fig_method_gad_eckart_irc_bars_topo.pdf, id=247, 402.58278pt x 296.299
 48pt>
 File: figures/fig_method_gad_eckart_irc_bars_topo.pdf Graphic file (type pdf)
 <use figures/fig_method_gad_eckart_irc_bars_topo.pdf>
 Package pdftex.def Info: figures/fig_method_gad_eckart_irc_bars_topo.pdf  used 
-on input line 224.
+on input line 282.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
 LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 230.
-<figures/fig_method_gad_no_eckart_conv_line.pdf, id=223, 404.513pt x 296.29948p
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 288.
+<figures/fig_method_gad_no_eckart_conv_line.pdf, id=248, 404.513pt x 296.29948p
 t>
 File: figures/fig_method_gad_no_eckart_conv_line.pdf Graphic file (type pdf)
 <use figures/fig_method_gad_no_eckart_conv_line.pdf>
 Package pdftex.def Info: figures/fig_method_gad_no_eckart_conv_line.pdf  used o
-n input line 236.
+n input line 294.
 (pdftex.def)             Requested size: 243.25798pt x 178.18796pt.
-<figures/fig_method_gad_no_eckart_irc_bars_topo.pdf, id=224, 402.58278pt x 296.
+<figures/fig_method_gad_no_eckart_irc_bars_topo.pdf, id=249, 402.58278pt x 296.
 29948pt>
 File: figures/fig_method_gad_no_eckart_irc_bars_topo.pdf Graphic file (type pdf
 )
 <use figures/fig_method_gad_no_eckart_irc_bars_topo.pdf>
 Package pdftex.def Info: figures/fig_method_gad_no_eckart_irc_bars_topo.pdf  us
-ed on input line 241.
+ed on input line 299.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
-<figures/fig_method_sella_carte_2k_conv_line.pdf, id=225, 402.58278pt x 296.299
+<figures/fig_method_sella_carte_2k_conv_line.pdf, id=250, 402.58278pt x 296.299
 48pt>
 File: figures/fig_method_sella_carte_2k_conv_line.pdf Graphic file (type pdf)
 <use figures/fig_method_sella_carte_2k_conv_line.pdf>
 Package pdftex.def Info: figures/fig_method_sella_carte_2k_conv_line.pdf  used 
-on input line 251.
+on input line 309.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
-<figures/fig_method_sella_carte_2k_irc_bars_topo.pdf, id=226, 402.58278pt x 296
+<figures/fig_method_sella_carte_2k_irc_bars_topo.pdf, id=251, 402.58278pt x 296
 .29948pt>
 File: figures/fig_method_sella_carte_2k_irc_bars_topo.pdf Graphic file (type pd
 f)
 <use figures/fig_method_sella_carte_2k_irc_bars_topo.pdf>
 Package pdftex.def Info: figures/fig_method_sella_carte_2k_irc_bars_topo.pdf  u
-sed on input line 256.
+sed on input line 314.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
- [5
+ [7
 
  <./figures/fig_method_gad_eckart_conv_line.pdf> <./figures/fig_method_gad_ecka
 rt_irc_bars_topo.pdf> <./figures/fig_method_gad_no_eckart_conv_line.pdf> <./fig
 ures/fig_method_gad_no_eckart_irc_bars_topo.pdf>]
-<figures/fig_method_sella_cart_2k_conv_line.pdf, id=427, 402.58278pt x 296.2994
+<figures/fig_method_sella_cart_2k_conv_line.pdf, id=453, 402.58278pt x 296.2994
 8pt>
 File: figures/fig_method_sella_cart_2k_conv_line.pdf Graphic file (type pdf)
 <use figures/fig_method_sella_cart_2k_conv_line.pdf>
 Package pdftex.def Info: figures/fig_method_sella_cart_2k_conv_line.pdf  used o
-n input line 265.
+n input line 323.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
-<figures/fig_method_sella_cart_2k_irc_bars_topo.pdf, id=428, 402.58278pt x 296.
+<figures/fig_method_sella_cart_2k_irc_bars_topo.pdf, id=454, 402.58278pt x 296.
 29948pt>
 File: figures/fig_method_sella_cart_2k_irc_bars_topo.pdf Graphic file (type pdf
 )
 <use figures/fig_method_sella_cart_2k_irc_bars_topo.pdf>
 Package pdftex.def Info: figures/fig_method_sella_cart_2k_irc_bars_topo.pdf  us
-ed on input line 270.
+ed on input line 328.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
-<figures/fig_method_sella_int_2k_conv_line.pdf, id=429, 402.58278pt x 296.29948
+<figures/fig_method_sella_int_2k_conv_line.pdf, id=455, 402.58278pt x 296.29948
 pt>
 File: figures/fig_method_sella_int_2k_conv_line.pdf Graphic file (type pdf)
 <use figures/fig_method_sella_int_2k_conv_line.pdf>
 Package pdftex.def Info: figures/fig_method_sella_int_2k_conv_line.pdf  used on
- input line 279.
+ input line 337.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
-<figures/fig_method_sella_int_2k_irc_bars_topo.pdf, id=430, 402.58278pt x 296.2
+<figures/fig_method_sella_int_2k_irc_bars_topo.pdf, id=456, 402.58278pt x 296.2
 9948pt>
 File: figures/fig_method_sella_int_2k_irc_bars_topo.pdf Graphic file (type pdf)
 
 <use figures/fig_method_sella_int_2k_irc_bars_topo.pdf>
 Package pdftex.def Info: figures/fig_method_sella_int_2k_irc_bars_topo.pdf  use
-d on input line 284.
+d on input line 342.
 (pdftex.def)             Requested size: 243.25798pt x 179.03793pt.
- [6 <./figures/fig_method_sella_carte_2k_conv_line.pdf> <./figures/fig_method_s
+ [8 <./figures/fig_method_sella_carte_2k_conv_line.pdf> <./figures/fig_method_s
 ella_carte_2k_irc_bars_topo.pdf> <./figures/fig_method_sella_cart_2k_conv_line.
-pdf> <./figures/fig_method_sella_cart_2k_irc_bars_topo.pdf>] [7 <./figures/fig_
+pdf> <./figures/fig_method_sella_cart_2k_irc_bars_topo.pdf>] [9 <./figures/fig_
 method_sella_int_2k_conv_line.pdf> <./figures/fig_method_sella_int_2k_irc_bars_
-topo.pdf>] [8
+topo.pdf>] [10
 
 ]
 LaTeX Font Info:    Trying to load font information for OMS+cmr on input line 3
-65.
+95.
 
 (/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/tex/la
 tex/base/omscmr.fd
 File: omscmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10.95> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 365.
-<figures/fig_gate_vs_irc_gad_eckart.pdf, id=733, 587.26427pt x 312.99384pt>
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 395.
+<figures/fig_gate_vs_irc_gad_eckart.pdf, id=756, 587.26427pt x 312.99384pt>
 File: figures/fig_gate_vs_irc_gad_eckart.pdf Graphic file (type pdf)
 <use figures/fig_gate_vs_irc_gad_eckart.pdf>
 Package pdftex.def Info: figures/fig_gate_vs_irc_gad_eckart.pdf  used on input 
-line 371.
+line 401.
 (pdftex.def)             Requested size: 235.88676pt x 125.72066pt.
-<figures/fig_gate_vs_irc_gad_no_eckart.pdf, id=734, 587.26427pt x 312.99384pt>
+<figures/fig_gate_vs_irc_gad_no_eckart.pdf, id=757, 587.26427pt x 312.99384pt>
 File: figures/fig_gate_vs_irc_gad_no_eckart.pdf Graphic file (type pdf)
 <use figures/fig_gate_vs_irc_gad_no_eckart.pdf>
 Package pdftex.def Info: figures/fig_gate_vs_irc_gad_no_eckart.pdf  used on inp
-ut line 376.
+ut line 406.
 (pdftex.def)             Requested size: 235.88676pt x 125.72066pt.
-<figures/fig_gate_vs_irc_sella_carte_2k.pdf, id=735, 587.26427pt x 312.99384pt>
+<figures/fig_gate_vs_irc_sella_carte_2k.pdf, id=758, 587.26427pt x 312.99384pt>
 
 File: figures/fig_gate_vs_irc_sella_carte_2k.pdf Graphic file (type pdf)
 <use figures/fig_gate_vs_irc_sella_carte_2k.pdf>
 Package pdftex.def Info: figures/fig_gate_vs_irc_sella_carte_2k.pdf  used on in
-put line 381.
+put line 411.
 (pdftex.def)             Requested size: 235.88676pt x 125.72066pt.
-<figures/fig_gate_vs_irc_sella_cart_2k.pdf, id=736, 587.26427pt x 312.99384pt>
+<figures/fig_gate_vs_irc_sella_cart_2k.pdf, id=759, 587.26427pt x 312.99384pt>
 File: figures/fig_gate_vs_irc_sella_cart_2k.pdf Graphic file (type pdf)
 <use figures/fig_gate_vs_irc_sella_cart_2k.pdf>
 Package pdftex.def Info: figures/fig_gate_vs_irc_sella_cart_2k.pdf  used on inp
-ut line 386.
+ut line 416.
 (pdftex.def)             Requested size: 235.88676pt x 125.72066pt.
-<figures/fig_gate_vs_irc_sella_int_2k.pdf, id=737, 587.26427pt x 312.99384pt>
+<figures/fig_gate_vs_irc_sella_int_2k.pdf, id=760, 587.26427pt x 312.99384pt>
 File: figures/fig_gate_vs_irc_sella_int_2k.pdf Graphic file (type pdf)
 <use figures/fig_gate_vs_irc_sella_int_2k.pdf>
 Package pdftex.def Info: figures/fig_gate_vs_irc_sella_int_2k.pdf  used on inpu
-t line 391.
+t line 421.
 (pdftex.def)             Requested size: 235.88676pt x 125.72066pt.
- [9
+ [11
 
  <./figures/fig_gate_vs_irc_gad_eckart.pdf> <./figures/fig_gate_vs_irc_gad_no_e
 ckart.pdf> <./figures/fig_gate_vs_irc_sella_carte_2k.pdf> <./figures/fig_gate_v
-s_irc_sella_cart_2k.pdf> <./figures/fig_gate_vs_irc_sella_int_2k.pdf>] [10
+s_irc_sella_cart_2k.pdf> <./figures/fig_gate_vs_irc_sella_int_2k.pdf>] [12
 
-] [11]
-<figures/fig_sella_allep_bars_rmsd.pdf, id=1022, 530.4317pt x 334.28061pt>
+] [13]
+<figures/fig_sella_allep_bars_rmsd.pdf, id=1046, 530.4317pt x 334.28061pt>
 File: figures/fig_sella_allep_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_sella_allep_bars_rmsd.pdf>
 Package pdftex.def Info: figures/fig_sella_allep_bars_rmsd.pdf  used on input l
-ine 458.
+ine 488.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_gad_noeck_new_bars_rmsd.pdf, id=1023, 530.4317pt x 334.28061pt>
+<figures/fig_gad_noeck_new_bars_rmsd.pdf, id=1047, 530.4317pt x 334.28061pt>
 File: figures/fig_gad_noeck_new_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_gad_noeck_new_bars_rmsd.pdf>
 Package pdftex.def Info: figures/fig_gad_noeck_new_bars_rmsd.pdf  used on input
- line 463.
+ line 493.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_carte_2k_bars_rmsd.pdf, id=1024, 530.4317pt x 334.28061pt>
+<figures/fig_sella_carte_2k_bars_rmsd.pdf, id=1048, 530.4317pt x 334.28061pt>
 File: figures/fig_sella_carte_2k_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_sella_carte_2k_bars_rmsd.pdf>
 Package pdftex.def Info: figures/fig_sella_carte_2k_bars_rmsd.pdf  used on inpu
-t line 468.
+t line 498.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_cart_2k_bars_rmsd.pdf, id=1025, 530.4317pt x 334.28061pt>
+<figures/fig_sella_cart_2k_bars_rmsd.pdf, id=1049, 530.4317pt x 334.28061pt>
 File: figures/fig_sella_cart_2k_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_sella_cart_2k_bars_rmsd.pdf>
 Package pdftex.def Info: figures/fig_sella_cart_2k_bars_rmsd.pdf  used on input
- line 473.
+ line 503.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_int_2k_bars_rmsd.pdf, id=1026, 530.4317pt x 334.28061pt>
+<figures/fig_sella_int_2k_bars_rmsd.pdf, id=1050, 530.4317pt x 334.28061pt>
 File: figures/fig_sella_int_2k_bars_rmsd.pdf Graphic file (type pdf)
 <use figures/fig_sella_int_2k_bars_rmsd.pdf>
 Package pdftex.def Info: figures/fig_sella_int_2k_bars_rmsd.pdf  used on input 
-line 478.
+line 508.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_allep_bars_endpoint.pdf, id=1027, 530.4317pt x 334.28061pt>
+<figures/fig_sella_allep_bars_endpoint.pdf, id=1051, 530.4317pt x 334.28061pt>
 File: figures/fig_sella_allep_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_sella_allep_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_sella_allep_bars_endpoint.pdf  used on inp
-ut line 488.
+ut line 518.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_gad_noeck_new_bars_endpoint.pdf, id=1028, 530.4317pt x 334.28061pt
+<figures/fig_gad_noeck_new_bars_endpoint.pdf, id=1052, 530.4317pt x 334.28061pt
 >
 File: figures/fig_gad_noeck_new_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_gad_noeck_new_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_gad_noeck_new_bars_endpoint.pdf  used on i
-nput line 493.
+nput line 523.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_carte_2k_bars_endpoint.pdf, id=1029, 530.4317pt x 334.28061p
+<figures/fig_sella_carte_2k_bars_endpoint.pdf, id=1053, 530.4317pt x 334.28061p
 t>
 File: figures/fig_sella_carte_2k_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_sella_carte_2k_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_sella_carte_2k_bars_endpoint.pdf  used on 
-input line 498.
+input line 528.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_cart_2k_bars_endpoint.pdf, id=1030, 530.4317pt x 334.28061pt
+<figures/fig_sella_cart_2k_bars_endpoint.pdf, id=1054, 530.4317pt x 334.28061pt
 >
 File: figures/fig_sella_cart_2k_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_sella_cart_2k_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_sella_cart_2k_bars_endpoint.pdf  used on i
-nput line 503.
+nput line 533.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
-<figures/fig_sella_int_2k_bars_endpoint.pdf, id=1031, 530.4317pt x 334.28061pt>
+<figures/fig_sella_int_2k_bars_endpoint.pdf, id=1055, 530.4317pt x 334.28061pt>
 
 File: figures/fig_sella_int_2k_bars_endpoint.pdf Graphic file (type pdf)
 <use figures/fig_sella_int_2k_bars_endpoint.pdf>
 Package pdftex.def Info: figures/fig_sella_int_2k_bars_endpoint.pdf  used on in
-put line 508.
+put line 538.
 (pdftex.def)             Requested size: 235.88676pt x 148.65494pt.
- [12
+ [14
 
  <./figures/fig_sella_allep_bars_rmsd.pdf> <./figures/fig_gad_noeck_new_bars_rm
 sd.pdf> <./figures/fig_sella_carte_2k_bars_rmsd.pdf> <./figures/fig_sella_cart_
-2k_bars_rmsd.pdf> <./figures/fig_sella_int_2k_bars_rmsd.pdf>] [13 <./figures/fi
+2k_bars_rmsd.pdf> <./figures/fig_sella_int_2k_bars_rmsd.pdf>] [15 <./figures/fi
 g_sella_allep_bars_endpoint.pdf> <./figures/fig_gad_noeck_new_bars_endpoint.pdf
 > <./figures/fig_sella_carte_2k_bars_endpoint.pdf> <./figures/fig_sella_cart_2k
 _bars_endpoint.pdf> <./figures/fig_sella_int_2k_bars_endpoint.pdf>]
-<figures/fig_cmp_irc_topo_all_classes_5methods.pdf, id=1644, 837.70515pt x 407.
+<figures/fig_cmp_irc_topo_all_classes_5methods.pdf, id=1666, 837.70515pt x 407.
 59528pt>
 File: figures/fig_cmp_irc_topo_all_classes_5methods.pdf Graphic file (type pdf)
 
 <use figures/fig_cmp_irc_topo_all_classes_5methods.pdf>
 Package pdftex.def Info: figures/fig_cmp_irc_topo_all_classes_5methods.pdf  use
-d on input line 525.
+d on input line 555.
 (pdftex.def)             Requested size: 466.86188pt x 227.15718pt.
-<figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf, id=1645, 837.70515pt x 407.
+<figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf, id=1667, 837.70515pt x 407.
 59528pt>
 File: figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf Graphic file (type pdf)
 
 <use figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf>
 Package pdftex.def Info: figures/fig_cmp_irc_rmsd_all_classes_5methods.pdf  use
-d on input line 534.
+d on input line 564.
 (pdftex.def)             Requested size: 466.86188pt x 227.15718pt.
- [14
+ [16
 
  <./figures/fig_cmp_irc_topo_all_classes_5methods.pdf> <./figures/fig_cmp_irc_r
-msd_all_classes_5methods.pdf>]
-Overfull \hbox (77.54883pt too wide) in paragraph at lines 549--553
+msd_all_classes_5methods.pdf>] [17
+
+]
+<figures/fig_eckart_step_ratio.pdf, id=1806, 499.24329pt x 325.27905pt>
+File: figures/fig_eckart_step_ratio.pdf Graphic file (type pdf)
+<use figures/fig_eckart_step_ratio.pdf>
+Package pdftex.def Info: figures/fig_eckart_step_ratio.pdf  used on input line 
+678.
+(pdftex.def)             Requested size: 417.72285pt x 272.17534pt.
+<figures/fig_eckart_step_distributions.pdf, id=1807, 931.90224pt x 496.75575pt>
+
+File: figures/fig_eckart_step_distributions.pdf Graphic file (type pdf)
+<use figures/fig_eckart_step_distributions.pdf>
+Package pdftex.def Info: figures/fig_eckart_step_distributions.pdf  used on inp
+ut line 690.
+(pdftex.def)             Requested size: 491.43513pt x 261.96797pt.
+ [18 <./figures/fig_eckart_step_ratio.pdf>]
+<figures/fig_eckart_per_sample_agreement.pdf, id=1851, 558.4363pt x 323.15105pt
+>
+File: figures/fig_eckart_per_sample_agreement.pdf Graphic file (type pdf)
+<use figures/fig_eckart_per_sample_agreement.pdf>
+Package pdftex.def Info: figures/fig_eckart_per_sample_agreement.pdf  used on i
+nput line 702.
+(pdftex.def)             Requested size: 417.72285pt x 241.73645pt.
+ [19 <./figures/fig_eckart_step_distributions.pdf>] [20 <./figures/fig_eckart_p
+er_sample_agreement.pdf>]
+Overfull \hbox (18.74416pt too wide) in paragraph at lines 765--776
+\OT1/cmr/m/n/10.95 un-der 2000 steps) at 300 steps, we re-cover Round 1's near-
+zero high-noise rates: 84.3/52.7/25.7/4.3/0.7/0.7%
+ []
+
+[21] [22]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `subscript' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\mathop' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\mathgroup' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\symoperators' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\nmlimits@' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\|' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\|' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `subscript' on input line 827.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 827.
+
+<figures/fig_fmax_vs_fnorm.pdf, id=1960, 507.98505pt x 326.96216pt>
+File: figures/fig_fmax_vs_fnorm.pdf Graphic file (type pdf)
+<use figures/fig_fmax_vs_fnorm.pdf>
+Package pdftex.def Info: figures/fig_fmax_vs_fnorm.pdf  used on input line 854.
+
+(pdftex.def)             Requested size: 344.00308pt x 221.41832pt.
+[23
+
+ <./figures/fig_fmax_vs_fnorm.pdf>]
+LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <12> not available
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 879.
+
+Overfull \hbox (41.63887pt too wide) in paragraph at lines 895--903
+ [] 
+ []
+
+[24
+
+]
+Overfull \hbox (77.54883pt too wide) in paragraph at lines 928--932
 []\OT1/cmr/m/n/10.95 Fix: \OT1/cmtt/m/n/10.95 src/gadplus/search/irc[]sella[]hi
 p.py::[]force[]first[]kick \OT1/cmr/m/n/10.95 monkey-patches \OT1/cmtt/m/n/10.9
 5 converged\OT1/cmr/m/n/10.95 , \OT1/cmtt/m/n/10.95 gradient[]converged\OT1/cmr
 /m/n/10.95 ,
  []
 
-[15
+[25
 
 ] (./IRC_COMPREHENSIVE_2026-04-20.aux)
+
+LaTeX Warning: There were undefined references.
+
 Package rerunfilecheck Info: File `IRC_COMPREHENSIVE_2026-04-20.out' has not ch
 anged.
-(rerunfilecheck)             Checksum: DB0F5D197AB95FEEDCCBB46F2F8C5882;2970.
+(rerunfilecheck)             Checksum: 3B9A6606661E3CCC3B28D65B96B1765E;4003.
  ) 
 Here is how much of TeX's memory you used:
- 11931 strings out of 480884
- 190366 string characters out of 5900692
- 485631 words of memory out of 5000000
- 28919 multiletter control sequences out of 15000+600000
- 420650 words of font info for 91 fonts, out of 8000000 for 9000
+ 11990 strings out of 480884
+ 191804 string characters out of 5900692
+ 485812 words of memory out of 5000000
+ 28947 multiletter control sequences out of 15000+600000
+ 420819 words of font info for 92 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
- 71i,11n,74p,620b,546s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 71i,11n,74p,621b,546s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/font
 s/enc/dvips/cm-super/cm-super-ts1.enc}</cvmfs/soft.computecanada.ca/gentoo/2023
 /x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></cvm
 fs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1
 /public/amsfonts/cm/cmbx12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64
--v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></cvmfs/soft.
+-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></cvmfs/soft.
 computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmbxti10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/us
-r/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></cvmfs/soft.compu
-tecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfo
-nts/cm/cmmi10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share
-/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></cvmfs/soft.computecanada
+amsfonts/cm/cmbx9.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/s
+hare/texmf-dist/fonts/type1/public/amsfonts/cm/cmbxti10.pfb></cvmfs/soft.comput
+ecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfon
+ts/cm/cmex10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></cvmfs/soft.computecanada
 .ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/c
-mmi9.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmmib10.pfb></cvmfs/soft.computecanada.ca/gen
-too/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pf
-b></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/font
-s/type1/public/amsfonts/cm/cmr6.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x
-86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></cvmfs/s
-oft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/pub
-lic/amsfonts/cm/cmr8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/us
-r/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></cvmfs/soft.compute
-canada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmsy10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/t
-exmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb></cvmfs/soft.computecanada.c
-a/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmt
-i10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dis
-t/fonts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/soft.computecanada.ca/gento
-o/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb>
-</cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/
-type1/public/cm-super/sfrm0900.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x8
-6-64-v3/usr/share/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb></cvmfs/s
-oft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/pub
-lic/cm-super/sfrm1095.pfb>
-Output written on IRC_COMPREHENSIVE_2026-04-20.pdf (15 pages, 712245 bytes).
+mmi12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-d
+ist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></cvmfs/soft.computecanada.ca/gent
+oo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb
+></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts
+/type1/public/amsfonts/cm/cmmib10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023
+/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></cvmf
+s/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/
+public/amsfonts/cm/cmr6.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3
+/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></cvmfs/soft.comp
+utecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmr8.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></cvmfs/soft.computecanada.c
+a/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cms
+y10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dis
+t/fonts/type1/public/amsfonts/cm/cmsy8.pfb></cvmfs/soft.computecanada.ca/gentoo
+/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb><
+/cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmti10.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x8
+6-64-v3/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></cvmfs/
+soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/pu
+blic/amsfonts/cm/cmtt12.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3
+/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></cvmfs/soft.com
+putecanada.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/cm-
+super/sfrm0900.pfb></cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/shar
+e/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb></cvmfs/soft.computecanad
+a.ca/gentoo/2023/x86-64-v3/usr/share/texmf-dist/fonts/type1/public/cm-super/sfr
+m1095.pfb>
+Output written on IRC_COMPREHENSIVE_2026-04-20.pdf (25 pages, 827012 bytes).
 PDF statistics:
- 1865 PDF objects out of 2073 (max. 8388607)
- 457 compressed objects within 5 object streams
- 50 named destinations out of 1000 (max. 500000)
- 274 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 2122 PDF objects out of 2487 (max. 8388607)
+ 556 compressed objects within 6 object streams
+ 76 named destinations out of 1000 (max. 500000)
+ 318 words of extra memory for PDF output out of 10000 (max. 10000000)
 

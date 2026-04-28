@@ -76,6 +76,27 @@ Each is a separate Hydra config, benchmarked independently:
 | 3 | `gad_adaptive_dt` | + Eigenvalue-clamped adaptive dt |
 | 4 | `nr_gad_flipflop` | + NR refinement when n_neg==1 |
 
+## Canonical methods for 5-method comparison (2026-04-20)
+
+The current `IRC_COMPREHENSIVE_2026-04-20.pdf` report uses these five
+methods × six noise levels × 300 samples × 2000 outer steps × HIP analytic
+Hessian every step:
+
+| Method | Convergence gate | Output dir |
+|---|---|---|
+| `gad_dt003_fmax` (canonical GAD Eckart) | n_neg==1 ∧ fmax<0.01 | `runs/gad_eckart_fmax/` |
+| `gad_dt003_no_eckart` | n_neg==1 ∧ fmax<0.01 | `runs/gad_no_eckart/` |
+| Sella cart+Eckart (2000-step) | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+| Sella cart no-Eckart (2000-step) | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+| Sella internal (2000-step, Sella default) | n_neg==1 ∧ fmax<0.01 | `runs/sella_2000/` |
+
+The historical `gad_dt003` data in `runs/round2`/`runs/round3` uses the
+**looser** `force_norm<0.01` gate. Kept for record and figures that
+explicitly contrast the two. New work should use `gad_dt003_fmax`.
+
+See `scripts/README.md` for the inventory of which slurm runs which
+method, and `STATUS_2026_04_20.md` for the latest dataset / IRC inventory.
+
 ## Dataset
 
 Transition1x HDF5. Three splits available:
@@ -406,6 +427,7 @@ GIF: random geometry → TS via GAD dynamics
 ## Don't
 
 - Don't use anything other than n_neg==1 + force<threshold as TS convergence
+- For new sweeps, use **fmax<0.01** (max per-atom force), not force_norm. The historical gad_dt003 data uses force_norm; everything new is fmax for fair comparison with Sella.
 - Don't skip Eckart projection when computing vibrational eigenvalues
 - Don't add eigenvalue product gates or tr_threshold filtering
 - Don't add features without independent benchmarking justification

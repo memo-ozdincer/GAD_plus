@@ -1,5 +1,47 @@
 # Backburner
 
+## 2026-04-20 deferred items
+
+### A. 10k-step rerun (both classes of methods)
+
+Current benchmark caps at 2000 outer steps. This favors Sella (over-
+provisioned; converges fast when it will) and penalizes GAD (still
+using step budget at 150/200pm, non-trivial tail hits the cap).
+A 10k-step rerun would produce an apples-to-apples comparison.
+
+Expected outcome:
+- Sella: ~no change.
+- GAD: +5 to +15 pp at 150/200 pm. Strengthens GAD>Sella conclusion.
+
+Compute: 5 methods × 6 noise × 300 samples × ~5× the current wall time
+at high noise. Rough budget: ~300 GPU-hours total, runnable in a day
+on a 24-task array.
+
+Blocker: nothing, but no rush. Queue when we're ready to "lock in" the
+final comparison numbers before scaling to full T1x.
+
+### B. Full Transition1x train split (9,561 samples, all 5 methods)
+
+The current universe is samples 0-299 of T1x train. Scaling to full
+train = 9,561 samples = 32× the current compute.
+
+Constraints:
+- Pre-agreement required on everything (methodology, step budget,
+  convergence criteria, noise levels, output format) before launch.
+- Estimated compute: 10,000 GPU-hours at 2000 steps, 30,000+ at 10k.
+  Easily handleable under rrg-aspuru but real money.
+- Output data volume: ~3M trajectory parquet files, ~600 GB total.
+  Needs a cleanup strategy (aggregate-and-delete trajs after summary).
+
+Don't launch until:
+1. Convergence criteria are consistent (fmax<0.01 everywhere).
+2. Step budget is finalized (10k recommended).
+3. IRC pipeline is finalized (maybe: rigorous investigation done, or
+   decision to drop rigorous).
+4. Output format is finalized (no more schema changes).
+
+---
+
 ## Currently running (2026-04-17, late afternoon)
 
 Three arrays submitted simultaneously (rrg-aspuru, parallel dispatch):
