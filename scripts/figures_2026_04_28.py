@@ -122,36 +122,64 @@ def fig_cmp_irc_topo_3m():
 
 
 def fig_irc_intended_grouped_3m():
-    """Grouped bar chart: IRC TOPO-intended, 3 methods x 6 noise levels."""
-    method_rates = {}
+    """Grouped + stacked bar chart: 3 methods per noise, each bar partitioned
+    into intended / half-intended / unintended (proportional, sums to 100%)."""
+    C_INT, C_HALF, C_UN = "#2ca02c", "#f0b432", "#d62728"
+
+    method_data = {}
     for k, (_, _, irc_dir, color, marker, label) in METHODS_3M.items():
         irc = load_irc(irc_dir)
-        rates = []
+        ints, halfs, uns = [], [], []
         for n in NOISES:
             if irc is None:
-                rates.append(np.nan); continue
+                ints.append(np.nan); halfs.append(np.nan); uns.append(np.nan); continue
             g = irc[irc["noise_pm"] == n]
-            rates.append(100 * g["topology_intended"].mean() if len(g) else np.nan)
-        method_rates[k] = (rates, color, label)
+            if not len(g):
+                ints.append(np.nan); halfs.append(np.nan); uns.append(np.nan); continue
+            tot = len(g)
+            ni = int(g["topology_intended"].sum())
+            nh = int((g["topology_half_intended"] & ~g["topology_intended"]).sum())
+            nu = tot - ni - nh
+            ints.append(100*ni/tot); halfs.append(100*nh/tot); uns.append(100*nu/tot)
+        method_data[k] = (ints, halfs, uns, color, label)
 
-    fig, ax = plt.subplots(figsize=(10, 5.0))
+    fig, ax = plt.subplots(figsize=(11, 5.4))
     n_methods = len(METHODS_3M)
     width = 0.27
     x = np.arange(len(NOISES))
     offsets = np.linspace(-(n_methods-1)/2, (n_methods-1)/2, n_methods) * width
-    for i, (k, (rates, color, label)) in enumerate(method_rates.items()):
-        bars = ax.bar(x + offsets[i], rates, width, color=color, edgecolor="white",
-                      linewidth=0.8, label=label)
-        for xi, r in zip(x + offsets[i], rates):
-            if not np.isnan(r):
-                ax.text(xi, r + 1.2, f"{r:.1f}", ha="center", va="bottom", fontsize=8)
+    for i, (k, (ints, halfs, uns, color, label)) in enumerate(method_data.items()):
+        xpos = x + offsets[i]
+        ax.bar(xpos, ints, width, color=C_INT, edgecolor=color, linewidth=1.4,
+               label="intended" if i == 0 else None)
+        ax.bar(xpos, halfs, width, bottom=ints, color=C_HALF, edgecolor=color,
+               linewidth=1.4, label="half-intended" if i == 0 else None)
+        ax.bar(xpos, uns, width, bottom=np.array(ints)+np.array(halfs),
+               color=C_UN, edgecolor=color, linewidth=1.4,
+               label="unintended" if i == 0 else None)
+        # Method label above each bar
+        for xi, ni in zip(xpos, ints):
+            if not np.isnan(ni):
+                ax.text(xi, ni/2, f"{ni:.0f}", ha="center", va="center",
+                        fontsize=8, fontweight="bold", color="white")
+        # Add a thin colored stripe above each group for method identity
+        for xi in xpos:
+            ax.plot([xi - width/2, xi + width/2], [101.5, 101.5],
+                    color=color, linewidth=2.4, solid_capstyle="butt")
     ax.set_xlabel("TS noise (pm)", fontsize=11)
-    ax.set_ylabel("IRC TOPO-intended (%)", fontsize=11)
+    ax.set_ylabel("IRC TOPO outcome (%)", fontsize=11)
     ax.set_xticks(x)
     ax.set_xticklabels([str(n) for n in NOISES])
-    ax.set_ylim(0, 105)
+    ax.set_ylim(0, 108)
     ax.grid(axis="y", alpha=0.3)
-    ax.legend(loc="upper right", fontsize=10, framealpha=0.95)
+    # Two legends: outcome class (color), method (edge color)
+    method_handles = [plt.Rectangle((0,0),1,1, facecolor="white",
+                                    edgecolor=v[3], linewidth=1.8, label=v[4])
+                      for v in method_data.values()]
+    leg1 = ax.legend(loc="upper right", fontsize=9, framealpha=0.95, title="outcome")
+    ax.add_artist(leg1)
+    ax.legend(handles=method_handles, loc="upper left", fontsize=9,
+              framealpha=0.95, title="method (edge)")
     save(fig, "fig_irc_intended_grouped_3m")
 
 

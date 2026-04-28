@@ -1,0 +1,8 @@
+\contentsline {paragraph}{Canonical Sella in this revision = ``libdef'' tuning config}{1}{section*.1}%
+\contentsline {section}{\numberline {1}Headline}{2}{section.1}%
+\contentsline {section}{\numberline {2}GAD step-size over time}{4}{section.2}%
+\contentsline {section}{\numberline {3}Appendix}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Sella tuning grid (full results, $n{=}100$)}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}GAD with larger $dt$ (partial)}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Data locations}{6}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}In flight at write time}{6}{subsection.3.4}%
