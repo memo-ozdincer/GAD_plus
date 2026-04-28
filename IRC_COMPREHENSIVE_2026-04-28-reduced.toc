@@ -1,0 +1,5 @@
+\contentsline {section}{\numberline {1}Headline}{2}{section.1}%
+\contentsline {section}{\numberline {2}GAD step-size over time}{4}{section.2}%
+\contentsline {section}{\numberline {3}Per-method breakdown}{5}{section.3}%
+\contentsline {section}{\numberline {4}Gate vs IRC sample overlap}{7}{section.4}%
+\contentsline {section}{\numberline {5}Data locations}{8}{section.5}%
