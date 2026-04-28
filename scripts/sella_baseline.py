@@ -51,6 +51,7 @@ class HipSellaCalculator(Calculator):
         self.device = device
         self._cached_coords = None
         self._cached_result = None
+        self.n_calls = 0
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
         super().calculate(atoms, properties, system_changes)
@@ -58,6 +59,7 @@ class HipSellaCalculator(Calculator):
 
         # Always compute with Hessian so we can cache it
         out = self.predict_fn(coords, self.atomic_nums, do_hessian=True, require_grad=False)
+        self.n_calls += 1
 
         # Cache for hessian_function
         self._cached_coords = coords.clone()
@@ -135,6 +137,12 @@ def main():
                         help="Use Cartesian coordinates instead of internal")
     parser.add_argument("--apply-eckart", action="store_true", default=False,
                         help="Eckart-project Hessian before passing to Sella")
+    parser.add_argument("--delta0", type=float, default=0.048,
+                        help="Sella initial trust radius")
+    parser.add_argument("--gamma", type=float, default=0.0,
+                        help="Sella line-search gamma (0 disables line search)")
+    parser.add_argument("--config-tag", type=str, default="",
+                        help="Optional tag appended to config_name (e.g. 'libdef', 'lson')")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -147,6 +155,8 @@ def main():
     coord_str = "internal" if use_internal else "cartesian"
     eckart_str = "_eckart" if apply_eckart else ""
     config_name = f"sella_{coord_str}{eckart_str}_fmax{fmax_str}"
+    if args.config_tag:
+        config_name = f"{config_name}_{args.config_tag}"
     print(f"Device: {device} | Sella baseline | fmax={args.fmax} | noise={noise_pm}pm | "
           f"coords={coord_str} | eckart={apply_eckart} | samples={args.n_samples} | max_steps={args.max_steps}")
 
@@ -230,10 +240,10 @@ def main():
                 internal=use_internal,
                 trajectory=None,
                 logfile=None,
-                delta0=0.048,
+                delta0=args.delta0,
                 hessian_function=hessian_fn,
                 diag_every_n=1,
-                gamma=0.0,
+                gamma=args.gamma,
                 rho_inc=1.035,
                 rho_dec=5.0,
                 sigma_inc=1.15,
@@ -306,6 +316,7 @@ def main():
             "final_eig0": eig0,
             "final_eig1": eig1,
             "total_steps": steps_taken,
+            "n_func_evals": int(getattr(ase_calc, "n_calls", 0)),
             "wall_time_s": wall,
             # Sella's own convergence
             "sella_converged": sella_converged,

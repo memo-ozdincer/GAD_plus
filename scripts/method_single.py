@@ -245,6 +245,21 @@ METHOD_CONFIGS = {
         force_criterion="fmax",
         force_threshold=1e-4,
     ),
+    # === 2026-04-28: bigger GAD dt sweep, matched fmax<0.01 gate ===
+    # Matches Round 6 canonical setup but tests larger step sizes for
+    # fairness against Sella's quasi-Newton ~10^-2 Å step.
+    "gad_dt005_fmax": dict(
+        runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt010_fmax": dict(
+        runner="gad", dt=0.010, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt020_fmax": dict(
+        runner="gad", dt=0.020, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
 }
 
 
