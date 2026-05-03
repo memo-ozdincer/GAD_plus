@@ -54,6 +54,34 @@ raw conv is supplementary.}
 \label{fig:narrative-conv}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_irc_bars_topo.pdf}
+\caption{IRC TOPO outcomes per (method, noise) — \textbf{partitioned bars}.
+Each bar = one method $\times$ one noise level, height = 100\% of $n=287$.
+Green = both IRC endpoints match labeled R+P by element-aware bond-graph
+isomorphism (the ``intended'' rate); peach = one endpoint matches;
+gray = neither. \textbf{Green segment height is what we report as
+TOPO-intended.} GAD's green stays at $\sim$45\% even at 200pm; Sella's
+collapses to $<$25\%, with the loss going partly into ``half'' (one
+endpoint OK) and ``unintended'' (wrong-saddle failures). Bar edge color
+encodes method (legend top right).}
+\label{fig:irc-bars-topo}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_irc_bars_combined.pdf}
+\caption{TOPO (top) vs RMSD (bottom, $0.3$\,\AA{} threshold) IRC outcomes,
+same data, two scoring criteria. The strict RMSD criterion has
+\textbf{much} smaller green segments because $0.3$\,\AA{} excludes many
+TOPO-correct endpoints (typical IRC endpoints are 0.35--0.5\,\AA{} from
+labeled R/P due to conformational breathing). The qualitative shape is
+the same: GAD wins big at high noise. We treat the TOPO bars as the
+headline; RMSD bars are for the strict-purist reader.}
+\label{fig:irc-bars-combined}
+\end{figure}
+
 \paragraph{Why this is the right framing.}
 \begin{enumerate}[leftmargin=1.5em]
 \item \textbf{Both methods need the HIP analytic Hessian.} Without it,

@@ -1,96 +1,96 @@
-\contentsline {paragraph}{Why this is the right framing.}{2}{section*.4}%
-\contentsline {paragraph}{Robustness — handicap arguments preempted (full data in sections below).}{2}{section*.5}%
-\contentsline {paragraph}{What's new vs.\ 04-28 reports.}{2}{section*.6}%
-\contentsline {section}{\numberline {1}Threshold sensitivity dictates the ranking}{4}{section.1}%
-\contentsline {paragraph}{Mechanism.}{4}{section*.10}%
-\contentsline {paragraph}{Sources.}{5}{section*.11}%
-\contentsline {section}{\numberline {2}🎯 Headline IRC-validated result (added 2026-05-01)}{6}{section.2}%
-\contentsline {paragraph}{What this is.}{6}{section*.12}%
-\contentsline {paragraph}{Cell legend.}{6}{section*.13}%
-\contentsline {paragraph}{Headline.}{6}{section*.14}%
-\contentsline {paragraph}{Why this is stronger than the raw-conv comparison.}{6}{section*.15}%
-\contentsline {paragraph}{Sella raw conv at 200pm = 27.2\%; IRC-TOPO = 23.3\%.}{6}{section*.16}%
-\contentsline {paragraph}{Strict RMSD-intended (0.3Å threshold).}{6}{section*.17}%
-\contentsline {paragraph}{Sources.}{7}{section*.18}%
-\contentsline {section}{\numberline {3}Raw-convergence headline tables (test, n=287)}{7}{section.3}%
-\contentsline {paragraph}{Without the $n_{\text {neg}}{=}1$ requirement (Sella's own default).}{7}{section*.19}%
-\contentsline {paragraph}{Sources.}{8}{section*.20}%
-\contentsline {paragraph}{Reading the headline.}{8}{section*.21}%
-\contentsline {section}{\numberline {4}GAD dt grid: cliff at $dt\!\approx \!0.008$}{9}{section.4}%
-\contentsline {paragraph}{Why the cliff.}{9}{section*.23}%
-\contentsline {section}{\numberline {5}Final-geometry RMSD distributions}{10}{section.5}%
-\contentsline {paragraph}{Sources.}{10}{section*.25}%
-\contentsline {section}{\numberline {6}Saddle-quality breakdown}{11}{section.6}%
-\contentsline {paragraph}{Sources.}{11}{section*.26}%
-\contentsline {section}{\numberline {7}Steps to convergence}{12}{section.7}%
-\contentsline {section}{\numberline {8}Adaptive-dt collapse}{13}{section.8}%
-\contentsline {paragraph}{Why adaptive\_dt collapses.}{13}{section*.28}%
-\contentsline {section}{\numberline {9}Low-dt GAD diagnostic — plateau is structural (added 2026-05-01)}{14}{section.9}%
-\contentsline {paragraph}{What this section investigates.}{14}{section*.29}%
-\contentsline {paragraph}{Method.}{14}{section*.30}%
-\contentsline {paragraph}{Cell legend.}{14}{section*.31}%
-\contentsline {paragraph}{Sources.}{14}{section*.32}%
-\contentsline {section}{\numberline {10}Trajectory dynamics: when does $f_{\qopname \relax m{max}}$ plateau? (added 2026-05-01)}{14}{section.10}%
-\contentsline {paragraph}{What this section measures.}{14}{section*.33}%
-\contentsline {paragraph}{Method legend.}{15}{section*.34}%
-\contentsline {paragraph}{Cell legend for the table below.}{16}{section*.37}%
-\contentsline {paragraph}{Sources.}{17}{section*.38}%
-\contentsline {paragraph}{Pending: Sella trajectories on test.}{17}{section*.39}%
-\contentsline {section}{\numberline {11}Sella without HIP Hessian (added 2026-05-01)}{17}{section.11}%
-\contentsline {paragraph}{What this section investigates.}{17}{section*.40}%
-\contentsline {paragraph}{Method.}{17}{section*.41}%
-\contentsline {paragraph}{Cell legend.}{18}{section*.42}%
-\contentsline {paragraph}{Sources.}{18}{section*.43}%
-\contentsline {section}{\numberline {12}Best-of-each \& two comparison framings (added 2026-05-01)}{18}{section.12}%
-\contentsline {paragraph}{What this section reports.}{18}{section*.44}%
-\contentsline {paragraph}{Best per method.}{18}{section*.45}%
-\contentsline {paragraph}{Cell legend.}{19}{section*.46}%
-\contentsline {paragraph}{Framing A — most-faithful comparison (both tuned, both armed with HIP H, same coordinate system, same gate).}{19}{section*.47}%
-\contentsline {paragraph}{Framing B — most-out-of-the-box for each.}{19}{section*.48}%
-\contentsline {paragraph}{Sella variants are separate optimizers.}{19}{section*.49}%
-\contentsline {paragraph}{Sources.}{20}{section*.50}%
-\contentsline {section}{\numberline {13}RMSD distribution: why does GAD plateau farther but more uniformly? (added 2026-05-01)}{20}{section.13}%
-\contentsline {paragraph}{What this measures.}{20}{section*.51}%
-\contentsline {paragraph}{Why Sella is bimodal at high noise.}{20}{section*.52}%
-\contentsline {paragraph}{Why GAD shifts farther but more uniformly.}{20}{section*.53}%
-\contentsline {paragraph}{Why GAD's median RMSD is systematically larger.}{20}{section*.54}%
-\contentsline {paragraph}{Can GAD's RMSD be reduced?}{20}{section*.55}%
-\contentsline {paragraph}{Steps to convergence (converged samples only).}{20}{section*.56}%
-\contentsline {paragraph}{Sources.}{21}{section*.57}%
-\contentsline {section}{\numberline {14}IRC method audit (added 2026-05-01)}{21}{section.14}%
-\contentsline {paragraph}{Why this section exists.}{21}{section*.58}%
-\contentsline {paragraph}{Pipeline.}{21}{section*.59}%
-\contentsline {paragraph}{Integrator.}{21}{section*.60}%
-\contentsline {paragraph}{Two scoring metrics, two questions.}{22}{section*.61}%
-\contentsline {paragraph}{Why TOPO is more permissive (and probably more correct).}{22}{section*.62}%
-\contentsline {paragraph}{Past bug.}{22}{section*.63}%
-\contentsline {paragraph}{Open audit items.}{22}{section*.64}%
-\contentsline {paragraph}{Sources.}{22}{section*.65}%
-\contentsline {section}{\numberline {15}Where do failed samples end up? (added 2026-05-01)}{22}{section.15}%
-\contentsline {paragraph}{Question.}{22}{section*.66}%
-\contentsline {paragraph}{Answer: Sella is NOT early-stopping.}{23}{section*.67}%
-\contentsline {paragraph}{Failure-mode classification (per cell).}{23}{section*.68}%
-\contentsline {paragraph}{Sella's high-noise failure mode = wrong-saddle.}{23}{section*.69}%
-\contentsline {paragraph}{GAD's high-noise failure mode = plateau-orbit.}{23}{section*.70}%
-\contentsline {paragraph}{Compound implication.}{23}{section*.71}%
-\contentsline {paragraph}{What MIGHT help Sella at 200pm (untested except where noted):}{23}{section*.72}%
-\contentsline {paragraph}{Sources.}{24}{section*.73}%
-\contentsline {section}{\numberline {16}Sella step-budget is NOT the bottleneck (added 2026-05-01)}{24}{section.16}%
-\contentsline {paragraph}{Question.}{24}{section*.74}%
-\contentsline {paragraph}{Method.}{24}{section*.75}%
-\contentsline {paragraph}{Sources.}{24}{section*.76}%
-\contentsline {section}{\numberline {17}Sella's HIP Hessian cadence — robust around library default (added 2026-05-01)}{24}{section.17}%
-\contentsline {paragraph}{Question.}{24}{section*.77}%
-\contentsline {paragraph}{Cell legend.}{24}{section*.78}%
-\contentsline {paragraph}{Compute.}{25}{section*.79}%
-\contentsline {paragraph}{Sources.}{25}{section*.80}%
-\contentsline {section}{\numberline {18}Huge-noise probe (300--2000 pm) — both methods saturate (added 2026-05-01)}{25}{section.18}%
-\contentsline {paragraph}{Question.}{25}{section*.81}%
-\contentsline {paragraph}{Method.}{25}{section*.82}%
-\contentsline {paragraph}{Cell legend.}{25}{section*.83}%
-\contentsline {paragraph}{Implication.}{26}{section*.84}%
-\contentsline {paragraph}{Sources.}{26}{section*.85}%
-\contentsline {section}{\numberline {19}Appendix — full sweep visualizations (added 2026-05-01)}{26}{section.19}%
-\contentsline {paragraph}{How to read the appendix figures.}{28}{section*.89}%
-\contentsline {section}{\numberline {20}Pending experiments (will append once data lands)}{28}{section.20}%
-\contentsline {section}{\numberline {21}Data locations}{30}{section.21}%
+\contentsline {paragraph}{Why this is the right framing.}{3}{section*.6}%
+\contentsline {paragraph}{Robustness — handicap arguments preempted (full data in sections below).}{3}{section*.7}%
+\contentsline {paragraph}{What's new vs.\ 04-28 reports.}{4}{section*.8}%
+\contentsline {section}{\numberline {1}Threshold sensitivity dictates the ranking}{6}{section.1}%
+\contentsline {paragraph}{Mechanism.}{6}{section*.12}%
+\contentsline {paragraph}{Sources.}{7}{section*.13}%
+\contentsline {section}{\numberline {2}🎯 Headline IRC-validated result (added 2026-05-01)}{8}{section.2}%
+\contentsline {paragraph}{What this is.}{8}{section*.14}%
+\contentsline {paragraph}{Cell legend.}{8}{section*.15}%
+\contentsline {paragraph}{Headline.}{8}{section*.16}%
+\contentsline {paragraph}{Why this is stronger than the raw-conv comparison.}{8}{section*.17}%
+\contentsline {paragraph}{Sella raw conv at 200pm = 27.2\%; IRC-TOPO = 23.3\%.}{8}{section*.18}%
+\contentsline {paragraph}{Strict RMSD-intended (0.3Å threshold).}{8}{section*.19}%
+\contentsline {paragraph}{Sources.}{9}{section*.20}%
+\contentsline {section}{\numberline {3}Raw-convergence headline tables (test, n=287)}{9}{section.3}%
+\contentsline {paragraph}{Without the $n_{\text {neg}}{=}1$ requirement (Sella's own default).}{9}{section*.21}%
+\contentsline {paragraph}{Sources.}{10}{section*.22}%
+\contentsline {paragraph}{Reading the headline.}{10}{section*.23}%
+\contentsline {section}{\numberline {4}GAD dt grid: cliff at $dt\!\approx \!0.008$}{11}{section.4}%
+\contentsline {paragraph}{Why the cliff.}{11}{section*.25}%
+\contentsline {section}{\numberline {5}Final-geometry RMSD distributions}{12}{section.5}%
+\contentsline {paragraph}{Sources.}{12}{section*.27}%
+\contentsline {section}{\numberline {6}Saddle-quality breakdown}{13}{section.6}%
+\contentsline {paragraph}{Sources.}{13}{section*.28}%
+\contentsline {section}{\numberline {7}Steps to convergence}{14}{section.7}%
+\contentsline {section}{\numberline {8}Adaptive-dt collapse}{15}{section.8}%
+\contentsline {paragraph}{Why adaptive\_dt collapses.}{15}{section*.30}%
+\contentsline {section}{\numberline {9}Low-dt GAD diagnostic — plateau is structural (added 2026-05-01)}{16}{section.9}%
+\contentsline {paragraph}{What this section investigates.}{16}{section*.31}%
+\contentsline {paragraph}{Method.}{16}{section*.32}%
+\contentsline {paragraph}{Cell legend.}{16}{section*.33}%
+\contentsline {paragraph}{Sources.}{16}{section*.34}%
+\contentsline {section}{\numberline {10}Trajectory dynamics: when does $f_{\qopname \relax m{max}}$ plateau? (added 2026-05-01)}{16}{section.10}%
+\contentsline {paragraph}{What this section measures.}{16}{section*.35}%
+\contentsline {paragraph}{Method legend.}{17}{section*.36}%
+\contentsline {paragraph}{Cell legend for the table below.}{18}{section*.39}%
+\contentsline {paragraph}{Sources.}{19}{section*.40}%
+\contentsline {paragraph}{Pending: Sella trajectories on test.}{19}{section*.41}%
+\contentsline {section}{\numberline {11}Sella without HIP Hessian (added 2026-05-01)}{19}{section.11}%
+\contentsline {paragraph}{What this section investigates.}{19}{section*.42}%
+\contentsline {paragraph}{Method.}{19}{section*.43}%
+\contentsline {paragraph}{Cell legend.}{20}{section*.44}%
+\contentsline {paragraph}{Sources.}{20}{section*.45}%
+\contentsline {section}{\numberline {12}Best-of-each \& two comparison framings (added 2026-05-01)}{20}{section.12}%
+\contentsline {paragraph}{What this section reports.}{20}{section*.46}%
+\contentsline {paragraph}{Best per method.}{20}{section*.47}%
+\contentsline {paragraph}{Cell legend.}{21}{section*.48}%
+\contentsline {paragraph}{Framing A — most-faithful comparison (both tuned, both armed with HIP H, same coordinate system, same gate).}{21}{section*.49}%
+\contentsline {paragraph}{Framing B — most-out-of-the-box for each.}{21}{section*.50}%
+\contentsline {paragraph}{Sella variants are separate optimizers.}{21}{section*.51}%
+\contentsline {paragraph}{Sources.}{22}{section*.52}%
+\contentsline {section}{\numberline {13}RMSD distribution: why does GAD plateau farther but more uniformly? (added 2026-05-01)}{22}{section.13}%
+\contentsline {paragraph}{What this measures.}{22}{section*.53}%
+\contentsline {paragraph}{Why Sella is bimodal at high noise.}{22}{section*.54}%
+\contentsline {paragraph}{Why GAD shifts farther but more uniformly.}{22}{section*.55}%
+\contentsline {paragraph}{Why GAD's median RMSD is systematically larger.}{22}{section*.56}%
+\contentsline {paragraph}{Can GAD's RMSD be reduced?}{22}{section*.57}%
+\contentsline {paragraph}{Steps to convergence (converged samples only).}{22}{section*.58}%
+\contentsline {paragraph}{Sources.}{23}{section*.59}%
+\contentsline {section}{\numberline {14}IRC method audit (added 2026-05-01)}{23}{section.14}%
+\contentsline {paragraph}{Why this section exists.}{23}{section*.60}%
+\contentsline {paragraph}{Pipeline.}{23}{section*.61}%
+\contentsline {paragraph}{Integrator.}{23}{section*.62}%
+\contentsline {paragraph}{Two scoring metrics, two questions.}{24}{section*.63}%
+\contentsline {paragraph}{Why TOPO is more permissive (and probably more correct).}{24}{section*.64}%
+\contentsline {paragraph}{Past bug.}{24}{section*.65}%
+\contentsline {paragraph}{Open audit items.}{24}{section*.66}%
+\contentsline {paragraph}{Sources.}{24}{section*.67}%
+\contentsline {section}{\numberline {15}Where do failed samples end up? (added 2026-05-01)}{24}{section.15}%
+\contentsline {paragraph}{Question.}{24}{section*.68}%
+\contentsline {paragraph}{Answer: Sella is NOT early-stopping.}{25}{section*.69}%
+\contentsline {paragraph}{Failure-mode classification (per cell).}{25}{section*.70}%
+\contentsline {paragraph}{Sella's high-noise failure mode = wrong-saddle.}{25}{section*.71}%
+\contentsline {paragraph}{GAD's high-noise failure mode = plateau-orbit.}{25}{section*.72}%
+\contentsline {paragraph}{Compound implication.}{25}{section*.73}%
+\contentsline {paragraph}{What MIGHT help Sella at 200pm (untested except where noted):}{25}{section*.74}%
+\contentsline {paragraph}{Sources.}{26}{section*.75}%
+\contentsline {section}{\numberline {16}Sella step-budget is NOT the bottleneck (added 2026-05-01)}{26}{section.16}%
+\contentsline {paragraph}{Question.}{26}{section*.76}%
+\contentsline {paragraph}{Method.}{26}{section*.77}%
+\contentsline {paragraph}{Sources.}{26}{section*.78}%
+\contentsline {section}{\numberline {17}Sella's HIP Hessian cadence — robust around library default (added 2026-05-01)}{26}{section.17}%
+\contentsline {paragraph}{Question.}{26}{section*.79}%
+\contentsline {paragraph}{Cell legend.}{26}{section*.80}%
+\contentsline {paragraph}{Compute.}{27}{section*.81}%
+\contentsline {paragraph}{Sources.}{27}{section*.82}%
+\contentsline {section}{\numberline {18}Huge-noise probe (300--2000 pm) — both methods saturate (added 2026-05-01)}{27}{section.18}%
+\contentsline {paragraph}{Question.}{27}{section*.83}%
+\contentsline {paragraph}{Method.}{27}{section*.84}%
+\contentsline {paragraph}{Cell legend.}{27}{section*.85}%
+\contentsline {paragraph}{Implication.}{28}{section*.86}%
+\contentsline {paragraph}{Sources.}{28}{section*.87}%
+\contentsline {section}{\numberline {19}Appendix — full sweep visualizations (added 2026-05-01)}{28}{section.19}%
+\contentsline {paragraph}{How to read the appendix figures.}{30}{section*.91}%
+\contentsline {section}{\numberline {20}Pending experiments (will append once data lands)}{30}{section.20}%
+\contentsline {section}{\numberline {21}Data locations}{32}{section.21}%
