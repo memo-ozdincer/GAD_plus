@@ -204,7 +204,10 @@ def run_irc_sella_hip(
             _force_first_kick(irc)
             irc.run(fmax=fmax, steps=max_steps, direction=direction)
             endpoints[direction] = atoms.positions.copy()
-        except Exception:
+        except Exception as exc:
+            import traceback
+            print(f"  [IRC {direction} FAILED] {type(exc).__name__}: {exc}", flush=True)
+            traceback.print_exc()
             endpoints[direction] = None
 
     return score_endpoints(

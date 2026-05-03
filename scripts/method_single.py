@@ -217,6 +217,32 @@ METHOD_CONFIGS = {
     # Top-2: always flip v₁ and v₂
     "multimode_top2": dict(runner="gad", dt=0.005, k_track=0, adaptive=False, max_disp=0.35,
                            multimode="top2"),
+    # === NR-polish on top of GAD: addresses the GAD plateau at fmax≈0.01 ===
+    # Switches to spectral-partitioned Newton-Raphson when n_neg=1 (refine
+    # phase), GAD otherwise (navigate phase). Driven to fmax<1e-4 (paper-strict).
+    "nr_gad_polish_dt007_strict": dict(
+        runner="pingpong",
+        dt=0.007,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=1.0,
+        nr_max_step_norm=0.3,
+        force_criterion="fmax",
+        force_threshold=1e-4,
+    ),
+    "nr_gad_polish_dt007_loose": dict(
+        # Same dynamics, looser gate (matches our other comparisons).
+        runner="pingpong",
+        dt=0.007,
+        k_track=0,
+        adaptive=False,
+        max_disp=0.35,
+        nr_damping=1.0,
+        nr_max_step_norm=0.3,
+        force_criterion="fmax",
+        force_threshold=0.01,
+    ),
     # === Tight convergence presets (for high-precision TS refinement) ===
     "gad_projected_fmax1e4": dict(
         runner="gad",
@@ -260,6 +286,38 @@ METHOD_CONFIGS = {
         runner="gad", dt=0.020, k_track=0, adaptive=False, max_disp=0.35,
         force_criterion="fmax", force_threshold=0.01,
     ),
+    # === 2026-04-29: dt grid filling between dt=0.005 (works) and dt=0.010 (collapses) ===
+    "gad_dt004_fmax": dict(
+        runner="gad", dt=0.004, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt006_fmax": dict(
+        runner="gad", dt=0.006, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt007_fmax": dict(
+        runner="gad", dt=0.007, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt008_fmax": dict(
+        runner="gad", dt=0.008, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    # Very small dt — for diagnostic / dynamics-fidelity studies. With dt this
+    # small, fixed step budgets won't always converge; useful for studying
+    # *whether* a sample is GAD-amenable in the limit of fine-grained Euler.
+    "gad_dt001_fmax": dict(
+        runner="gad", dt=0.001, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt0005_fmax": dict(
+        runner="gad", dt=0.0005, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
+    "gad_dt0001_fmax": dict(
+        runner="gad", dt=0.0001, k_track=0, adaptive=False, max_disp=0.35,
+        force_criterion="fmax", force_threshold=0.01,
+    ),
 }
 
 
@@ -296,6 +354,9 @@ def main():
         default=True,
         help="Write converged TS geometries to a multi-frame XYZ file",
     )
+    parser.add_argument("--start-from", type=str, default="ts_noised",
+                        choices=["ts_noised", "reactant", "product", "midpoint"],
+                        help="Initial geometry: noised TS (default), reactant, product, or linear midpoint.")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -453,13 +514,42 @@ def main():
         z = sample.z.to(device)
         formula = getattr(sample, "formula", f"sample_{i}")
 
-        coords_start = coords_ts + noise_vecs[i].to(device)
+        if args.start_from == "ts_noised":
+            coords_start = coords_ts + noise_vecs[i].to(device)
+            start_method_str = f"noised_ts_{noise_pm}pm"
+        elif args.start_from == "reactant":
+            if not hasattr(sample, "pos_reactant"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_reactant on sample")
+                continue
+            coords_start = sample.pos_reactant.to(device)
+            start_method_str = "reactant"
+        elif args.start_from == "product":
+            if not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_product on sample")
+                continue
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product is all zeros")
+                continue
+            coords_start = pos_p
+            start_method_str = "product"
+        elif args.start_from == "midpoint":
+            if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: midpoint needs reactant+product")
+                continue
+            pos_r = sample.pos_reactant.to(device)
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product missing")
+                continue
+            coords_start = 0.5 * (pos_r + pos_p)
+            start_method_str = "midpoint"
 
         logger = TrajectoryLogger(
             output_dir=output_dir,
             run_id=run_id,
             sample_id=i,
-            start_method=f"noised_ts_{noise_pm}pm",
+            start_method=start_method_str,
             search_method=args.method,
             formula=formula,
         )

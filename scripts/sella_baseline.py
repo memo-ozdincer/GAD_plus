@@ -143,6 +143,17 @@ def main():
                         help="Sella line-search gamma (0 disables line search)")
     parser.add_argument("--config-tag", type=str, default="",
                         help="Optional tag appended to config_name (e.g. 'libdef', 'lson')")
+    parser.add_argument("--no-hessian", action="store_true", default=False,
+                        help="Don't pass HIP Hessian to Sella (Sella falls back to BFGS H-update). "
+                             "Used for the 'Sella without Hessians' baseline.")
+    parser.add_argument("--start-from", type=str, default="ts_noised",
+                        choices=["ts_noised", "reactant", "product", "midpoint"],
+                        help="Initial geometry: noised TS (default), reactant, product, or linear midpoint.")
+    parser.add_argument("--diag-every", type=int, default=1,
+                        help="Force full Hessian recompute every N steps (Sella's diag_every_n). "
+                             "1 (default) = every step (HIP injection); 3 = Sella library default; "
+                             "use a large number (e.g. 99999) to disable forced recomputes and let "
+                             "Sella decide via nsteps_per_diag.")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -219,7 +230,26 @@ def main():
         z = sample.z.to(device)
         formula = getattr(sample, "formula", f"sample_{i}")
 
-        coords_start = coords_ts + noise_vecs[i].to(device)
+        if args.start_from == "ts_noised":
+            coords_start = coords_ts + noise_vecs[i].to(device)
+        elif args.start_from == "reactant":
+            if not hasattr(sample, "pos_reactant"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_reactant"); continue
+            coords_start = sample.pos_reactant.to(device)
+        elif args.start_from == "product":
+            if not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_product"); continue
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product all zeros"); continue
+            coords_start = pos_p
+        elif args.start_from == "midpoint":
+            if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: midpoint needs R+P"); continue
+            pos_r = sample.pos_reactant.to(device); pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product missing"); continue
+            coords_start = 0.5 * (pos_r + pos_p)
 
         # Create ASE Atoms
         positions_np = coords_start.detach().cpu().numpy().reshape(-1, 3)
@@ -229,26 +259,31 @@ def main():
         # Attach calculator with Hessian caching
         ase_calc = HipSellaCalculator(predict_fn, z, device=device)
         atoms.calc = ase_calc
-        hessian_fn = make_hessian_function(ase_calc, apply_eckart=apply_eckart)
+        if args.no_hessian:
+            hessian_fn = None
+        else:
+            hessian_fn = make_hessian_function(ase_calc, apply_eckart=apply_eckart)
 
         # Run Sella
         t0 = time.time()
         try:
-            opt = Sella(
-                atoms,
+            sella_kwargs = dict(
+                atoms=atoms,
                 order=1,
                 internal=use_internal,
                 trajectory=None,
                 logfile=None,
                 delta0=args.delta0,
-                hessian_function=hessian_fn,
-                diag_every_n=1,
+                diag_every_n=args.diag_every,
                 gamma=args.gamma,
                 rho_inc=1.035,
                 rho_dec=5.0,
                 sigma_inc=1.15,
                 sigma_dec=0.65,
             )
+            if hessian_fn is not None:
+                sella_kwargs["hessian_function"] = hessian_fn
+            opt = Sella(**sella_kwargs)
             sella_converged = opt.run(fmax=args.fmax, steps=args.max_steps)
             steps_taken = opt.nsteps
         except Exception as e:

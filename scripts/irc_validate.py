@@ -105,6 +105,9 @@ def main():
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--n-dataset-samples", type=int, default=300,
                         help="Number of dataset samples to load (must cover sample_ids in survey)")
+    parser.add_argument("--split", type=str, default="train", choices=["train", "test", "val"],
+                        help="Transition1x split for reactant/product references. "
+                             "MUST match the split that produced the survey runs.")
     parser.add_argument(
         "--method",
         type=str,
@@ -215,9 +218,10 @@ def main():
     # ---- Load dataset to get reference geometries ----
     from gadplus.data.transition1x import Transition1xDataset, UsePos
     dataset = Transition1xDataset(
-        h5_path, split="train", max_samples=args.n_dataset_samples,
+        h5_path, split=args.split, max_samples=args.n_dataset_samples,
         transform=UsePos("pos_transition"),
     )
+    print(f"Dataset: split={args.split}, loaded {len(dataset)} samples")
 
     # ---- Dispatch IRC integrator based on --method ----
     from gadplus.search.irc_validate import run_irc_validation
