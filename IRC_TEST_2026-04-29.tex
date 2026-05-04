@@ -718,6 +718,86 @@ Sella@2k at 100/150/200 pm by $\{-3.1, -0.7, +8.0\}$ pp respectively.
 at $\sim$1.20$\times$ the wall-clock per attempt because GAD's per-step
 is faster). At low noise, Sella still wins on the same budget.
 
+\subsection{What does GAD spend its excess steps on? — phase breakdown}
+
+For each trajectory we record the smallest step at which each of four
+fmax thresholds $\{0.05, 0.01, 0.005, 0.001\}$ is first crossed (with the
+$n_{\text{neg}}{=}1$ constraint for GAD; no $n_{\text{neg}}$ constraint
+for Sella since the trajlog parquets don't store per-step $n_{\text{neg}}$).
+The gap between thresholds tells us where the budget is spent.
+
+\begin{center}\small
+\textbf{Median first-crossing step per fmax threshold (only for samples
+that ever crossed it; n\_crossed in parens)} \\[0.3em]
+\begin{tabular}{l|c|cccccc}
+\toprule
+Method & fmax threshold & 10 & 30 & 50 & 100 & 150 & 200 \\
+\midrule
+\multirow{4}{*}{GAD dt=0.007 (5k)}
+                    & $f_{\max}{<}0.05$ & 15 (283) & 40 (282) & 58 (273) & 103 (240) & 148 (210) & 261 (202) \\
+                    & $f_{\max}{<}0.01$ & 72 (256) & 144 (255) & 199 (246) & 331 (209) & 436 (167) & 545 (128) \\
+                    & $f_{\max}{<}0.005$ & 0 of 287 & 0 of 287 & 0 of 287 & 0 of 287 & 0 of 287 & 0 of 287 \\
+                    & $f_{\max}{<}0.001$ & 0 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+\multirow{4}{*}{Sella libdef (2k)}
+                    & $f_{\max}{<}0.05$ & 4 (287) & 5 (286) & 6 (278) & 9 (251) & 11 (208) & 18 (133) \\
+                    & $f_{\max}{<}0.01$ & 5 (270) & 7 (271) & 8 (257) & 9 (210) & 12 (158) & 16 (74) \\
+                    & $f_{\max}{<}0.005$ & 5 (96) & 8 (90) & 8 (83) & 9 (73) & 11 (42) & 14 (18) \\
+                    & $f_{\max}{<}0.001$ & 0 & 0 & 0 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{Sella's trajlog terminates when Sella's intrinsic convergence
+($\|F\|_{\text{rms}}{<}0.0045$, library default) triggers; samples that
+hit the looser fmax gate first are recorded but the trajectory stops
+before reaching tighter thresholds. So Sella's "$0$ at $f_{\max}{<}0.001$"
+is a logging artefact, not an algorithmic limit. GAD's "$0$ at
+$f_{\max}{<}0.005$" is real: 70 sampled GAD trajectories at all dt grid
+points and the low-dt diagnostic confirmed structural plateau.}
+\end{center}
+
+\paragraph{Reading: where GAD's budget goes.} The gap between
+"first-crossing $f_{\max}{<}0.05$" and "first-crossing $f_{\max}{<}0.01$"
+quantifies the descent-vs-tightening trade. For GAD dt=0.007, this gap
+is:
+\begin{center}\small
+\begin{tabular}{l|cccccc}
+\toprule
+& 10 & 30 & 50 & 100 & 150 & 200 \\
+\midrule
+GAD steps in $0.05 \to 0.01$ tightening   & 57  & 104 & 141 & 228 & 288 & 284 \\
+\textit{ratio (\# tightening / \# fast descent)}   & 3.8$\times$ & 2.6$\times$ & 2.4$\times$ & 2.2$\times$ & 1.9$\times$ & 1.1$\times$ \\
+\midrule
+Sella steps in $0.05 \to 0.01$ tightening & 1   & 2   & 2   & 0   & 1   & $-2$ \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{Sella jumps from "fast descent" zone to "below 0.01" in
+essentially one step (negative ``gap'' at 200pm = some samples cross
+0.01 \emph{before} 0.05, because the median is over different sample
+populations: $n_{\text{crossed}}{<}0.01$ subset is much smaller than
+$n_{\text{crossed}}{<}0.05$ subset).
+GAD spends 1.1--3.8$\times$ more steps in the tightening phase
+than in the descent phase.}
+\end{center}
+
+\textbf{Mechanistic implication.} GAD's excess steps are \emph{not}
+descent — the descent phase (above $0.05$) takes 15--261 steps, comparable
+to Sella's full run. GAD's excess is the tightening phase (0.05 down to
+0.01) where the orbit around the saddle is being resolved by Euler steps
+of size $dt \cdot \|F\|$. Trust-region Newton (Sella) does this in
+$\le 1$ step. This is consistent with the structural plateau finding:
+GAD's slow tightening near the saddle is the same phenomenon as the
+inability to push below 0.005, just at a higher fmax level.
+
+\paragraph{Source.}
+Computed directly from per-step trajectory parquets:
+\texttt{runs/test\_dtgrid/gad\_dt007\_fmax/traj\_*.parquet} (force\_max,
+n\_neg per step) and
+\texttt{runs/test\_sella\_trajlog/carteck\_libdef/traj\_*.parquet}.
+Query: \texttt{MIN(CASE WHEN force\_max<thresh ... THEN step END)}
+grouped by sample.
+
 \subsection{Sella with extended budget — does it help?}
 
 We have Sella libdef runs at 2k, 5k, and 10k step budgets (10pm--100pm

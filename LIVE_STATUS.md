@@ -76,7 +76,7 @@ Run `squeue -u memoozd` to see live state.
 | 60154183 | Sella matched-budget (12 cells)   | DONE 8/12 | `runs/test_sella_extended/carteck_libdef_{5k,10k}/` — 5k cells done; 10k high-noise timed out. **Result: step budget is NOT bottleneck (5k=2k within 2pp).** |
 | 60314225 | NR-GAD polish (12 cells, n=80)    | **DONE 2026-05-04** | All 12 cells COMPLETED in 1.9–4.3h. **Negative result: NR underperforms vanilla GAD by 14–40pp at every noise; 0% conv at strict gate (no sample broke fmax<1e-3, min observed=0.0055).** See FINDINGS §20 + tex §"NR-polish negative result". |
 | 60314226 | Midpoint single-ended (4 cells)   | RUNNING (~7h left) | RELAUNCH of 60153126 — 96G mem, 18h. Awaiting completion. |
-| 60316944 | 200pm timeout recovery (8 cells)  | RUNNING 4/8 (~2.5h left) | 4 cells COMPLETED, 4 still RUNNING. Hess-freq d=3/5/10/25 200pm + Sella libdef 10k 150/200pm + trajlog 200pm + Sella internal 200pm. |
+| 60316944 | Sella high-noise recovery (6 cells) | RUNNING 3/6 (~1.25h left) | 3 cells COMPLETED (carteck_default 150/200pm, carteck_libdef 200pm — numbers unchanged from existing tables, just refreshed). 3 still RUNNING: internal_default 100/150/200pm. **150/200pm are new data** (previously truncated) — integrate into headline tables when they land. |
 
 ## ⚖️ Compute analysis (rewritten 2026-05-04 — earlier "50× more compute" framing was wrong)
 
