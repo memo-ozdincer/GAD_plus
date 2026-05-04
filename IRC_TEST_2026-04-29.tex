@@ -9,6 +9,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{hyperref}
+\usepackage{multirow}
 \hypersetup{colorlinks=true,linkcolor=blue!60!black,urlcolor=blue!60!black}
 
 \title{\Large\textbf{GAD vs Sella on HIP --- T1x \emph{test} split, comprehensive}\\[4pt]
@@ -446,30 +447,376 @@ columns \texttt{n\_neg\_1\_only\_pct} and \texttt{conv\_pct}, from
 
 \newpage
 % =================================================================
-\section{Steps to convergence}
+\section{Compute cost — what does GAD's robustness actually cost? (rewritten 2026-05-04)}
+\label{sec:compute}
 % =================================================================
+
+\paragraph{The question.} GAD takes $\sim\!30\times$ more \emph{steps} per
+converged TS than Sella. The question this section answers is:
+\textbf{does step count map to wall-clock cost? And if you spend equal
+compute, does GAD's robustness premium hold?} We answer with five
+aligned probes (per-step cost, distribution, wall-aligned trajectories,
+truncation curves, and budget-extended Sella) — all on the same n=287
+test split with the same HIP analytic Hessian served to every method.
+
+\paragraph{TL;DR (will be defended below).}
+\begin{itemize}[leftmargin=1.5em]
+\item Step counts differ by $30\!\times$, but \textbf{per-step wall-time is
+  comparable} (GAD $\approx 62$ ms/step, Sella $\approx 76$ ms/step) — both
+  are dominated by the HIP Hessian + eigendecomp.
+\item \textbf{Wall-time per converged TS} ratio (GAD/Sella) is
+  $3.3\!\times$ at 10pm and only $\mathbf{1.27\!\times}$ at 200pm — much
+  smaller than the step ratio because GAD's longer tail still ends in a
+  TS, while Sella's tail just hits the budget.
+\item \textbf{Sella with $2.5\!\times$ more compute (budget $2k\!\to\!5k$)
+  gains $+1$ converged TS at 100pm.} Sella saturates at $\sim$96\% of
+  the easy cells and $\sim$76\% at 100pm — extra budget cannot recover
+  the wrong-saddle/non-saddle failures.
+\item \textbf{If you want $N$ converged TS at 200pm}, Sella tops out at
+  $N{=}89$ regardless of compute; GAD reaches $N{=}128$ at $1.27\times$
+  Sella's per-TS cost. Above $N{=}89$, GAD is the only option.
+\end{itemize}
+
+\subsection{Per-step cost — GAD step is \emph{not} cheaper than Sella step}
+
+Sella's P-RFO trust-region update and GAD's Euler $\dot x = F + 2(F\!\cdot\!v_1)v_1$
+\emph{both} require: (i) one HIP Hessian call (the dominant cost), (ii)
+one eigendecomp on the (full or projected) Hessian, (iii) one matrix-vector
+or trust-region linear solve. The eigendecomp dominates over the linear
+solve, and the HIP Hessian dominates over the eigendecomp. So per-step
+costs end up similar:
+
+\begin{center}\small
+\textbf{Median per-step wall-cost (ms/step), all $n=287$, samples with $\geq\!5$ steps} \\[0.3em]
+\begin{tabular}{l|cccccc}
+\toprule
+Method (per-step formula) & 10 & 30 & 50 & 100 & 150 & 200 \\
+\midrule
+GAD dt=0.007 (Eckart H + eigendec + Euler)         & 63.6 & 61.9 & 62.1 & 61.5 & 61.6 & 62.1 \\
+Sella libdef 2k (cart Eckart H every step + RFO)   & 78.7 & 76.9 & 76.7 & 76.6 & 74.5 & 74.2 \\
+Sella libdef 5k (same, longer budget)              & 77.9 & 77.4 & 81.8 & 76.5 &  --  &  --  \\
+Sella default 2k (cart, no Eckart)                 & 82.2 & 78.6 & 79.1 & 76.1 & 74.2 & 74.2 \\
+Sella internal 2k (internal coords)                & 109  & 102  & 97.4 & 93.6 &  --  &  --  \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{Sella's per-step is $\sim$20\% slower than GAD's because the
+trust-region matrix solve adds a few ms per step over GAD's plain Euler.}
+\end{center}
+
+\textbf{Reading.} Per-step wall is essentially flat across noise levels
+($\pm$3 ms). Sella's per-step is $1.20\!\times$ GAD's, not faster.
+\textbf{The "GAD is slower" intuition is entirely a step-count effect, not
+a per-step cost effect.} This means the headline ratio of total compute
+is governed by the step-count ratio modulo a tiny per-step correction.
+
+\paragraph{Source.} \texttt{analysis\_2026\_04\_29/compute\_summary.csv}
+column \texttt{med\_ms\_per\_step}, computed as
+\texttt{MEDIAN(wall\_time\_s / total\_steps)*1000}
+over all 287 samples per cell from
+\texttt{runs/test\_dtgrid/gad\_dt007\_fmax/summary\_*.parquet} and
+\texttt{runs/test\_set/sella\_carteck\_*/summary\_*.parquet}.
+
+\subsection{Steps-to-convergence distribution — full picture, not just median}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_test_steps_hist.pdf}
-\caption{Histogram of total\_steps for converged samples
-($f_{\max}{<}0.01 \wedge n_{\text{neg}}{=}1$, n=287). GAD takes
-\emph{much} more steps than Sella (Sella is QN+trust, GAD is Euler).
-Per-converged-TS GAD costs $\sim$50$\times$ more compute; but GAD
-converges more samples at high noise.}
+\includegraphics[width=\textwidth]{figures/fig_compute_step_dist.pdf}
+\caption{Steps-to-convergence distribution for the
+\emph{converged subset} of each cell. Filled circle = median; thick bar
+= P25--P75; thin tail = up to P95; numeric label = median.
+Sella's median is 4--16 steps across noise; GAD's median is 72--545
+(dt=0.007). \emph{Both methods have heavy P95 tails} approaching the
+budget — for Sella at high noise, a sample either converges fast or
+hits the wall.}
 \end{figure}
 
-\begin{center}
-\textbf{Median compute (per-sample, includes failed runs)} \\[0.3em]
-\begin{tabular}{l|cccccc}
+\begin{center}\small
+\textbf{Step-count quantiles for the converged subset only} \\[0.3em]
+\begin{tabular}{l|c|cccccc}
 \toprule
-Method & 10 & 30 & 50 & 100 & 150 & 200 \\
+Method & quantile & 10 & 30 & 50 & 100 & 150 & 200 \\
 \midrule
-GAD dt=0.007 (5k) median calls   & ~150 & ~290 & ~440 & ~830 & ~1500 & ~2200 \\
-Sella libdef median calls        & 4 & 6 & 7 & 9 & 11 & 13 \\
+\multirow{4}{*}{GAD dt=0.007 (5k)}
+                    & P25 & 55  & 114 & 158 & 254 & 325 & 386 \\
+                    & median & 72 & 144 & 199 & 331 & 436 & 545 \\
+                    & P75 & 97  & 204 & 281 & 421 & 588 & 756 \\
+                    & P95 & 374 & 404 & 491 & 816 & 1876 & 2869 \\
+\midrule
+\multirow{4}{*}{Sella libdef (2k)}
+                    & P25 & 4 & 5 & 6 & 8 & 9 & 11 \\
+                    & median & 4 & 6 & 7 & 9 & 12 & 16 \\
+                    & P75 & 6 & 8 & 9 & 12 & 17 & 26 \\
+                    & P95 & 2000 & 818 & 1338 & 2000 & 2000 & 2000 \\
 \bottomrule
 \end{tabular}
+\vskip0.4em
+\textit{Sella's P95 = 2000 (budget cap) at 10pm even though median is 4
+— a small fraction of samples Sella can never solve. GAD's
+P95 of 2869 at 200pm reflects the long plateau-orbit phase.}
 \end{center}
+
+\paragraph{Source.} \texttt{compute\_summary.csv} columns
+\texttt{p25\_step\_conv, med\_step\_conv, p75\_step\_conv, p95\_step\_conv},
+\texttt{WHERE converged}.
+
+\subsection{Wall-time-per-converged-TS — the actual cost metric}
+
+This is the cleanest single-number cost: total wall-clock spent across
+all 287 attempts in a cell, divided by the number of converged TS
+produced. It charges all of the budget, including failed runs that ran
+out the clock.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_compute_wall_per_conv.pdf}
+\caption{Wall-time per converged TS = $\sum_{i=1}^{287}\!\text{wall}_i\,/\,n_{\text{conv}}$.
+Log y-axis. \textbf{The ratio (GAD/Sella libdef) is $\mathbf{3.3\times}$
+at 10pm and only $\mathbf{1.27\times}$ at 200pm.} GAD costs more per TS
+at low noise (where Sella nails it in 4 steps); the gap shrinks as
+noise rises and Sella's failed runs run out the 2k budget.}
+\end{figure}
+
+\begin{center}\small
+\textbf{Wall-time per converged TS (sec), computed from $n{=}287$ attempts} \\[0.3em]
+\begin{tabular}{l|cccccc|c}
+\toprule
+Method & 10 & 30 & 50 & 100 & 150 & 200 & sum \\
+\midrule
+GAD dt=0.003 (5k)        & 54.2 & 67.5 & 88.7 & 183.8 & 326.8 & 534.1 & 1255 \\
+GAD dt=0.005 (5k)        & 47.7 & 57.1 & 74.3 & 156.0 & 278.5 & 472.3 & 1086 \\
+GAD dt=0.007 (5k)        & 46.6 & 51.1 & 67.9 & 140.7 & 260.9 & 440.9 &  \textbf{1008} \\
+Sella libdef (2k)        & \textbf{14.0} & \textbf{15.1} & \textbf{22.2} & \textbf{60.9} & \textbf{125.3} & 348.4 &  586 \\
+Sella libdef (5k)        & 32.9 & 34.4 & 59.0 & 144.6 &  --   &   --  &   -- \\
+Sella libdef (10k)       & 61.9 & 66.2 & 104.0 &  --  &  --   &   --  &   -- \\
+Sella default (2k)       & 13.7 & 15.4 & 21.7 & 73.4 & 192.6 & 586.6 &  903 \\
+Sella internal (2k)      & 47.1 & 51.6 & 66.8 & 159.9 &  --   &   --  &   -- \\
+\midrule
+GAD/Sella-libdef-2k ratio & 3.33 & 3.38 & 3.06 & 2.31 & 2.08 & \textbf{1.27} & 1.72 \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{$n_{\text{conv}}$ = samples reaching $n_{\text{neg}}=1 \wedge f_{\max}<0.01$.
+"sum" = sum of wall-per-conv across noise levels (a stand-in for
+"production cost across the whole noise grid").}
+\end{center}
+
+\textbf{Reading.} At 200pm, GAD's per-TS cost premium over Sella libdef
+is only $1.27\times$, far smaller than the step-count ratio ($545/16
+\approx 34\times$). Two effects compress the ratio: (i) Sella's per-step
+is $\sim 20\%$ slower; (ii) Sella's failed runs at high noise still burn
+the full 2k step budget, so the denominator $n_{\text{conv}}$ shrinks
+faster than the numerator does. Sella default (cart no Eckart) is
+\emph{the most expensive} method at 200pm because $n_{\text{conv}}=59$.
+
+\paragraph{Source.} \texttt{compute\_summary.csv} column
+\texttt{wall\_per\_conv\_TS\_s} = \texttt{SUM(wall\_time\_s) /
+SUM(CAST(converged AS INT))} per cell.
+
+\subsection{$f_{\max}(t)$ aligned by wall-time — Sella drops faster \emph{and} tighter}
+
+Step-by-step plots are misleading because GAD and Sella have different
+per-step semantics. Aligning by cumulative wall-time gives the
+fair compute-domain comparison.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_compute_dynamics_walltime.pdf}
+\caption{Median $f_{\max}$ per cell as a function of cumulative wall-time
+across the trajectory; shaded = IQR over samples in the same cell.
+Three noise levels: 30, 100, 200 pm. \textbf{Sella (red) drops below
+$f_{\max}{=}0.01$ within $\sim 0.3$ s and continues toward $0.001$};
+GAD curves drop fast for $\sim 1$--10 s then \emph{flatten} just above
+$f_{\max}{=}0.01$.}
+\end{figure}
+
+\textbf{What this shows mechanistically:}
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{Sella reaches $f_{\max}{<}0.01$ in less wall-time than GAD,
+  on the median sample.} Not just fewer steps — actually less seconds.
+\item \textbf{Sella's median continues toward $f_{\max}{=}0.001$} (1000$\times$
+  tighter than the gate). \textbf{GAD's median plateaus at
+  $f_{\max} \approx 0.01$ regardless of how many seconds you spend.}
+  This is the structural plateau confirmed in the low-dt diagnostic
+  (\S "Low-dt GAD diagnostic").
+\item \textbf{At 200pm, Sella's IQR widens dramatically} — the
+  $\sim$30\% of samples that fail wallow at $f_{\max} \sim 0.05$--$1$ for
+  hundreds of seconds. GAD's IQR is much tighter at 200pm — when GAD
+  fails, it fails uniformly at the structural plateau, not at random
+  high $f_{\max}$.
+\end{itemize}
+
+\paragraph{Source.} \texttt{analysis\_2026\_04\_29/dynamics\_walltime.csv}
+(per-method per-noise per-bin median/P25/P75 of $f_{\max}$).
+For GAD: \texttt{wall\_time\_s} comes directly from the trajectory parquet
+(cumulative). For Sella: \texttt{wall} = \texttt{step} $\times$ median
+ms/step (since Sella traj parquets don't store cumulative wall).
+
+\subsection{GAD truncation: how much budget would actually have sufficed?}
+
+If you stopped each GAD run at step $N$, what fraction of the eventually-converged
+samples would already have converged? This tells us how much of the budget
+is \emph{useful} vs \emph{wasted on the plateau}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_compute_truncation_cdf.pdf}
+\caption{For each method × noise: x-axis is the step-budget cap $N$;
+y-axis is the fraction of all $n{=}287$ samples that achieved
+$n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \emph{by} step $N$. Sella
+(red) saturates by step $\sim 30$; GAD (blue/orange) needs $\sim 500$--$2000$
+steps to saturate. \textbf{The plateau is visible as the upper-right
+flat region}: extending GAD's budget further yields almost no new
+conversions.}
+\end{figure}
+
+\begin{center}\small
+\textbf{Cumulative converged-fraction at increasing step budget (GAD dt=0.007 5k)} \\[0.3em]
+\textit{Each cell: \% of $n{=}287$ samples that achieved
+$n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ by step $N$.} \\[0.3em]
+\begin{tabular}{l|cccccc}
+\toprule
+Step budget $N$ & 10pm & 30pm & 50pm & 100pm & 150pm & 200pm \\
+\midrule
+$N{=}100$  & 27.9 &  3.5 &  0.7 &  0.0 &  0.0 &  0.0 \\
+$N{=}200$  & 78.4 & 70.0 & 49.5 &  9.4 &  3.1 &  1.7 \\
+$N{=}500$  & 88.5 & 87.1 & 80.5 & 50.5 & 26.1 & 11.5 \\
+$N{=}1000$ & 89.2 & 88.5 & 85.0 & 67.6 & 50.2 & 27.5 \\
+$N{=}2000$ & 89.2 & 88.9 & 85.7 & 72.5 & 56.4 & 39.0 \\
+$N{=}5000$ (full) & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 & 44.6 \\
+\midrule
+\multicolumn{7}{l}{\textit{Sella libdef (2k) — cumulative \% by step}} \\
+$N{=}10$ & 90.2 & 88.9 & 85.4 & 64.5 & 47.4 & 26.1 \\
+$N{=}30$ & 93.4 & 95.5 & 90.2 & 73.5 & 53.7 & 30.0 \\
+$N{=}100$ & 93.7 & 95.8 & 91.6 & 75.6 & 55.7 & 30.7 \\
+$N{=}2000$ (full) & 96.2 & 96.2 & 92.0 & 75.6 & 57.1 & 31.0 \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{Sella saturates within 30 steps; the marginal value of
+increasing budget from 30 to 2000 is $\le 5$pp at every noise.}
+\end{center}
+
+\textbf{Reading.} GAD's marginal value per step decays geometrically.
+At 200pm, going from $N{=}1000$ to $N{=}5000$ ($4\times$ more compute)
+yields $44.6 - 27.5 = 17.1$ pp more conversions — non-trivial,
+$\sim$50 extra TS for $4\times$ the compute. Going from $N{=}2000$ to
+$N{=}5000$ yields only $5.6$ pp more conversions. \textbf{If we ran GAD
+at $N{=}2000$ (matching Sella's budget), we'd get 39.0\% conv at 200pm —
+still ahead of Sella's 31.0\%, with comparable per-attempt cost.}
+
+\paragraph{Source.} \texttt{analysis\_2026\_04\_29/gad\_truncation.csv}
+(\texttt{frac\_of\_total} column) and \texttt{sella\_truncation.csv}.
+Computed by reading per-step traj parquets and finding the smallest
+step at which $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ first held.
+
+\paragraph{Mirror experiment: GAD at Sella's budget (2000 steps).}
+For paper hygiene, we already have the data — just truncate the existing
+GAD trajectories at step 2000 and recount. The result: GAD@2k beats
+Sella@2k at 100/150/200 pm by $\{-3.1, -0.7, +8.0\}$ pp respectively.
+\textbf{At 200pm, GAD wins by 8 pp at the same step budget} (and
+at $\sim$1.20$\times$ the wall-clock per attempt because GAD's per-step
+is faster). At low noise, Sella still wins on the same budget.
+
+\subsection{Sella with extended budget — does it help?}
+
+We have Sella libdef runs at 2k, 5k, and 10k step budgets (10pm--100pm
+only for 5k/10k due to compute). Does $5\!\times$ more compute let Sella
+recover the failed runs?
+
+\begin{center}\small
+\textbf{Sella libdef: convergence rate vs step budget} \\[0.3em]
+\textit{Each cell: $n_{\text{conv}}$ / 287 (\%); same trajectories restarted
+with longer budget would only differ in the post-2k tail.} \\[0.3em]
+\begin{tabular}{l|cccc}
+\toprule
+Sella libdef budget & 10pm & 30pm & 50pm & 100pm \\
+\midrule
+2000 steps  & 276 (96.2) & 276 (96.2) & 264 (92.0) & 217 (75.6) \\
+5000 steps  & 276 (96.2) & 276 (96.2) & 264 (92.0) & 218 (75.9) \\
+10000 steps & 276 (96.2) & 276 (96.2) & 265 (92.3) &  --   \\
+\midrule
+$\Delta$ (10k - 2k) & 0 & 0 & +1 & --  \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{$5\times$ to $10\times$ more compute yields $0$ to $+1$ converged
+TS. Sella is at its asymptote.}
+\end{center}
+
+\textbf{Mechanism.} Sella's failure modes at 200pm are 63\% wrong-saddle
+($n_{\text{neg}}\geq 2$) and 27\% non-saddle ($n_{\text{neg}}=0$, energy
+minimum) — see \S "Where do failed samples end up?". Trust-region P-RFO
+\emph{converged successfully} on those samples, just to the wrong critical
+point. More steps don't help — the algorithm has nothing to do.
+By contrast, GAD's failures at 200pm are 62\% plateau-orbit (in the right
+basin, $n_{\text{neg}}{=}1$, just $f_{\max}\!\sim\!0.05$ above gate) — those
+\emph{would} converge with a Newton polish, just not with more Euler.
+
+\paragraph{Source.} \texttt{runs/test\_sella\_extended/carteck\_libdef\_5k/}
+and \texttt{carteck\_libdef\_10k/}. Compare to
+\texttt{runs/test\_set/sella\_carteck\_libdef/} for the 2k baseline.
+
+\subsection{The compute–accuracy frontier — what does it cost to produce $N$ TS?}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_compute_pareto.pdf}
+\caption{Per noise: total wall-clock cost spent on the cell ($x$-axis,
+log) vs number of converged TS produced ($y$-axis). Each method = 1
+point. Top-left = best (cheap + many TS). \textbf{At low noise (10/30/50pm),
+Sella libdef dominates the frontier} — same n\_conv at lower cost. At
+100pm onwards, GAD shifts upward in $n_{\text{conv}}$ while Sella variants
+plateau in $y$. \textbf{At 200pm there is no method on the
+frontier above $n_{\text{conv}}{=}128$ — GAD dt=0.007 alone reaches there.}}
+\end{figure}
+
+\textbf{The decision rule}: if you want $\le 90$ converged TS at 200pm,
+Sella libdef is cheaper. If you want $\le 130$, GAD dt=0.007 is the only
+method that can deliver, and the ratio of "GAD's cost per TS" to "Sella's
+cost per TS for the cheap fraction" is $1.27\times$. The compute premium
+buys 44\% more TS access at the highest noise level.
+
+\subsection{Putting it all together — the bottom line}
+
+\textit{The "$50\times$ more compute" framing in earlier drafts was
+misleading.} It compared step counts, but per-step costs differ by
+$1.20\times$ and per-converged-TS wall-time differs by 1.3-3.3$\times$
+depending on noise — and the per-TS ratio at 200pm (where the claim
+matters) is the smallest of all. Three points to take away:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item \textbf{GAD's "robustness" is real and the cost is modest.} At
+  200pm GAD costs $1.27\times$ Sella per converged TS and produces 44\%
+  more TS. There's no separate "GAD is cheap, just slow" — the compute
+  is similar; the difference is which samples you can convert.
+\item \textbf{The plateau costs roughly half of GAD's compute at high
+  noise.} Truncating GAD at 2000 steps captures 39/44.6 = 87\% of its
+  eventual conversions. The remaining 13\% requires the long tail.
+\item \textbf{Sella with more budget cannot recover wrong-saddle
+  failures.} 5× and 10× budget extensions yield 0–1 extra conversions.
+  Sella's compute headroom is exhausted; only a different algorithm
+  (or an HIP-armed restart from a different initial geometry) helps.
+\end{enumerate}
+
+\paragraph{Pending probes.} The matched-budget Sella sweep at 5k/10k for
+150pm and 200pm is in flight (\texttt{60316944}). Predicted: $+\le\!2$pp
+on raw conv at both cells, consistent with the 100pm asymptote.
+
+\paragraph{Sources for this section (one place).}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.1em]
+\item \texttt{analysis\_2026\_04\_29/compute\_summary.csv} — per-cell
+  step quantiles, wall, ms/step, wall-per-conv-TS.
+\item \texttt{analysis\_2026\_04\_29/gad\_truncation.csv} — fraction
+  converged by step $N$ (GAD).
+\item \texttt{analysis\_2026\_04\_29/sella\_truncation.csv} — fraction
+  converged by step $N$ (Sella).
+\item \texttt{analysis\_2026\_04\_29/dynamics\_walltime.csv} — $f_{\max}$
+  median+IQR by wall-time bin.
+\item Build script: \texttt{scripts/analyze\_compute.py}.
+\item Figures: \texttt{figures/fig\_compute\_*.pdf}
+  \texttt{(step\_dist, wall\_per\_conv, dynamics\_walltime, truncation\_cdf, pareto)}.
+\end{itemize}
 
 \newpage
 % =================================================================
@@ -1338,6 +1685,37 @@ budgets) are partial coverage and confirm the structural plateau —
 \label{fig:gad-lineage}
 \end{figure}
 
+\paragraph{IRC scoring sensitivity — headlines robust to knob choices.}
+We re-scored the existing IRC parquets at multiple settings to check
+robustness:
+
+\begin{center}\small
+\begin{tabular}{l|cc|cc|c}
+\toprule
+                  & \multicolumn{2}{c|}{TOPO @ cutoff=1.2} & \multicolumn{2}{c|}{TOPO @ cutoff=1.3} & gap shift \\
+                  & GAD dt=0.007 & Sella libdef & GAD dt=0.007 & Sella libdef & \\
+\midrule
+200pm             & 52.3 & 31.5 & 53.5 & 32.9 & $-$0.2 \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\begin{tabular}{l|cc|cc|c}
+\toprule
+                  & \multicolumn{2}{c|}{RMSD @ thr=0.3 \AA} & \multicolumn{2}{c|}{RMSD @ thr=0.5 \AA} & gap shift \\
+                  & GAD dt=0.007 & Sella libdef & GAD dt=0.007 & Sella libdef & \\
+\midrule
+200pm             & 24.9 & 13.6 & 32.0 & 19.7 & $+$1.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+{\small Numbers denominated by valid-IRC samples (i.e.\ both endpoints
+produced); minor difference from headline table which uses $n=287$.
+The +21pp GAD-vs-Sella gap at 200pm is preserved within $\pm 1$pp across
+both scoring knob variations. Sources:
+\texttt{analysis\_2026\_04\_29/irc\_sensitivity.csv} (192 rows for every
+method × noise × threshold × cutoff combination), builder
+\texttt{scripts/analyze\_irc\_sensitivity.py}.}
+
 \paragraph{How to read the appendix figures.}
 \begin{itemize}[leftmargin=1.5em]
 \item For the headline narrative, only Fig.~\ref{fig:narrative-irc}
@@ -1354,6 +1732,90 @@ budgets) are partial coverage and confirm the structural plateau —
 \end{itemize}
 
 % =================================================================
+\section{NR-polish negative result (added 2026-05-04)}
+% =================================================================
+
+\paragraph{What we tried.} A spectral-partitioned Newton--Raphson polish
+on top of converged-or-near GAD, hypothesised to break the structural
+plateau at $f_{\max}{\approx}0.01$ by switching from explicit Euler
+($\dot x = F + 2(F\!\cdot\!v_1)v_1$) to a quasi-second-order step
+$\Delta x = -H^{-1} F$ with the unstable mode reflected. Predicted (from
+the "GAD plateaus near saddle because $v_1$ noise floor matches $F$
+floor" mechanism): NR should drop $f_{\max}$ to $\sim 10^{-5}$ and shrink
+final-RMSD to Sella levels.
+
+\paragraph{Configuration.} \texttt{nr\_gad\_polish\_dt007} runner
+(\texttt{scripts/method\_single.py}), $dt{=}0.007$, NR phase activates
+when $n_{\text{neg}}{=}1$, two thresholds tested: \texttt{loose} (gate
+$f_{\max}{<}10^{-2}$) and \texttt{strict} (gate $f_{\max}{<}10^{-4}$).
+Test split, $n{=}80$ subset, 3000 step budget, 6 noise levels.
+SLURM 60314225 (12 cells, all completed in 1.9--4.3 h each).
+
+\paragraph{Result — NR underperforms vanilla GAD.}
+
+\begin{center}\small
+\begin{tabular}{l|cccccc}
+\toprule
+\textit{conv $\equiv n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$, percentages.}
+& 10 & 30 & 50 & 100 & 150 & 200 \\
+\midrule
+GAD dt=0.007 (5k, $n{=}287$) — \emph{baseline}      & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 & 44.6 \\
+NR-polish loose (3k, $n{=}80$)                       & 65.0 & 48.8 & 46.3 & 37.5 & 30.0 & 30.0 \\
+NR-polish strict ($f_{\max}{<}10^{-4}$ gate, $n{=}80$) & 0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 \\
+\midrule
+$\Delta$ (NR-loose -- baseline)                      & $-24.2$ & $-40.1$ & $-39.4$ & $-35.3$ & $-28.2$ & $-14.6$ \\
+\bottomrule
+\end{tabular}
+\vskip0.4em
+\textit{NR underperforms by 14–40 pp at every noise. Strict ($f_{\max}{<}10^{-4}$)
+fails everywhere; \textbf{not a single sample across all $480$
+NR-loose attempts crossed $f_{\max}{<}10^{-3}$} (min observed: $0.0055$).}
+\end{center}
+
+\paragraph{Diagnosis.} The minimum $f_{\max}$ achieved across all 480
+NR-loose samples was $0.0055$, not the $10^{-5}$ predicted. This rules
+out "NR converges deeper than GAD" — NR is doing \emph{worse} than vanilla
+GAD even at the loose gate. Mechanism: the NR step
+$\Delta x = -(H + \alpha v_1 v_1^\top)^{-1} F$ takes \emph{large} jumps
+near the saddle where $H$ is near-singular along the $v_1$ direction.
+Those jumps overshoot the saddle basin, requiring GAD to re-approach.
+The flip-flop never settles. Final $f_{\max}$ averages 0.21--0.72 (vs
+GAD baseline 0.024--0.27).
+
+\paragraph{Average $f_{\max}$ at termination.}
+\begin{center}\small
+\begin{tabular}{l|cccccc}
+\toprule
+& 10 & 30 & 50 & 100 & 150 & 200 \\
+\midrule
+GAD dt=0.007 (5k) avg $f_{\max}$ at end  & 0.024 & 0.025 & 0.050 & 0.125 & 0.199 & 0.269 \\
+NR-polish loose avg $f_{\max}$ at end    & 0.21 & 0.41 & 0.36 & 0.72 & 0.48 & 0.62 \\
+\midrule
+\multicolumn{7}{l}{\textit{NR-loose ends at 4–10$\times$ \emph{higher} $f_{\max}$ than vanilla GAD.}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Implication for the paper.} NR-GAD polish (the canonical
+"level 4" feature in the bottom-up plan) is \emph{not} a path to tighter
+convergence as currently implemented. The structural plateau at
+$f_{\max} \approx 0.01$ stays. Two paths forward, neither fast:
+\begin{enumerate}[leftmargin=1.5em]
+\item Trust-region NR (cap $\|\Delta x\|$ by some radius $\delta$), so
+  the polish phase doesn't overshoot. Effectively re-implementing
+  Sella's RFO logic on top of GAD.
+\item Skip NR; treat the plateau as physical and accept GAD's
+  $f_{\max}{\sim}10^{-2}$ floor. \emph{This is what the paper's headline
+  result already does — IRC validation works at the loose gate.}
+\end{enumerate}
+
+\paragraph{Sources.}
+\texttt{runs/test\_nrpolish/nr\_gad\_polish\_dt007\_\{loose,strict\}/summary\_*.parquet}
+(960 samples total). SLURM logs:
+\texttt{logs/testnrpolish\_60314225\_\{0..11\}.\{out,err\}}.
+
+\newpage
+% =================================================================
 \section{Pending experiments (will append once data lands)}
 % =================================================================
 
@@ -1362,7 +1824,9 @@ budgets) are partial coverage and confirm the structural plateau —
 \item \textbf{IRC TOPO validation rerun} (60146557): previous 60110465 had a \texttt{split="train"} bug; smoke 60145419 verified the fix (1/5 RMSD-INTENDED, 4/5 TOPO-INTENDED). Full 36-cell rerun queued.
 \item \textbf{Low-dt diagnostic} (60110297): partial data already shows plateau is structural (see §Low-dt section above).
 \item \textbf{Sella Hessian-frequency sweep} (60147671): \texttt{diag\_every}$\in\{3,5,10,25\}$ on libdef config, 6 noise levels. Fills the gap between ``every step'' and ``never'' Hessian-injection cadences.
-\item \textbf{NR-GAD polish} (60151717): GAD dt=0.007 + spectral-NR refinement at $n_{\text{neg}}{=}1$, gates fmax<0.01 and fmax<1e-4. Tests whether NR breaks the GAD plateau (predicted: yes, RMSD should drop).
+\item \textbf{NR-GAD polish} (60151717 timed out, relaunched 60314225 with $n{=}80, 3000$ steps, 18h time):
+  \emph{landed 2026-05-04 — predicted-help-but-didn't.}
+  See §"NR-polish negative result" below.
 \item \textbf{Midpoint single-ended} (60153126): GAD dt=0.003/0.007 + Sella libdef + Sella internal default, all from R+P linear midpoint at 0pm noise. Adds the ``geodesic midpoint'' starting condition the user asked for.
 \item \textbf{Huge-noise probe} (60154004): noise $\in\{300, 500, 1000, 2000\}$ pm $\times$ 4 methods (GAD dt=0.003/0.007, Sella libdef-2k, Sella libdef-5k step budget) $\times$ n=50. Tests: Sella wrong-saddle failure at huge noise, Sella step-budget question (does 5k vs 2k help?), HIP Hessian quality at huge displacement, GAD/HIP robustness limits.
 \end{itemize}

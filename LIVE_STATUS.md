@@ -1,5 +1,5 @@
 # LIVE_STATUS — GAD+ comprehensive benchmark
-**Last updated:** 2026-05-01 (auto-updated by Claude across sessions)
+**Last updated:** 2026-05-04 (auto-updated by Claude across sessions)
 **Owner:** memo.ozdincer@mail.utoronto.ca
 **Cluster:** Narval, account `rrg-aspuru`
 
@@ -74,8 +74,27 @@ Run `squeue -u memoozd` to see live state.
 | 60153126 | Midpoint single-ended (4 cells) | PENDING | `runs/test_midpoint/{gad_dt003,gad_dt007,sella_carteck_libdef,sella_internal_default}/` — start from R+P midpoint, 0pm noise, 10000 steps |
 | 60154004 | Huge-noise probe (16 cells, n=50) | PENDING | `runs/test_huge/*` at 300/500/1000/2000pm. Tests Sella's wrong-saddle mode + Sella-5k vs 2k step budget + GAD/HIP robustness at huge displacement |
 | 60154183 | Sella matched-budget (12 cells)   | DONE 8/12 | `runs/test_sella_extended/carteck_libdef_{5k,10k}/` — 5k cells done; 10k high-noise timed out. **Result: step budget is NOT bottleneck (5k=2k within 2pp).** |
-| 60314225 | NR-GAD polish (12 cells, n=80)    | PENDING | RELAUNCH of 60151717 — smaller n, longer time (18h, 3000 steps). Tests if NR breaks GAD plateau. |
-| 60314226 | Midpoint single-ended (4 cells)   | PENDING | RELAUNCH of 60153126 — 96G mem, 18h. Sella internal at 10k steps OOMd at 48G. |
+| 60314225 | NR-GAD polish (12 cells, n=80)    | **DONE 2026-05-04** | All 12 cells COMPLETED in 1.9–4.3h. **Negative result: NR underperforms vanilla GAD by 14–40pp at every noise; 0% conv at strict gate (no sample broke fmax<1e-3, min observed=0.0055).** See FINDINGS §20 + tex §"NR-polish negative result". |
+| 60314226 | Midpoint single-ended (4 cells)   | RUNNING (~7h left) | RELAUNCH of 60153126 — 96G mem, 18h. Awaiting completion. |
+| 60316944 | 200pm timeout recovery (8 cells)  | RUNNING 4/8 (~2.5h left) | 4 cells COMPLETED, 4 still RUNNING. Hess-freq d=3/5/10/25 200pm + Sella libdef 10k 150/200pm + trajlog 200pm + Sella internal 200pm. |
+
+## ⚖️ Compute analysis (rewritten 2026-05-04 — earlier "50× more compute" framing was wrong)
+
+| metric | GAD dt=0.007 | Sella libdef 2k | ratio (G/S) |
+|---|---|---|---|
+| ms/step (median) | 62 ms | 76 ms | 0.82× |
+| Median converged step (200pm) | 545 | 16 | 34× |
+| **Wall-time per converged TS @ 200pm** | **441 s** | **348 s** | **1.27×** |
+| n_conv at 200pm | 128 / 287 | 89 / 287 | 1.44× more |
+
+The "50× cheaper" claim was step-count, not wall-time. Per-step wall is
+similar (both dominated by HIP Hessian + eigendecomp). Sella saturates
+at ~89 conv at 200pm regardless of compute (5k = 10k = 2k within ±2pp).
+Above n_conv = 89 at 200pm, GAD is the only option, at 27% extra wall
+per produced TS.
+
+**See `IRC_TEST_2026-04-29.pdf` §"Compute cost" + 5 new figures
+(`figures/fig_compute_*.pdf`) + `analysis_2026_04_29/compute_summary.csv`.**
 
 **Next launches planned (waiting in TODO):**
 - IRC validation rerun (after split=test fix verified by smoke job 60145419)

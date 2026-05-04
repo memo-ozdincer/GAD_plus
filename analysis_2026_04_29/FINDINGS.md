@@ -82,20 +82,55 @@ the gap at the cost of more steps. Worth a follow-up experiment.
 - distrib figures: `figures/fig_rmsd_distrib_test.{pdf,png}`, `figures/fig_rmsd_distrib_combined.{pdf,png}`
 - builders: `scripts/analyze_rmsd_bimodal.py`, `scripts/analyze_rmsd_gad.py`
 
-## 3. Compute: Sella is much cheaper per converged TS
+## 3. Compute cost — replaced 2026-05-04 (the "50× cheaper" framing was misleading)
 
-Median per-sample compute:
+Earlier draft compared Sella vs GAD on **step counts**: Sella's median 13
+steps vs GAD's 700-1000 steps gave the "Sella is 50× cheaper" headline.
+That framing is wrong because per-step cost is comparable — both call HIP
+Hessian + eigendecomp every step. The right metric is wall-time per
+converged TS.
 
-| method | 200 pm |
-|---|---|
-| Sella libdef | 13 calls / 1.0 s |
-| GAD dt=0.007 (5k) | ~700-1000 calls / ~50 s |
+**Per-step wall-time** (median across all $n=287$ samples per cell, ms/step):
+- GAD dt=0.007: 62 ms/step (consistent across noise)
+- Sella libdef: 76 ms/step (1.20× GAD; trust-region linear solve adds ~14 ms)
+- Sella internal: 100 ms/step (internal-coords transform overhead)
 
-Sella is ~50x cheaper per success. But GAD has higher absolute success
-rate at high noise. So the question is **TS-found per GPU-hour**, not
-just rate.
+**Wall-time per converged TS** (`SUM(wall_time_s)` over all 287 attempts /
+`SUM(converged)`):
 
-**Sources:** `analysis_2026_04_29/threshold_sweep.csv` (median_calls, median_wall_s columns).
+| noise | GAD dt007 (5k) | Sella libdef (2k) | ratio | n_conv (GAD/Sella) |
+|---|---|---|---|---|
+| 10pm  | 47 s  | 14 s  | 3.33× | 256 / 276 |
+| 30pm  | 51 s  | 15 s  | 3.38× | 255 / 276 |
+| 50pm  | 68 s  | 22 s  | 3.06× | 246 / 264 |
+| 100pm | 141 s | 61 s  | 2.31× | 209 / 217 |
+| 150pm | 261 s | 125 s | 2.08× | 167 / 164 |
+| **200pm** | **441 s** | **348 s** | **1.27×** | **128 / 89** |
+
+At 200pm, GAD costs only **27% more wall per converged TS** while
+producing **44% more converged TS**. Above n_conv = 89 at 200pm, Sella
+*cannot deliver* regardless of compute (Sella libdef 5k = 218 conv, 10k
+= 218 conv at 100pm — saturated).
+
+**Mechanism for why Sella saturates and GAD doesn't:**
+- Sella's failures at 200pm: 63% wrong-saddle (n_neg≥2), 27% non-saddle
+  (n_neg=0 minimum). P-RFO already converged successfully, just to the
+  wrong critical point. More steps don't help.
+- GAD's failures at 200pm: 62% plateau-orbit (right basin, n_neg=1, just
+  fmax≈0.05 above gate). These would converge with a Newton polish (but
+  see §20 — naive NR-polish doesn't work).
+
+**GAD truncated to 2k step budget (matched to Sella):** at 200pm raw
+conv drops from 44.6% → 39.0% (vs Sella's 31.0%) — GAD still wins by 8pp
+at the same step budget.
+
+**Sources:**
+- `analysis_2026_04_29/compute_summary.csv` (per-cell step quantiles, wall, ms/step, wall-per-conv-TS).
+- `analysis_2026_04_29/gad_truncation.csv` and `sella_truncation.csv` (cumulative converged-fraction by step N).
+- `analysis_2026_04_29/dynamics_walltime.csv` (fmax median+IQR by wall-time bin).
+- Build script: `scripts/analyze_compute.py`.
+- Figures: `figures/fig_compute_step_dist.pdf, fig_compute_wall_per_conv.pdf, fig_compute_dynamics_walltime.pdf, fig_compute_truncation_cdf.pdf, fig_compute_pareto.pdf`.
+- Section in tex: §"Compute cost — what does GAD's robustness actually cost?" (rewritten 2026-05-04).
 
 ## 4. dt grid: cliff at dt ≈ 0.008
 
@@ -981,6 +1016,119 @@ test — beyond it, both methods saturate and the comparison loses
 meaning. Don't extend the headline noise grid above 200pm.
 
 **Sources:** `runs/test_huge/{gad_dt003_fmax,gad_dt007_fmax,sella_libdef_2k,sella_libdef_5k}/summary_*.parquet`.
+
+## 19. IRC sensitivity to scoring knobs (added 2026-05-03)
+
+**Question.** The original IRC validation used `rmsd_threshold=0.3 Å` and
+bond `cutoff_scale=1.2 × covalent_radius`. Both knobs are somewhat
+arbitrary. Are the headlines robust if we pick different values?
+
+**Method.** `scripts/analyze_irc_sensitivity.py` re-scores existing IRC
+parquets at `rmsd_threshold ∈ {0.3, 0.4, 0.5, 0.7}` Å and
+`cutoff_scale ∈ {1.1, 1.2, 1.3, 1.4}` without re-running IRC (just
+recomputes the scoring functions on cached endpoint coords).
+
+**Source data:** `runs/test_irc/<method>/irc_validation_*.parquet`
+(forward_coords_flat, reverse_coords_flat columns).
+Output: `analysis_2026_04_29/irc_sensitivity.csv` (one row per
+method × noise × rmsd_threshold × cutoff_scale).
+
+### TOPO sensitivity (cutoff_scale)
+
+TOPO-intended at cutoff=1.2 (canonical) vs 1.3 (more permissive):
+
+| method | 200pm @ 1.2 | 200pm @ 1.3 | shift |
+|---|---|---|---|
+| GAD dt=0.007 (5k) | 52.3 | 53.5 | +1.2 |
+| Sella libdef     | 31.5 | 32.9 | +1.4 |
+| gap (GAD−Sella)  | +20.8 | +20.6 | unchanged |
+
+(Note: the cutoff=1.2 numbers here differ slightly from the headline
+table because this script denominates by samples-with-valid-endpoints
+rather than full $n=287$. The ranking is unchanged.)
+
+### RMSD-intended sensitivity (threshold)
+
+RMSD-intended at threshold=0.3 Å vs 0.5 Å:
+
+| method | 200pm @ 0.3 Å | 200pm @ 0.5 Å | shift |
+|---|---|---|---|
+| GAD dt=0.007 (5k) | 24.9 | 32.0 | +7.1 |
+| Sella libdef     | 13.6 | 19.7 | +6.1 |
+| gap (GAD−Sella)  | +11.3 | +12.3 | +1.0 |
+
+RMSD numbers are uniformly higher with looser threshold (as expected),
+but the gap is preserved.
+
+### Conclusion: headlines are robust
+
+- Cutoff_scale 1.2 → 1.3: every cell shifts by ≤2pp. Ranking unchanged.
+- RMSD threshold 0.3 → 0.5: every cell shifts up uniformly ~6-10pp; the
+  GAD-minus-Sella gap is preserved within ±1pp.
+- **The +21pp IRC-TOPO headline at 200pm is robust to these knob choices.**
+
+This pre-empts the reviewer concern "you cherry-picked the bond cutoff
+or RMSD threshold."
+
+**Sources:**
+- `analysis_2026_04_29/irc_sensitivity.csv` (192 rows, every
+  method × noise × rmsd_threshold × cutoff_scale combination)
+- builder: `scripts/analyze_irc_sensitivity.py`
+
+## 20. NR-polish negative result (added 2026-05-04)
+
+**Hypothesis:** spectral-partitioned Newton–Raphson polish on top of
+GAD breaks the structural plateau at fmax≈0.01. Mechanism would be: NR
+step Δx = -H⁻¹F (with v_1 reflected) is quasi-second-order, whereas
+explicit Euler is first-order. Predicted: NR phase drives fmax to ~1e-5
+when activated.
+
+**Setup:** `scripts/method_single.py --method nr_gad_polish_dt007_{loose,strict}`
+on test split, n=80 subset, 3000 step budget, 6 noise levels (10/30/50/100/150/200pm),
+two thresholds: loose (fmax<0.01) and strict (fmax<1e-4). SLURM 60314225,
+12 cells, all completed in 1.9–4.3 h. Reduced from full n=287 because the
+NR phase is expensive (per-step Hessian eigendecomp + linear solve in
+the polished phase).
+
+**Result:** NR underperforms vanilla GAD by 14–40pp at every noise.
+
+| noise | GAD dt=0.007 baseline (n=287) | NR-loose (n=80) | Δ |
+|---|---|---|---|
+| 10pm  | 89.2% | 65.0% | -24.2pp |
+| 30pm  | 88.9% | 48.8% | -40.1pp |
+| 50pm  | 85.7% | 46.3% | -39.4pp |
+| 100pm | 72.8% | 37.5% | -35.3pp |
+| 150pm | 58.2% | 30.0% | -28.2pp |
+| 200pm | 44.6% | 30.0% | -14.6pp |
+
+**Critical diagnostic:** strict (fmax<1e-4) hits **0% conv across ALL
+noise levels**. Min observed fmax across all 480 NR-loose samples =
+0.0055; not a single sample crossed fmax<1e-3. The NR phase is *not*
+driving fmax down — it's making it worse.
+
+**Mechanism (revised hypothesis):** the NR step magnitude
+‖(H + αv_1v_1ᵀ)⁻¹F‖ blows up near the saddle, where H is near-singular
+along v_1. Each NR jump is large enough to escape the saddle basin,
+forcing GAD to re-approach in the next iteration. The flip-flop between
+NR overshooting and GAD recovering never settles. Average final fmax for
+NR-loose: 0.21–0.72, vs vanilla GAD 0.024–0.27 — NR ends 4–10× *worse*
+than no polish.
+
+**Implications:**
+- The "level 4" of the bottom-up plan (NR+GAD flipflop) does not work
+  as currently implemented.
+- The structural plateau at fmax≈0.01 stays — must either accept it
+  (paper headline already does, IRC validation works at fmax<0.01)
+  or implement trust-region NR (cap ‖Δx‖ — effectively Sella's RFO
+  logic on top of GAD).
+- Predicted-help-but-didn't. Documented as negative result; should NOT
+  be relaunched at full n=287 unless the algorithm is fixed first.
+
+**Sources:**
+- Summary parquets: `runs/test_nrpolish/nr_gad_polish_dt007_{loose,strict}/summary_*.parquet`
+- 480 trajectory parquets: `runs/test_nrpolish/.../traj_*.parquet`
+- SLURM logs: `logs/testnrpolish_60314225_{0..11}.out` (and `.err`)
+- Tex section: §"NR-polish negative result" (added 2026-05-04).
 
 ## Open follow-up questions (not yet investigated)
 

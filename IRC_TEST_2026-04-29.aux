@@ -14,8 +14,8 @@
 \fi}
 \global\let\hyper@last\relax 
 \gdef\HyperFirstAtBeginDocument#1{#1}
-\providecommand\HyField@AuxAddToFields[1]{}
-\providecommand\HyField@AuxAddToCoFields[2]{}
+\providecommand*\HyPL@Entry[1]{}
+\HyPL@Entry{0<</S/D>>}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces (A) The simple comparison: best-of-each, both tuned, both with HIP H every step, same coord system, same step budget — the ``most-faithful'' framing. (B) Sella's variants are different algorithms. We never collapse them under one ``Sella'' row; internal-coords Sella is a different optimizer from Cartesian, etc.\relax }}{1}{figure.caption.2}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
 \newlabel{fig:narrative-irc}{{1}{1}{(A) The simple comparison: best-of-each, both tuned, both with HIP H every step, same coord system, same step budget — the ``most-faithful'' framing. (B) Sella's variants are different algorithms. We never collapse them under one ``Sella'' row; internal-coords Sella is a different optimizer from Cartesian, etc.\relax }{figure.caption.2}{}}
@@ -53,86 +53,119 @@
 \@writefile{toc}{\contentsline {paragraph}{Sources.}{12}{section*.27}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {6}Saddle-quality breakdown}{13}{section.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Sources.}{13}{section*.28}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Steps to convergence}{14}{section.7}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Histogram of total\_steps for converged samples ($f_{\qopname  \relax m{max}}{<}0.01 \wedge n_{\text  {neg}}{=}1$, n=287). GAD takes \emph  {much} more steps than Sella (Sella is QN+trust, GAD is Euler). Per-converged-TS GAD costs $\sim $50$\times $ more compute; but GAD converges more samples at high noise.\relax }}{14}{figure.caption.29}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8}Adaptive-dt collapse}{15}{section.8}\protected@file@percent }
-\newlabel{sec:adapt}{{8}{15}{Adaptive-dt collapse}{section.8}{}}
-\@writefile{toc}{\contentsline {paragraph}{Why adaptive\_dt collapses.}{15}{section*.30}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9}Low-dt GAD diagnostic — plateau is structural (added 2026-05-01)}{16}{section.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What this section investigates.}{16}{section*.31}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Method.}{16}{section*.32}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{16}{section*.33}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{16}{section*.34}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10}Trajectory dynamics: when does $f_{\qopname  \relax m{max}}$ plateau? (added 2026-05-01)}{16}{section.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What this section measures.}{16}{section*.35}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Method legend.}{17}{section*.36}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Median $f_{\qopname  \relax m{max}}(t)$ per method × noise level (line); IQR band across 30 samples (shaded). Horizontal dotted lines: convergence thresholds $\{0.05, 0.01, 0.005, 0.001\}$. y-axis is log scale. Reading the figure: all GAD curves drop fast for $\sim $50--500 steps then flatten just above $f_{\qopname  \relax m{max}}{=}0.01$. Sella (cyan, train, 100pm only) drops below 0.01 within $\sim $10 steps and continues toward 0.001. GAD's flat region is the ``plateau''; Sella's absence of a flat region is the qualitative difference.\relax }}{17}{figure.caption.37}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Same as above but for the mean force norm $\|F\|_{\text  {mean}} = \frac  {1}{N}\DOTSB \sum@ \slimits@ _a \|F_a\|_2$. The qualitative shape mirrors $f_{\qopname  \relax m{max}}$ but at lower absolute values (by definition, mean $\le $ max). The plateau still appears at the same proportional level for GAD ($\sim 0.005$, vs $f_{\qopname  \relax m{max}}\sim 0.01$), confirming the structural-noise-floor hypothesis: it's not a single-atom-mode artifact but a global property of the dynamics near the saddle.\relax }}{18}{figure.caption.38}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend for the table below.}{18}{section*.39}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{19}{section*.40}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Pending: Sella trajectories on test.}{19}{section*.41}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {11}Sella without HIP Hessian (added 2026-05-01)}{19}{section.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What this section investigates.}{19}{section*.42}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Method.}{19}{section*.43}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{20}{section*.44}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{20}{section*.45}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {12}Best-of-each \& two comparison framings (added 2026-05-01)}{20}{section.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What this section reports.}{20}{section*.46}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Best per method.}{20}{section*.47}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{21}{section*.48}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Framing A — most-faithful comparison (both tuned, both armed with HIP H, same coordinate system, same gate).}{21}{section*.49}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Framing B — most-out-of-the-box for each.}{21}{section*.50}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sella variants are separate optimizers.}{21}{section*.51}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{22}{section*.52}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {13}RMSD distribution: why does GAD plateau farther but more uniformly? (added 2026-05-01)}{22}{section.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What this measures.}{22}{section*.53}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why Sella is bimodal at high noise.}{22}{section*.54}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why GAD shifts farther but more uniformly.}{22}{section*.55}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why GAD's median RMSD is systematically larger.}{22}{section*.56}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Can GAD's RMSD be reduced?}{22}{section*.57}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Steps to convergence (converged samples only).}{22}{section*.58}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{23}{section*.59}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {14}IRC method audit (added 2026-05-01)}{23}{section.14}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why this section exists.}{23}{section*.60}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Pipeline.}{23}{section*.61}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Integrator.}{23}{section*.62}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Two scoring metrics, two questions.}{24}{section*.63}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why TOPO is more permissive (and probably more correct).}{24}{section*.64}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Past bug.}{24}{section*.65}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Open audit items.}{24}{section*.66}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{24}{section*.67}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {15}Where do failed samples end up? (added 2026-05-01)}{24}{section.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Question.}{24}{section*.68}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Answer: Sella is NOT early-stopping.}{25}{section*.69}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Failure-mode classification (per cell).}{25}{section*.70}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sella's high-noise failure mode = wrong-saddle.}{25}{section*.71}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{GAD's high-noise failure mode = plateau-orbit.}{25}{section*.72}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Compound implication.}{25}{section*.73}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{What MIGHT help Sella at 200pm (untested except where noted):}{25}{section*.74}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{26}{section*.75}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {16}Sella step-budget is NOT the bottleneck (added 2026-05-01)}{26}{section.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Question.}{26}{section*.76}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Method.}{26}{section*.77}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{26}{section*.78}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {17}Sella's HIP Hessian cadence — robust around library default (added 2026-05-01)}{26}{section.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Question.}{26}{section*.79}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{26}{section*.80}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Compute.}{27}{section*.81}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{27}{section*.82}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {18}Huge-noise probe (300--2000 pm) — both methods saturate (added 2026-05-01)}{27}{section.18}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Question.}{27}{section*.83}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Method.}{27}{section*.84}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{27}{section*.85}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Implication.}{28}{section*.86}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sources.}{28}{section*.87}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {19}Appendix — full sweep visualizations (added 2026-05-01)}{28}{section.19}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces \textbf  {Every method, on one canvas.} Left: GAD family (dt grid + adaptive + low-dt). Right: Sella family (libdef cart, default cart, internal coords, Hessian cadences d=3/10/25, matched-budget 5k, no-Hessian partial). Same gate ($n_{\text  {neg}}{=}1\,\wedge \,f_{\qopname  \relax m{max}}{<}0.01$), test n=287. Color coding: each family stays in one warm/cool palette so the eye can group them. The ``no HIP H'' (BFGS only) line at the bottom of the right panel is partial (timed out at 12h with $\sim $5\% conv at every noise).\relax }}{29}{figure.caption.88}\protected@file@percent }
-\newlabel{fig:full-sweep}{{12}{29}{\textbf {Every method, on one canvas.} Left: GAD family (dt grid + adaptive + low-dt). Right: Sella family (libdef cart, default cart, internal coords, Hessian cadences d=3/10/25, matched-budget 5k, no-Hessian partial). Same gate ($n_{\text {neg}}{=}1\,\wedge \,f_{\max }{<}0.01$), test n=287. Color coding: each family stays in one warm/cool palette so the eye can group them. The ``no HIP H'' (BFGS only) line at the bottom of the right panel is partial (timed out at 12h with $\sim $5\% conv at every noise).\relax }{figure.caption.88}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Sella's three hyperparameter axes, each varied alone. (A) hyperparameter only ($\delta _0,\gamma $): minor effect. (B) coordinate system (internal vs Cartesian + Eckart): $\sim $10pp drop at high noise — this is an algorithm change, not a hparam tweak. (C) HIP H injection cadence (every 1, 3, 10, 25 steps, vs none): smooth degradation across $N=1\to 25$ ($-$3 to $-$13pp at 100--150pm), then a cliff to $\sim $5\% when no Hessian at all. The first 1-of-25 HIP Hessian per chain is what's load-bearing, not ``every step.''\relax }}{29}{figure.caption.89}\protected@file@percent }
-\newlabel{fig:sella-variants}{{13}{29}{Sella's three hyperparameter axes, each varied alone. (A) hyperparameter only ($\delta _0,\gamma $): minor effect. (B) coordinate system (internal vs Cartesian + Eckart): $\sim $10pp drop at high noise — this is an algorithm change, not a hparam tweak. (C) HIP H injection cadence (every 1, 3, 10, 25 steps, vs none): smooth degradation across $N=1\to 25$ ($-$3 to $-$13pp at 100--150pm), then a cliff to $\sim $5\% when no Hessian at all. The first 1-of-25 HIP Hessian per chain is what's load-bearing, not ``every step.''\relax }{figure.caption.89}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces GAD's hyperparameter axes. (A) dt grid at fixed 5000-step budget: monotone improvement from dt=0.003 to dt=0.007; collapse at dt=0.008 from Euler instability ($dt < 2/|\lambda _{\qopname  \relax m{max}}|$ is violated by stiff bond modes). (B) Step-budget tradeoff: dt=0.007/5k beats dt=0.003/5k beats adaptive\_dt; very-small-dt rows (1e-3, 5e-4 with 20k--40k step budgets) are partial coverage and confirm the structural plateau — 70$\times $ dt drop changes conv by $\le $5pp.\relax }}{30}{figure.caption.90}\protected@file@percent }
-\newlabel{fig:gad-lineage}{{14}{30}{GAD's hyperparameter axes. (A) dt grid at fixed 5000-step budget: monotone improvement from dt=0.003 to dt=0.007; collapse at dt=0.008 from Euler instability ($dt < 2/|\lambda _{\max }|$ is violated by stiff bond modes). (B) Step-budget tradeoff: dt=0.007/5k beats dt=0.003/5k beats adaptive\_dt; very-small-dt rows (1e-3, 5e-4 with 20k--40k step budgets) are partial coverage and confirm the structural plateau — 70$\times $ dt drop changes conv by $\le $5pp.\relax }{figure.caption.90}{}}
-\@writefile{toc}{\contentsline {paragraph}{How to read the appendix figures.}{30}{section*.91}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {20}Pending experiments (will append once data lands)}{30}{section.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {21}Data locations}{32}{section.21}\protected@file@percent }
-\gdef \@abspage@last{32}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Compute cost — what does GAD's robustness actually cost? (rewritten 2026-05-04)}{14}{section.7}\protected@file@percent }
+\newlabel{sec:compute}{{7}{14}{Compute cost — what does GAD's robustness actually cost? (rewritten 2026-05-04)}{section.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{The question.}{14}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{TL;DR (will be defended below).}{14}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Per-step cost — GAD step is \emph  {not} cheaper than Sella step}{14}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{14}{section*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Steps-to-convergence distribution — full picture, not just median}{15}{subsection.7.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Steps-to-convergence distribution for the \emph  {converged subset} of each cell. Filled circle = median; thick bar = P25--P75; thin tail = up to P95; numeric label = median. Sella's median is 4--16 steps across noise; GAD's median is 72--545 (dt=0.007). \emph  {Both methods have heavy P95 tails} approaching the budget — for Sella at high noise, a sample either converges fast or hits the wall.\relax }}{15}{figure.caption.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{15}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Wall-time-per-converged-TS — the actual cost metric}{15}{subsection.7.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Wall-time per converged TS = $\DOTSB \sum@ \slimits@ _{i=1}^{287}\!\text  {wall}_i\,/\,n_{\text  {conv}}$. Log y-axis. \textbf  {The ratio (GAD/Sella libdef) is $\mathbf  {3.3\times }$ at 10pm and only $\mathbf  {1.27\times }$ at 200pm.} GAD costs more per TS at low noise (where Sella nails it in 4 steps); the gap shrinks as noise rises and Sella's failed runs run out the 2k budget.\relax }}{16}{figure.caption.34}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{16}{section*.35}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}$f_{\qopname  \relax m{max}}(t)$ aligned by wall-time — Sella drops faster \emph  {and} tighter}{16}{subsection.7.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Median $f_{\qopname  \relax m{max}}$ per cell as a function of cumulative wall-time across the trajectory; shaded = IQR over samples in the same cell. Three noise levels: 30, 100, 200 pm. \textbf  {Sella (red) drops below $f_{\qopname  \relax m{max}}{=}0.01$ within $\sim 0.3$ s and continues toward $0.001$}; GAD curves drop fast for $\sim 1$--10 s then \emph  {flatten} just above $f_{\qopname  \relax m{max}}{=}0.01$.\relax }}{17}{figure.caption.36}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{17}{section*.37}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.5}GAD truncation: how much budget would actually have sufficed?}{17}{subsection.7.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces For each method × noise: x-axis is the step-budget cap $N$; y-axis is the fraction of all $n{=}287$ samples that achieved $n_{\text  {neg}}{=}1 \wedge f_{\qopname  \relax m{max}}{<}0.01$ \emph  {by} step $N$. Sella (red) saturates by step $\sim 30$; GAD (blue/orange) needs $\sim 500$--$2000$ steps to saturate. \textbf  {The plateau is visible as the upper-right flat region}: extending GAD's budget further yields almost no new conversions.\relax }}{18}{figure.caption.38}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{19}{section*.39}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Mirror experiment: GAD at Sella's budget (2000 steps).}{19}{section*.40}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.6}Sella with extended budget — does it help?}{19}{subsection.7.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Source.}{19}{section*.41}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.7}The compute–accuracy frontier — what does it cost to produce $N$ TS?}{20}{subsection.7.7}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Per noise: total wall-clock cost spent on the cell ($x$-axis, log) vs number of converged TS produced ($y$-axis). Each method = 1 point. Top-left = best (cheap + many TS). \textbf  {At low noise (10/30/50pm), Sella libdef dominates the frontier} — same n\_conv at lower cost. At 100pm onwards, GAD shifts upward in $n_{\text  {conv}}$ while Sella variants plateau in $y$. \textbf  {At 200pm there is no method on the frontier above $n_{\text  {conv}}{=}128$ — GAD dt=0.007 alone reaches there.}\relax }}{20}{figure.caption.42}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.8}Putting it all together — the bottom line}{20}{subsection.7.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pending probes.}{21}{section*.43}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources for this section (one place).}{21}{section*.44}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Adaptive-dt collapse}{22}{section.8}\protected@file@percent }
+\newlabel{sec:adapt}{{8}{22}{Adaptive-dt collapse}{section.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Why adaptive\_dt collapses.}{22}{section*.45}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Low-dt GAD diagnostic — plateau is structural (added 2026-05-01)}{23}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What this section investigates.}{23}{section*.46}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Method.}{23}{section*.47}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{23}{section*.48}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{23}{section*.49}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10}Trajectory dynamics: when does $f_{\qopname  \relax m{max}}$ plateau? (added 2026-05-01)}{23}{section.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What this section measures.}{23}{section*.50}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Method legend.}{24}{section*.51}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Median $f_{\qopname  \relax m{max}}(t)$ per method × noise level (line); IQR band across 30 samples (shaded). Horizontal dotted lines: convergence thresholds $\{0.05, 0.01, 0.005, 0.001\}$. y-axis is log scale. Reading the figure: all GAD curves drop fast for $\sim $50--500 steps then flatten just above $f_{\qopname  \relax m{max}}{=}0.01$. Sella (cyan, train, 100pm only) drops below 0.01 within $\sim $10 steps and continues toward 0.001. GAD's flat region is the ``plateau''; Sella's absence of a flat region is the qualitative difference.\relax }}{24}{figure.caption.52}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Same as above but for the mean force norm $\|F\|_{\text  {mean}} = \frac  {1}{N}\DOTSB \sum@ \slimits@ _a \|F_a\|_2$. The qualitative shape mirrors $f_{\qopname  \relax m{max}}$ but at lower absolute values (by definition, mean $\le $ max). The plateau still appears at the same proportional level for GAD ($\sim 0.005$, vs $f_{\qopname  \relax m{max}}\sim 0.01$), confirming the structural-noise-floor hypothesis: it's not a single-atom-mode artifact but a global property of the dynamics near the saddle.\relax }}{25}{figure.caption.53}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend for the table below.}{25}{section*.54}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{26}{section*.55}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pending: Sella trajectories on test.}{26}{section*.56}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11}Sella without HIP Hessian (added 2026-05-01)}{26}{section.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What this section investigates.}{26}{section*.57}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Method.}{26}{section*.58}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{27}{section*.59}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{27}{section*.60}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12}Best-of-each \& two comparison framings (added 2026-05-01)}{27}{section.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What this section reports.}{27}{section*.61}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Best per method.}{27}{section*.62}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{28}{section*.63}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Framing A — most-faithful comparison (both tuned, both armed with HIP H, same coordinate system, same gate).}{28}{section*.64}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Framing B — most-out-of-the-box for each.}{28}{section*.65}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sella variants are separate optimizers.}{28}{section*.66}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{29}{section*.67}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13}RMSD distribution: why does GAD plateau farther but more uniformly? (added 2026-05-01)}{29}{section.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What this measures.}{29}{section*.68}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why Sella is bimodal at high noise.}{29}{section*.69}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why GAD shifts farther but more uniformly.}{29}{section*.70}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why GAD's median RMSD is systematically larger.}{29}{section*.71}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Can GAD's RMSD be reduced?}{29}{section*.72}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Steps to convergence (converged samples only).}{29}{section*.73}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{30}{section*.74}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {14}IRC method audit (added 2026-05-01)}{30}{section.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why this section exists.}{30}{section*.75}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pipeline.}{30}{section*.76}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Integrator.}{30}{section*.77}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Two scoring metrics, two questions.}{31}{section*.78}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why TOPO is more permissive (and probably more correct).}{31}{section*.79}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Past bug.}{31}{section*.80}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Open audit items.}{31}{section*.81}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{31}{section*.82}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {15}Where do failed samples end up? (added 2026-05-01)}{31}{section.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Question.}{31}{section*.83}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Answer: Sella is NOT early-stopping.}{32}{section*.84}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Failure-mode classification (per cell).}{32}{section*.85}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sella's high-noise failure mode = wrong-saddle.}{32}{section*.86}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{GAD's high-noise failure mode = plateau-orbit.}{32}{section*.87}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Compound implication.}{32}{section*.88}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What MIGHT help Sella at 200pm (untested except where noted):}{32}{section*.89}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{33}{section*.90}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {16}Sella step-budget is NOT the bottleneck (added 2026-05-01)}{33}{section.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Question.}{33}{section*.91}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Method.}{33}{section*.92}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{33}{section*.93}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {17}Sella's HIP Hessian cadence — robust around library default (added 2026-05-01)}{33}{section.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Question.}{33}{section*.94}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{33}{section*.95}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Compute.}{34}{section*.96}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{34}{section*.97}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {18}Huge-noise probe (300--2000 pm) — both methods saturate (added 2026-05-01)}{34}{section.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Question.}{34}{section*.98}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Method.}{34}{section*.99}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cell legend.}{34}{section*.100}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Implication.}{35}{section*.101}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{35}{section*.102}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {19}Appendix — full sweep visualizations (added 2026-05-01)}{35}{section.19}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces \textbf  {Every method, on one canvas.} Left: GAD family (dt grid + adaptive + low-dt). Right: Sella family (libdef cart, default cart, internal coords, Hessian cadences d=3/10/25, matched-budget 5k, no-Hessian partial). Same gate ($n_{\text  {neg}}{=}1\,\wedge \,f_{\qopname  \relax m{max}}{<}0.01$), test n=287. Color coding: each family stays in one warm/cool palette so the eye can group them. The ``no HIP H'' (BFGS only) line at the bottom of the right panel is partial (timed out at 12h with $\sim $5\% conv at every noise).\relax }}{36}{figure.caption.103}\protected@file@percent }
+\newlabel{fig:full-sweep}{{16}{36}{\textbf {Every method, on one canvas.} Left: GAD family (dt grid + adaptive + low-dt). Right: Sella family (libdef cart, default cart, internal coords, Hessian cadences d=3/10/25, matched-budget 5k, no-Hessian partial). Same gate ($n_{\text {neg}}{=}1\,\wedge \,f_{\max }{<}0.01$), test n=287. Color coding: each family stays in one warm/cool palette so the eye can group them. The ``no HIP H'' (BFGS only) line at the bottom of the right panel is partial (timed out at 12h with $\sim $5\% conv at every noise).\relax }{figure.caption.103}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {17}{\ignorespaces Sella's three hyperparameter axes, each varied alone. (A) hyperparameter only ($\delta _0,\gamma $): minor effect. (B) coordinate system (internal vs Cartesian + Eckart): $\sim $10pp drop at high noise — this is an algorithm change, not a hparam tweak. (C) HIP H injection cadence (every 1, 3, 10, 25 steps, vs none): smooth degradation across $N=1\to 25$ ($-$3 to $-$13pp at 100--150pm), then a cliff to $\sim $5\% when no Hessian at all. The first 1-of-25 HIP Hessian per chain is what's load-bearing, not ``every step.''\relax }}{36}{figure.caption.104}\protected@file@percent }
+\newlabel{fig:sella-variants}{{17}{36}{Sella's three hyperparameter axes, each varied alone. (A) hyperparameter only ($\delta _0,\gamma $): minor effect. (B) coordinate system (internal vs Cartesian + Eckart): $\sim $10pp drop at high noise — this is an algorithm change, not a hparam tweak. (C) HIP H injection cadence (every 1, 3, 10, 25 steps, vs none): smooth degradation across $N=1\to 25$ ($-$3 to $-$13pp at 100--150pm), then a cliff to $\sim $5\% when no Hessian at all. The first 1-of-25 HIP Hessian per chain is what's load-bearing, not ``every step.''\relax }{figure.caption.104}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {18}{\ignorespaces GAD's hyperparameter axes. (A) dt grid at fixed 5000-step budget: monotone improvement from dt=0.003 to dt=0.007; collapse at dt=0.008 from Euler instability ($dt < 2/|\lambda _{\qopname  \relax m{max}}|$ is violated by stiff bond modes). (B) Step-budget tradeoff: dt=0.007/5k beats dt=0.003/5k beats adaptive\_dt; very-small-dt rows (1e-3, 5e-4 with 20k--40k step budgets) are partial coverage and confirm the structural plateau — 70$\times $ dt drop changes conv by $\le $5pp.\relax }}{37}{figure.caption.105}\protected@file@percent }
+\newlabel{fig:gad-lineage}{{18}{37}{GAD's hyperparameter axes. (A) dt grid at fixed 5000-step budget: monotone improvement from dt=0.003 to dt=0.007; collapse at dt=0.008 from Euler instability ($dt < 2/|\lambda _{\max }|$ is violated by stiff bond modes). (B) Step-budget tradeoff: dt=0.007/5k beats dt=0.003/5k beats adaptive\_dt; very-small-dt rows (1e-3, 5e-4 with 20k--40k step budgets) are partial coverage and confirm the structural plateau — 70$\times $ dt drop changes conv by $\le $5pp.\relax }{figure.caption.105}{}}
+\@writefile{toc}{\contentsline {paragraph}{IRC scoring sensitivity — headlines robust to knob choices.}{37}{section*.106}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{How to read the appendix figures.}{37}{section*.107}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {20}NR-polish negative result (added 2026-05-04)}{38}{section.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What we tried.}{38}{section*.108}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Configuration.}{38}{section*.109}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Result — NR underperforms vanilla GAD.}{38}{section*.110}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Diagnosis.}{38}{section*.111}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Average $f_{\qopname  \relax m{max}}$ at termination.}{38}{section*.112}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Implication for the paper.}{38}{section*.113}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sources.}{39}{section*.114}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {21}Pending experiments (will append once data lands)}{40}{section.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {22}Data locations}{41}{section.22}\protected@file@percent }
+\gdef \@abspage@last{41}
