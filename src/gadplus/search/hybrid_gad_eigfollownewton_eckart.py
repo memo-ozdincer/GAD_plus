@@ -189,16 +189,26 @@ def _internal_mass_weighted_state(force_cart, hessian_cart, coords, masses):
     }
 
 
+def _internal_vector_to_cartesian(vec_i, state):
+    """
+    Converts an internal mass-weighted vector to Cartesian coordinates.
+    """
+
+    vec_q = state["U_int"] @ vec_i
+    vec_x = state["inv_sqrt_m3"] * vec_q
+
+    return vec_x.reshape(state["force_shape"])
+
+
 def _internal_step_to_cartesian(step_i, state, trust_radius=None):
     """
     Converts an internal mass-weighted step back to Cartesian coordinates.
     """
 
-    step_q = state["U_int"] @ step_i
-    step_x = state["inv_sqrt_m3"] * step_q
+    step_x = _internal_vector_to_cartesian(step_i, state)
     step_x = _cartesian_trust_limit(step_x, trust_radius)
 
-    return step_x.reshape(state["force_shape"])
+    return step_x
 
 def projected_gad_step(
     force_cart,
@@ -247,6 +257,10 @@ def projected_gad_step(
 
     step_i = gad_dt * gad_dir_i
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=gad_dir_i,
+        state=state,
+    )
     step_cart = _internal_step_to_cartesian(
         step_i=step_i,
         state=state,
@@ -260,6 +274,8 @@ def projected_gad_step(
         "target_mode_vec_internal": v,
         "num_external_modes": state["U_ext"].shape[1],
         "num_internal_modes": state["U_int"].shape[1],
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": torch.linalg.vector_norm(F_i),
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
     }
@@ -307,6 +323,10 @@ def projected_index1_newton_step(
     F_eig = eigvecs.T @ F_i
     step_i = eigvecs @ (F_eig / denom)
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=step_i,
+        state=state,
+    )
     step_cart = _internal_step_to_cartesian(
         step_i=step_i,
         state=state,
@@ -319,6 +339,8 @@ def projected_index1_newton_step(
         "target_eigval": eigvals[target_mode],
         "num_external_modes": state["U_ext"].shape[1],
         "num_internal_modes": state["U_int"].shape[1],
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": torch.linalg.vector_norm(F_i),
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
     }
@@ -382,8 +404,8 @@ def projected_hybrid_gad_newton_step(
         v = eigvecs[:, target_mode]
 
         # Projected GAD direction.
-        gad_dir_i = F_i - 2.0 * torch.dot(F_i, v) * v
-        step_i = gad_dt * gad_dir_i
+        direction_i = F_i - 2.0 * torch.dot(F_i, v) * v
+        step_i = gad_dt * direction_i
 
         method = "projected_gad"
 
@@ -394,9 +416,14 @@ def projected_hybrid_gad_newton_step(
 
         F_eig = eigvecs.T @ F_i
         step_i = eigvecs @ (F_eig / denom)
+        direction_i = step_i
 
         method = "projected_eigenvector_following_newton"
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=direction_i,
+        state=state,
+    )
     step_cart = _internal_step_to_cartesian(
         step_i=step_i,
         state=state,
@@ -413,6 +440,8 @@ def projected_hybrid_gad_newton_step(
         "num_zero_modes": num_zero_modes,
         "num_positive_modes": num_positive_modes,
         "hessian_has_clear_index1": hessian_has_clear_index1,
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": force_norm_internal,
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
     }
@@ -421,23 +450,50 @@ def projected_hybrid_gad_newton_step(
 
 
 if __name__ == "__main__":
-    # x:       shape (n, 3)
-    # force:   shape (n,) or, for example, (natoms, 3)
-    # hessian: shape (n, n), where n = force.numel()
-    # z:       shape (n,)
+    # coords:  shape (natoms, 3)
+    # force:   shape (natoms, 3), force = -grad_x V
+    # hessian: shape (3 * natoms, 3 * natoms)
+    # z:       shape (natoms,)
 
-    coords = torch.randn(10, 3)
-    force = torch.randn(10)
-    hessian = torch.randn(10, 10)
-    z = torch.randint(1, 100, (10,)) # atomic numbers
+    natoms = 10
+    coords = torch.randn(natoms, 3)
+    force = torch.randn(natoms, 3)
+    hessian = torch.randn(3 * natoms, 3 * natoms)
+    z = torch.tensor([6] * natoms)  # carbon atoms
 
     coords = coords.double()
     force = force.double()
-    hessian = hessian.double()
+    hessian = _symmetrize(hessian.double())
 
     masses = masses_from_z(z, device=coords.device, dtype=coords.dtype)
 
-    step, info = projected_hybrid_gad_newton_step(
+    # 1) Pure GAD: returns a Cartesian step already scaled by gad_dt.
+    gad_step, gad_info = projected_gad_step(
+        force_cart=force,
+        hessian_cart=hessian,
+        coords=coords,
+        masses=masses,
+        target_mode=0,
+        gad_dt=1.0e-2,
+        trust_radius=0.05,
+    )
+    coords_after_gad = coords + gad_step
+    gad_direction = gad_info["direction_cart"]  # unscaled Cartesian direction
+
+    # 2) Pure eigenvector-following Newton: returns a Cartesian Newton step.
+    newton_step, newton_info = projected_index1_newton_step(
+        force_cart=force,
+        hessian_cart=hessian,
+        coords=coords,
+        masses=masses,
+        target_mode=0,
+        min_curvature=1.0e-6,
+        trust_radius=0.05,
+    )
+    coords_after_newton = coords + newton_step
+
+    # 3) Hybrid: uses GAD far away and Newton near the saddle.
+    hybrid_step, hybrid_info = projected_hybrid_gad_newton_step(
         force_cart=force,
         hessian_cart=hessian,
         coords=coords,
@@ -449,5 +505,10 @@ if __name__ == "__main__":
         min_curvature=1.0e-6,
         trust_radius=0.05,
     )
+    coords_after_hybrid = coords + hybrid_step
 
-    coords_next = coords + step
+    print("GAD step norm:", gad_info["step_norm_cart"].item())
+    print("GAD direction norm:", gad_info["direction_norm_cart"].item())
+    print("Newton step norm:", newton_info["step_norm_cart"].item())
+    print("Hybrid method:", hybrid_info["method"])
+    print("Hybrid step norm:", hybrid_info["step_norm_cart"].item())

@@ -60,6 +60,17 @@ def fnorm(forces: torch.Tensor) -> float:
     return float(torch.linalg.vector_norm(forces.reshape(-1)).item())
 
 
+def info_scalar(info: dict, key: str, default=None) -> float | None:
+    value = info.get(key, default)
+    if value is None:
+        return None
+    if isinstance(value, torch.Tensor):
+        if value.numel() == 0:
+            return None
+        return float(value.detach().reshape(-1)[0].cpu().item())
+    return float(value)
+
+
 def n_neg_eckart(hessian: torch.Tensor, coords: torch.Tensor,
                  atomic_nums: torch.Tensor) -> tuple[int, float, float]:
     """Eckart-projected n_neg + eig0 + eig1 (vibrational only)."""
@@ -176,6 +187,9 @@ def main():
         final_eig1 = 0.0
         final_energy = float("nan")
         final_method_used = ""
+        final_step_norm_cart = float("nan")
+        final_force_norm_internal = float("nan")
+        final_target_eigval = float("nan")
         n_steps_actual = 0
         for step_idx in range(args.n_steps):
             out = predict_fn(coords, atomic_nums, do_hessian=True,
@@ -195,6 +209,10 @@ def main():
                 "sample_id": i, "step": step_idx, "energy": E_v,
                 "force_max": fmax_v, "force_norm": fnorm_v,
                 "n_neg": n_neg, "eig0": eig0, "eig1": eig1,
+                "step_method": None,
+                "step_norm_cart": None,
+                "force_norm_internal": None,
+                "target_eigval": None,
             })
 
             # Convergence check
@@ -240,6 +258,23 @@ def main():
                 )
                 used = info.get("method", "?")
             final_method_used = used
+            step_norm_cart = info_scalar(
+                info,
+                "step_norm_cart",
+                default=torch.linalg.vector_norm(step),
+            )
+            force_norm_internal = info_scalar(
+                info,
+                "force_norm_internal",
+                default=info.get("force_norm"),
+            )
+            target_eigval = info_scalar(info, "target_eigval")
+            traj_rows[-1].update({
+                "step_method": used,
+                "step_norm_cart": step_norm_cart,
+                "force_norm_internal": force_norm_internal,
+                "target_eigval": target_eigval,
+            })
 
             # Apply step. Defensive on shape.
             step = step.reshape_as(coords)
@@ -248,6 +283,9 @@ def main():
             final_force_max = fmax_v; final_force_norm = fnorm_v
             final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
             final_energy = E_v
+            final_step_norm_cart = step_norm_cart
+            final_force_norm_internal = force_norm_internal
+            final_target_eigval = target_eigval
             n_steps_actual = step_idx + 1
 
         wall = time.time() - t0
@@ -263,6 +301,9 @@ def main():
             "total_steps": n_steps_actual,
             "final_force_max": final_force_max,
             "final_force_norm": final_force_norm,
+            "final_step_norm_cart": final_step_norm_cart,
+            "final_force_norm_internal": final_force_norm_internal,
+            "final_target_eigval": final_target_eigval,
             "final_n_neg": final_n_neg,
             "final_eig0": final_eig0, "final_eig1": final_eig1,
             "final_energy": final_energy,

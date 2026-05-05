@@ -189,16 +189,26 @@ def _internal_mass_weighted_state(force_cart, hessian_cart, coords, masses):
     }
 
 
+def _internal_vector_to_cartesian(vec_i, state):
+    """
+    Converts an internal mass-weighted vector to Cartesian coordinates.
+    """
+
+    vec_q = state["U_int"] @ vec_i
+    vec_x = state["inv_sqrt_m3"] * vec_q
+
+    return vec_x.reshape(state["force_shape"])
+
+
 def _internal_step_to_cartesian(step_i, state, trust_radius=None):
     """
     Converts an internal mass-weighted step back to Cartesian coordinates.
     """
 
-    step_q = state["U_int"] @ step_i
-    step_x = state["inv_sqrt_m3"] * step_q
+    step_x = _internal_vector_to_cartesian(step_i, state)
     step_x = _cartesian_trust_limit(step_x, trust_radius)
 
-    return step_x.reshape(state["force_shape"])
+    return step_x
 
 
 def damped_eigenfollowing_step(
@@ -208,6 +218,7 @@ def damped_eigenfollowing_step(
     target_mode=0,
     min_curvature=1.0e-8,
     trust_radius=None,
+    trust_norm_fn=None,
     max_iter=80,
 ):
     """
@@ -233,6 +244,11 @@ def damped_eigenfollowing_step(
         step_eig = sign * F_eig / (curv + mu)
         return eigvecs @ step_eig
 
+    def step_norm(step):
+        if trust_norm_fn is None:
+            return torch.linalg.vector_norm(step)
+        return trust_norm_fn(step)
+
     step = step_for_mu(torch.zeros((), dtype=F_i.dtype, device=F_i.device))
 
     if trust_radius is None:
@@ -240,18 +256,18 @@ def damped_eigenfollowing_step(
 
     delta = torch.as_tensor(trust_radius, dtype=F_i.dtype, device=F_i.device)
 
-    if torch.linalg.vector_norm(step) <= delta:
+    if step_norm(step) <= delta:
         return step, torch.zeros((), dtype=F_i.dtype, device=F_i.device)
 
     lo = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
     hi = torch.ones((), dtype=F_i.dtype, device=F_i.device)
 
-    while torch.linalg.vector_norm(step_for_mu(hi)) > delta:
+    while step_norm(step_for_mu(hi)) > delta:
         hi = 2.0 * hi
 
     for _ in range(max_iter):
         mid = 0.5 * (lo + hi)
-        if torch.linalg.vector_norm(step_for_mu(mid)) > delta:
+        if step_norm(step_for_mu(mid)) > delta:
             lo = mid
         else:
             hi = mid
@@ -308,6 +324,10 @@ def projected_gad_step(
 
     step_i = gad_dt * gad_dir_i
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=gad_dir_i,
+        state=state,
+    )
     step_cart = _internal_step_to_cartesian(
         step_i=step_i,
         state=state,
@@ -321,6 +341,8 @@ def projected_gad_step(
         "target_mode_vec_internal": v,
         "num_external_modes": state["U_ext"].shape[1],
         "num_internal_modes": state["U_int"].shape[1],
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": torch.linalg.vector_norm(F_i),
         "step_norm_internal": torch.linalg.vector_norm(step_i),
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
@@ -361,6 +383,14 @@ def projected_index1_newton_step(
     if not (0 <= target_mode < eigvals.numel()):
         raise ValueError("target_mode is outside the internal-mode spectrum.")
 
+    def cartesian_step_norm(step_i):
+        step_x = _internal_step_to_cartesian(
+            step_i=step_i,
+            state=state,
+            trust_radius=None,
+        )
+        return torch.linalg.vector_norm(step_x)
+
     step_i, mu = damped_eigenfollowing_step(
         F_i=F_i,
         eigvals=eigvals,
@@ -368,8 +398,13 @@ def projected_index1_newton_step(
         target_mode=target_mode,
         min_curvature=min_curvature,
         trust_radius=trust_radius,
+        trust_norm_fn=cartesian_step_norm,
     )
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=step_i,
+        state=state,
+    )
     step_cart = _internal_step_to_cartesian(
         step_i=step_i,
         state=state,
@@ -383,6 +418,8 @@ def projected_index1_newton_step(
         "damping_mu": mu,
         "num_external_modes": state["U_ext"].shape[1],
         "num_internal_modes": state["U_int"].shape[1],
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": torch.linalg.vector_norm(F_i),
         "step_norm_internal": torch.linalg.vector_norm(step_i),
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
@@ -448,8 +485,8 @@ def projected_hybrid_gad_newton_step(
         v = eigvecs[:, target_mode]
 
         # Projected GAD direction.
-        gad_dir_i = F_i - 2.0 * torch.dot(F_i, v) * v
-        step_i = gad_dt * gad_dir_i
+        direction_i = F_i - 2.0 * torch.dot(F_i, v) * v
+        step_i = gad_dt * direction_i
 
         step_cart = _internal_step_to_cartesian(
             step_i=step_i,
@@ -460,6 +497,14 @@ def projected_hybrid_gad_newton_step(
         method = "projected_gad"
 
     else:
+        def cartesian_step_norm(step_i):
+            step_x = _internal_step_to_cartesian(
+                step_i=step_i,
+                state=state,
+                trust_radius=None,
+            )
+            return torch.linalg.vector_norm(step_x)
+
         step_i, damping_mu = damped_eigenfollowing_step(
             F_i=F_i,
             eigvals=eigvals,
@@ -467,7 +512,9 @@ def projected_hybrid_gad_newton_step(
             target_mode=target_mode,
             min_curvature=min_curvature,
             trust_radius=trust_radius,
+            trust_norm_fn=cartesian_step_norm,
         )
+        direction_i = step_i
 
         step_cart = _internal_step_to_cartesian(
             step_i=step_i,
@@ -476,6 +523,10 @@ def projected_hybrid_gad_newton_step(
         )
         method = "projected_damped_eigenvector_following_newton"
 
+    direction_cart = _internal_vector_to_cartesian(
+        vec_i=direction_i,
+        state=state,
+    )
     info = {
         "method": method,
         "internal_eigvals": eigvals,
@@ -487,6 +538,8 @@ def projected_hybrid_gad_newton_step(
         "num_zero_modes": num_zero_modes,
         "num_positive_modes": num_positive_modes,
         "hessian_has_clear_index1": hessian_has_clear_index1,
+        "direction_cart": direction_cart,
+        "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": force_norm_internal,
         "step_norm_internal": torch.linalg.vector_norm(step_i),
         "step_norm_cart": torch.linalg.vector_norm(step_cart),
@@ -505,11 +558,11 @@ if __name__ == "__main__":
     coords = torch.randn(natoms, 3)
     force = torch.randn(natoms, 3)
     hessian = torch.randn(3 * natoms, 3 * natoms)
-    z = torch.randint(1, 100, (natoms,))  # atomic numbers
+    z = torch.tensor([6] * natoms)  # carbon atoms
 
     coords = coords.double()
     force = force.double()
-    hessian = hessian.double()
+    hessian = _symmetrize(hessian.double())
 
     masses = masses_from_z(z, device=coords.device, dtype=coords.dtype)
 

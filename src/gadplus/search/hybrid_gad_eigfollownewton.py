@@ -177,18 +177,37 @@ def hybrid_gad_newton_step_from_force(
 
 
 if __name__ == "__main__":
-    # x:       shape (n, 3)
-    # force:   shape (n,) or, for example, (natoms, 3)
-    # hessian: shape (n, n), where n = force.numel()
+    # coords:  shape (natoms, 3)
+    # force:   shape (natoms, 3), force = -grad_x V
+    # hessian: shape (3 * natoms, 3 * natoms)
 
-    x = torch.randn(10, 3)
-    force = torch.randn(10)
-    hessian = torch.randn(10, 10)
+    natoms = 10
+    coords = torch.randn(natoms, 3).double()
+    force = torch.randn(natoms, 3).double()
+    hessian = torch.randn(3 * natoms, 3 * natoms).double()
+    hessian = _symmetrize(hessian)
 
-    force = force.double()
-    hessian = hessian.double()
+    # 1) Pure GAD: returns an unscaled Cartesian direction.
+    gad_direction, gad_info = gad_direction_from_force(
+        force=force,
+        hessian=hessian,
+        target_mode=0,
+    )
+    gad_step = _trust_limit(1.0e-2 * gad_direction.reshape(-1), 0.05).reshape_as(force)
+    coords_after_gad = coords + gad_step
 
-    step, info = hybrid_gad_newton_step_from_force(
+    # 2) Pure eigenvector-following Newton: returns a Cartesian Newton step.
+    newton_step, newton_info = index1_saddle_step_from_force(
+        force=force,
+        hessian=hessian,
+        target_mode=0,
+        min_curvature=1.0e-6,
+        trust_radius=0.05,
+    )
+    coords_after_newton = coords + newton_step
+
+    # 3) Hybrid: uses GAD when ||force|| > switch_force, otherwise Newton.
+    hybrid_step, hybrid_info = hybrid_gad_newton_step_from_force(
         force,
         hessian,
         target_mode=0,          # lowest Hessian eigenmode
@@ -197,5 +216,10 @@ if __name__ == "__main__":
         min_curvature=1.0e-6,
         trust_radius=0.05,
     )
+    coords_after_hybrid = coords + hybrid_step
 
-    x_next = x + step.reshape_as(x)
+    print("GAD direction norm:", torch.linalg.vector_norm(gad_direction).item())
+    print("GAD step norm:", torch.linalg.vector_norm(gad_step).item())
+    print("Newton step norm:", newton_info["step_norm"].item())
+    print("Hybrid method:", hybrid_info["method"])
+    print("Hybrid step norm:", torch.linalg.vector_norm(hybrid_step).item())

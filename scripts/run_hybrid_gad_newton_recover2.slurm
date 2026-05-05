@@ -7,6 +7,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=/lustre07/scratch/memoozd/gadplus/logs/hgnrec2_%A_%a.out
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/hgnrec2_%A_%a.err
+#SBATCH --array=7-19,25-39,44-49
 
 set -euo pipefail
 module purge
