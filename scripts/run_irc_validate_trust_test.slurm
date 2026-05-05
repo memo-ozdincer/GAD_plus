@@ -8,7 +8,7 @@
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/irc_trust_%A_%a.err
 #SBATCH --array=0-2
 #
-# Smoke test: trust original converged labels, skip refinement, do not gate before IRC.
+# Smoke test: trust original converged labels, skip refinement, do not apply the criterion before IRC.
 
 set -euo pipefail
 

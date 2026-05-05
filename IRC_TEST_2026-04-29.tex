@@ -48,7 +48,7 @@ internal-coords Sella is a different optimizer from Cartesian, etc.}
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_narrative_conv.pdf}
-\caption{Raw-convergence companion (Sella's library default gate fmax<0.05
+\caption{Raw-convergence companion (Sella's library default criterion fmax<0.05
 left, our canonical fmax<0.01 right). At fmax<0.05 GAD wins by +22pp at
 200pm; at fmax<0.01 by +17pp. IRC TOPO is the \emph{paper headline},
 raw conv is supplementary.}
@@ -299,7 +299,7 @@ Sella default & \textbf{35.9} & \textbf{33.1} & \textbf{34.1} & 22.3 & \textbf{1
 
 \paragraph{Without the $n_{\text{neg}}{=}1$ requirement (Sella's own default).}
 Sella's library default checks only force convergence, not saddle index.
-Reporting under that gate (no saddle requirement) gives Sella some
+Reporting under that criterion (no saddle requirement) gives Sella some
 headroom — e.g.\ at 200\,pm Sella libdef goes from 46.0\% (with
 $n_{\text{neg}}{=}1$) to 55.1\% (without). The gap is "Sella claims
 converged but landed at a non-saddle stationary point" (mostly
@@ -349,7 +349,7 @@ and \texttt{runs/test\_set/sella\_*\/summary\_*.parquet}. Sella internal
 \item At $\|F\|_{\text{mean}}{<}0.01$ (lenient mean force): \textbf{GAD wins by +24 pp at 200pm}.
 \item At $f_{\max}{<}0.005$ (tight): \textbf{Sella dominates everywhere; GAD goes to 0\%}.
 \end{itemize}
-The "right" gate is debatable. Below we use $f_{\max}{<}0.01$ as the
+The "right" criterion is debatable. Below we use $f_{\max}{<}0.01$ as the
 canonical for IRC validation since IRC is the chemical ground truth.
 
 \newpage
@@ -635,7 +635,7 @@ $f_{\max}{=}0.01$.}
 \item \textbf{Sella reaches $f_{\max}{<}0.01$ in less wall-time than GAD,
   on the median sample.} Not just fewer steps — actually less seconds.
 \item \textbf{Sella's median continues toward $f_{\max}{=}0.001$} (1000$\times$
-  tighter than the gate). \textbf{GAD's median plateaus at
+  tighter than the criterion). \textbf{GAD's median plateaus at
   $f_{\max} \approx 0.01$ regardless of how many seconds you spend.}
   This is the structural plateau confirmed in the low-dt diagnostic
   (\S "Low-dt GAD diagnostic").
@@ -749,7 +749,7 @@ Method & fmax threshold & 10 & 30 & 50 & 100 & 150 & 200 \\
 \vskip0.4em
 \textit{Sella's trajlog terminates when Sella's intrinsic convergence
 ($\|F\|_{\text{rms}}{<}0.0045$, library default) triggers; samples that
-hit the looser fmax gate first are recorded but the trajectory stops
+hit the looser fmax criterion first are recorded but the trajectory stops
 before reaching tighter thresholds. So Sella's "$0$ at $f_{\max}{<}0.001$"
 is a logging artefact, not an algorithmic limit. GAD's "$0$ at
 $f_{\max}{<}0.005$" is real: 70 sampled GAD trajectories at all dt grid
@@ -830,7 +830,7 @@ minimum) — see \S "Where do failed samples end up?". Trust-region P-RFO
 \emph{converged successfully} on those samples, just to the wrong critical
 point. More steps don't help — the algorithm has nothing to do.
 By contrast, GAD's failures at 200pm are 62\% plateau-orbit (in the right
-basin, $n_{\text{neg}}{=}1$, just $f_{\max}\!\sim\!0.05$ above gate) — those
+basin, $n_{\text{neg}}{=}1$, just $f_{\max}\!\sim\!0.05$ above criterion) — those
 \emph{would} converge with a Newton polish, just not with more Euler.
 
 \paragraph{Source.} \texttt{runs/test\_sella\_extended/carteck\_libdef\_5k/}
@@ -1088,7 +1088,7 @@ Sella libdef (train, 100pm) & --       & --       & --       & 10 (2)   & --    
   samples cross (4--24 vs 11--26): it's stuck, not just slow.
 \item dt=$10^{-3}$ at 5000-step cutoff is 6$\times$ slower than dt=0.007
   to cross 0.01 (and would need its full 20k budget to match crossings).
-  Smaller-dt is purely compute-wasteful for this gate.
+  Smaller-dt is purely compute-wasteful for this criterion.
 \item \textbf{No GAD configuration} crosses $f_{\max}{<}0.005$ in any cell
   with any step budget tested (max 5000 steps shown; even 20k for
   dt=$10^{-3}$ doesn't move the needle). The plateau is real, not
@@ -1140,7 +1140,7 @@ test both Cartesian-Eckart and internal-coords variants.
 
 \paragraph{Method.} Same Sella scripts as the canonical Sella row, but
 with \texttt{hessian\_function=None} (i.e.\ no HIP injection). Step
-budget 2000, gate $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$.
+budget 2000, criterion $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$.
 Job 60110188 timed out at 12h before any cell finished
 all 287 samples; we parse per-sample CONV/FAIL lines from stdout logs.
 
@@ -1191,7 +1191,7 @@ before parquet write). Saved as
 \texttt{analysis\_2026\_04\_29/sella\_nohess\_partial.csv} via
 \texttt{scripts/parse\_nohess\_logs.py}. ``With HIP H'' rows from
 \texttt{analysis\_2026\_04\_29/threshold\_sweep.csv} at
-\texttt{threshold=0.01, gate=conv\_fmax\_pct}.
+\texttt{threshold=0.01, criterion=conv\_fmax\_pct}.
 
 % =================================================================
 \section{Best-of-each \& two comparison framings (added 2026-05-01)}
@@ -1209,7 +1209,7 @@ canonical ``best'' Sella per noise level, plus two explicit
   $dt\geq 0.008$ collapses from Euler instability).
 \item \textbf{Best Sella (Cartesian + Eckart):} \texttt{libdef} hyperparams
   ($\delta_0{=}0.1, \gamma{=}0.4$), full HIP analytic Hessian every
-  step (\texttt{diag\_every\_n=1}), gate fmax<0.01.
+  step (\texttt{diag\_every\_n=1}), criterion fmax<0.01.
 \item \textbf{Best Sella (internal coords):} \texttt{internal\_default}
   ($\delta_0{=}0.048, \gamma{=}0$), full HIP H every step. \emph{Reported
   separately from Cartesian} — internal-coords Sella is a different
@@ -1217,11 +1217,11 @@ canonical ``best'' Sella per noise level, plus two explicit
 \end{itemize}
 
 \paragraph{Cell legend.} Both columns are convergence rate (\%) on the
-$n=287$ test set under the gate $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
+$n=287$ test set under the criterion $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
 eV/{\AA}. Source \texttt{analysis\_2026\_04\_29/threshold\_sweep.csv}.
 
 \begin{center}\small
-\textbf{Head-to-head best vs best (loose gate, fmax<0.01 $\wedge$ $n_{\text{neg}}{=}1$)} \\[0.3em]
+\textbf{Head-to-head best vs best (loose criterion, fmax<0.01 $\wedge$ $n_{\text{neg}}{=}1$)} \\[0.3em]
 \begin{tabular}{l|cccccc}
 \toprule
 method                                            & 10 & 30 & 50 & 100 & 150 & 200 \\
@@ -1240,7 +1240,7 @@ where Sella's trust-region collapses but GAD's monotone descent keeps
 pushing.
 
 \paragraph{Framing A — most-faithful comparison (both tuned, both armed
-with HIP H, same coordinate system, same gate).} Above table.
+with HIP H, same coordinate system, same criterion).} Above table.
 
 \paragraph{Framing B — most-out-of-the-box for each.}
 \begin{itemize}[leftmargin=1.5em]
@@ -1258,11 +1258,11 @@ with HIP H, same coordinate system, same gate).} Above table.
 \begin{center}\small
 \begin{tabular}{l|cccccc}
 \toprule
-out-of-box config / gate                                  & 10 & 30 & 50 & 100 & 150 & 200 \\
+out-of-box config / criterion                                  & 10 & 30 & 50 & 100 & 150 & 200 \\
 \midrule
 GAD dt=0.003 / fmax<0.01                                  & 88.2 & 87.1 & 84.7 & 69.3 & 51.6 & 34.8 \\
 Sella internal default (every-step H) / fmax<0.01         & 79.1 & 77.4 & 71.8 & 50.9 & --   & --   \\
-Sella internal default / fmax<0.05 (Sella's own gate)     & 94.4 & 90.6 & 84.7 & 63.8 & --   & --   \\
+Sella internal default / fmax<0.05 (Sella's own criterion)     & 94.4 & 90.6 & 84.7 & 63.8 & --   & --   \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1543,7 +1543,7 @@ the wrong attractor}.
 
 \paragraph{GAD's high-noise failure mode = plateau-orbit.} 99 of 159
 GAD failures at 200pm (62\%) are $n_{\text{neg}}=1, f_{\max}\in[0.01, 0.05]$.
-Median fail $f_{\max}$ = $0.046$ — only 5$\times$ the gate, not 50$\times$.
+Median fail $f_{\max}$ = $0.046$ — only 5$\times$ the criterion, not 50$\times$.
 GAD found the right saddle and is orbiting it. \emph{More step budget
 might help} — but the structural plateau eventually limits it. NR polish
 (60151717) is the right fix here.
@@ -1674,11 +1674,11 @@ at large displacement and tests whether GAD's lead persists.
 the headline grid). 4 noise × 4 methods. 5000 steps for GAD, 2k+5k
 for Sella.
 
-\paragraph{Cell legend.} \% conv (and total $n=50$ implicit). Strict gate
-= $n_{\text{neg}}=1 \wedge f_{\max}<0.01$. Loose gate = $n_{\text{neg}}=1 \wedge f_{\max}<0.05$.
+\paragraph{Cell legend.} \% conv (and total $n=50$ implicit). Strict criterion
+= $n_{\text{neg}}=1 \wedge f_{\max}<0.01$. Loose criterion = $n_{\text{neg}}=1 \wedge f_{\max}<0.05$.
 
 \begin{center}\small
-\textbf{Strict gate} \\[0.3em]
+\textbf{Strict criterion} \\[0.3em]
 \begin{tabular}{l|cccc}
 \toprule
                           & 300pm & 500pm & 1000pm & 2000pm \\
@@ -1690,7 +1690,7 @@ Sella libdef 5k           & 20.0  & 6.0   & 0.0    & 0.0 \\
 \bottomrule
 \end{tabular}
 \vskip0.4em
-\textbf{Loose gate} \\[0.3em]
+\textbf{Loose criterion} \\[0.3em]
 \begin{tabular}{l|cccc}
 \toprule
                           & 300pm & 500pm & 1000pm & 2000pm \\
@@ -1705,8 +1705,8 @@ Sella libdef 5k           & 34.0  & 18.0  & 4.0    & 2.0 \\
 
 \textbf{Reading the data:}
 \begin{itemize}[leftmargin=1.5em]
-\item GAD's lead persists at 300/500pm. Loose gate at 500pm: GAD 42\%, Sella 18\% ($+$24pp).
-\item Both methods saturate at 1000pm+ (both at strict 0\%, only loose-gate signal). The 200pm in our headline grid was the right stress test.
+\item GAD's lead persists at 300/500pm. Loose criterion at 500pm: GAD 42\%, Sella 18\% ($+$24pp).
+\item Both methods saturate at 1000pm+ (both at strict 0\%, only loose-criterion signal). The 200pm in our headline grid was the right stress test.
 \item Sella step-budget continues to NOT help (5k vs 2k essentially identical at 500/1000/2000pm).
 \item HIP Hessian remains numerically sensible at large displacement — both methods produce reasonable $n_{\text{neg}}=1$ saddles at 300pm.
 \end{itemize}
@@ -1731,7 +1731,7 @@ deliberately; the figures here show every method we measured.
 \caption{\textbf{Every method, on one canvas.} Left: GAD family (dt
 grid + adaptive + low-dt). Right: Sella family (libdef cart, default
 cart, internal coords, Hessian cadences d=3/10/25, matched-budget 5k,
-no-Hessian partial). Same gate ($n_{\text{neg}}{=}1\,\wedge\,f_{\max}{<}0.01$),
+no-Hessian partial). Same criterion ($n_{\text{neg}}{=}1\,\wedge\,f_{\max}{<}0.01$),
 test n=287. Color coding: each family stays in one warm/cool palette so
 the eye can group them. The ``no HIP H'' (BFGS only) line at the bottom of
 the right panel is partial (timed out at 12h with $\sim$5\% conv at every noise).}
@@ -1826,8 +1826,8 @@ final-RMSD to Sella levels.
 
 \paragraph{Configuration.} \texttt{nr\_gad\_polish\_dt007} runner
 (\texttt{scripts/method\_single.py}), $dt{=}0.007$, NR phase activates
-when $n_{\text{neg}}{=}1$, two thresholds tested: \texttt{loose} (gate
-$f_{\max}{<}10^{-2}$) and \texttt{strict} (gate $f_{\max}{<}10^{-4}$).
+when $n_{\text{neg}}{=}1$, two thresholds tested: \texttt{loose} (criterion
+$f_{\max}{<}10^{-2}$) and \texttt{strict} (criterion $f_{\max}{<}10^{-4}$).
 Test split, $n{=}80$ subset, 3000 step budget, 6 noise levels.
 SLURM 60314225 (12 cells, all completed in 1.9--4.3 h each).
 
@@ -1841,7 +1841,7 @@ SLURM 60314225 (12 cells, all completed in 1.9--4.3 h each).
 \midrule
 GAD dt=0.007 (5k, $n{=}287$) — \emph{baseline}      & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 & 44.6 \\
 NR-polish loose (3k, $n{=}80$)                       & 65.0 & 48.8 & 46.3 & 37.5 & 30.0 & 30.0 \\
-NR-polish strict ($f_{\max}{<}10^{-4}$ gate, $n{=}80$) & 0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 \\
+NR-polish strict ($f_{\max}{<}10^{-4}$ criterion, $n{=}80$) & 0.0 &  0.0 &  0.0 &  0.0 &  0.0 &  0.0 \\
 \midrule
 $\Delta$ (NR-loose -- baseline)                      & $-24.2$ & $-40.1$ & $-39.4$ & $-35.3$ & $-28.2$ & $-14.6$ \\
 \bottomrule
@@ -1855,7 +1855,7 @@ NR-loose attempts crossed $f_{\max}{<}10^{-3}$} (min observed: $0.0055$).}
 \paragraph{Diagnosis.} The minimum $f_{\max}$ achieved across all 480
 NR-loose samples was $0.0055$, not the $10^{-5}$ predicted. This rules
 out "NR converges deeper than GAD" — NR is doing \emph{worse} than vanilla
-GAD even at the loose gate. Mechanism: the NR step
+GAD even at the loose criterion. Mechanism: the NR step
 $\Delta x = -(H + \alpha v_1 v_1^\top)^{-1} F$ takes \emph{large} jumps
 near the saddle where $H$ is near-singular along the $v_1$ direction.
 Those jumps overshoot the saddle basin, requiring GAD to re-approach.
@@ -1886,7 +1886,7 @@ $f_{\max} \approx 0.01$ stays. Two paths forward, neither fast:
   Sella's RFO logic on top of GAD.
 \item Skip NR; treat the plateau as physical and accept GAD's
   $f_{\max}{\sim}10^{-2}$ floor. \emph{This is what the paper's headline
-  result already does — IRC validation works at the loose gate.}
+  result already does — IRC validation works at the loose criterion.}
 \end{enumerate}
 
 \paragraph{Sources.}

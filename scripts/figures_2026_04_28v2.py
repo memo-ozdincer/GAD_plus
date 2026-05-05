@@ -2,10 +2,9 @@
 """Figure set for IRC_COMPREHENSIVE_2026-04-28v2.
 
 Differences from v1 (figures_2026_04_28.py):
-  * "Sella cart+Eckart" line replaced by "Sella tuned" (libdef config:
-    delta0=0.1, gamma=0.4, n=100 — tuning grid winner from the
-    sella_tune sweep). The original "default" config (delta0=0.048,
-    gamma=0.0, n=300) goes to the appendix.
+  * "Sella cart+Eckart" line uses the delta0=0.10, gamma=0.40 setting
+    (n=100 — tuning grid winner from the sella_tune sweep). The
+    delta0=0.048, gamma=0.0 setting (n=300) goes to the appendix.
   * Grouped bar chart is now stacked: each bar shows
     intended / half-intended / unintended partitions (0-100% of cell).
   * Two appendix figures: Sella tuning comparison (3 configs x 6 noise)
@@ -24,17 +23,21 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
-C_GAD       = "#1f77b4"
-C_SELLA_CE  = "#d62728"
-C_SELLA_INT = "#9467bd"
+C_GAD       = palette_color(0)
+C_SELLA_CE  = palette_color(3)
+C_SELLA_INT = palette_color(4)
 
-C_INT, C_HALF, C_UN = "#2ca02c", "#f0b432", "#d62728"
+C_INT, C_HALF, C_UN = palette_color(2), palette_color(8), palette_color(3)
 
-# --- Canonical 3-method config (Sella cart+Eckart now = libdef tuned, n=100) ---
+# --- Canonical 3-method config (Sella cart+Eckart, delta0=0.10, gamma=0.40, n=100) ---
 METHODS_3M = {
     "gad_eckart": dict(
         summaries=[f"/lustre07/scratch/memoozd/gadplus/runs/round2/summary_gad_dt003_{n}pm.parquet"
@@ -53,7 +56,7 @@ METHODS_3M = {
         conv_col="conv_nneg1_fmax001",
         irc_dir="/lustre07/scratch/memoozd/gadplus/runs/irc_sella_libdef",
         denom=100,
-        color=C_SELLA_CE, marker="s", label="Sella tuned (δ₀=0.1, γ=0.4)",
+        color=C_SELLA_CE, marker="s", label="Sella cart+Eckart (δ₀=0.10, γ=0.40)",
     ),
     "sella_int": dict(
         summaries=[f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/"
@@ -70,34 +73,34 @@ SELLA_TUNE = {
     "default": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/sella_tune/default/"
                   "summary_sella_cartesian_eckart_fmax0p01_default_{n}pm.parquet",
-        color="#d62728", marker="s", label="default (δ₀=0.048, γ=0)"),
+        color=palette_color(3), marker="s", label="δ₀=0.048, γ=0"),
     "libdef": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/sella_tune/libdef/"
                   "summary_sella_cartesian_eckart_fmax0p01_libdef_{n}pm.parquet",
-        color="#1f77b4", marker="o", label="libdef (δ₀=0.1, γ=0.4)"),
+        color=palette_color(0), marker="o", label="δ₀=0.10, γ=0.40"),
     "lson": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/sella_tune/lson/"
                   "summary_sella_cartesian_eckart_fmax0p01_lson_{n}pm.parquet",
-        color="#9467bd", marker="^", label="lson (δ₀=0.048, γ=0.4)"),
+        color=palette_color(4), marker="^", label="lson (δ₀=0.048, γ=0.4)"),
 }
 
 GAD_BIGDT = {
     "gad_dt003_fmax (canonical)": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/gad_eckart_fmax/"
                   "summary_gad_dt003_fmax_{n}pm.parquet",
-        color="#1f77b4", marker="o"),
+        color=palette_color(0), marker="o"),
     "gad_dt005_fmax": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/gad_bigger_dt/gad_dt005_fmax/"
                   "summary_gad_dt005_fmax_{n}pm.parquet",
-        color="#2ca02c", marker="s"),
+        color=palette_color(2), marker="s"),
     "gad_dt010_fmax": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/gad_bigger_dt/gad_dt010_fmax/"
                   "summary_gad_dt010_fmax_{n}pm.parquet",
-        color="#ff7f0e", marker="^"),
+        color=palette_color(1), marker="^"),
     "gad_dt020_fmax": dict(
         path_tmpl="/lustre07/scratch/memoozd/gadplus/runs/gad_bigger_dt/gad_dt020_fmax/"
                   "summary_gad_dt020_fmax_{n}pm.parquet",
-        color="#d62728", marker="v"),
+        color=palette_color(3), marker="v"),
 }
 
 

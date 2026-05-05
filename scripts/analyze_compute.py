@@ -27,6 +27,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT_CSV = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT_FIG = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT_CSV.mkdir(exist_ok=True, parents=True)
@@ -40,35 +44,35 @@ METHODS = [
     ("GAD dt=0.003 (5k)",
      str(RUNS / "test_dtgrid/gad_dt003_fmax/summary_*.parquet"),
      str(RUNS / "test_dtgrid/gad_dt003_fmax/traj_*{noise}pm*.parquet"),
-     "#08306b", "o"),
+     palette_color(0), "o"),
     ("GAD dt=0.005 (5k)",
      str(RUNS / "test_dtgrid/gad_dt005_fmax/summary_*.parquet"),
      str(RUNS / "test_dtgrid/gad_dt005_fmax/traj_*{noise}pm*.parquet"),
-     "#2171b5", "s"),
+     palette_color(9), "s"),
     ("GAD dt=0.007 (5k)",
      str(RUNS / "test_dtgrid/gad_dt007_fmax/summary_*.parquet"),
      str(RUNS / "test_dtgrid/gad_dt007_fmax/traj_*{noise}pm*.parquet"),
-     "#ff7f0e", "^"),
-    ("Sella libdef (2k)",
+     palette_color(1), "^"),
+    ("Sella cart+Eckart, δ0=0.10 γ=0.40 H/step (2k)",
      str(RUNS / "test_set/sella_carteck_libdef/summary_*.parquet"),
      str(RUNS / "test_sella_trajlog/carteck_libdef/traj_*{noise}pm*.parquet"),
-     "#d62728", "D"),
-    ("Sella libdef (5k)",
+     palette_color(3), "D"),
+    ("Sella cart+Eckart, δ0=0.10 γ=0.40 H/step (5k)",
      str(RUNS / "test_sella_extended/carteck_libdef_5k/summary_*.parquet"),
      None,
-     "#9467bd", "v"),
-    ("Sella libdef (10k)",
+     palette_color(4), "v"),
+    ("Sella cart+Eckart, δ0=0.10 γ=0.40 H/step (10k)",
      str(RUNS / "test_sella_extended/carteck_libdef_10k/summary_*.parquet"),
      None,
-     "#8c564b", "P"),
-    ("Sella default (2k)",
+     palette_color(5), "P"),
+    ("Sella cart+Eckart, δ0=0.048 γ=0 H/step (2k)",
      str(RUNS / "test_set/sella_carteck_default/summary_*.parquet"),
      None,
-     "#e377c2", "X"),
-    ("Sella internal (2k)",
+     palette_color(6), "X"),
+    ("Sella internal, δ0=0.048 γ=0 H/step (2k)",
      str(RUNS / "test_set/sella_internal_default/summary_*.parquet"),
      None,
-     "#7f7f7f", "*"),
+     palette_color(7), "*"),
 ]
 
 
@@ -336,7 +340,7 @@ def plot_step_dist(summary_df: pd.DataFrame):
         for xi, (yarr, c) in enumerate(zip(ys, colors)):
             ax.plot([xi, xi], [yarr[0], yarr[3]], color=c, lw=2.0, alpha=0.4)
             ax.plot([xi, xi], [yarr[0], yarr[2]], color=c, lw=4.0, alpha=0.7)
-            ax.plot(xi, yarr[1], "o", color=c, markersize=10, markeredgecolor="black", markeredgewidth=0.7)
+            ax.plot(xi, yarr[1], "o", color=c, markersize=10, markeredgecolor=palette_color(7), markeredgewidth=0.7)
             ax.text(xi, yarr[3]*1.1 if yarr[3]>0 else 1, f"{int(yarr[1])}",
                     ha="center", fontsize=7)
         ax.set_yscale("log")
@@ -372,7 +376,7 @@ def plot_wall_per_conv(summary_df: pd.DataFrame):
             if not np.isfinite(v) or v <= 0: continue
             ax.bar(i + method_offsets[j], v, bar_w,
                    color=color, label=label if i == 0 else None,
-                   edgecolor="black", linewidth=0.4)
+                   edgecolor=palette_color(7), linewidth=0.4)
     ax.set_xticks(range(len(NOISES)))
     ax.set_xticklabels([f"{n}pm" for n in NOISES])
     ax.set_yscale("log")
@@ -407,11 +411,11 @@ def plot_dynamics_walltime(dyn_df: pd.DataFrame):
                             color=color, alpha=0.15)
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.axhline(0.05, color="gray", ls=":", alpha=0.5)
-        ax.axhline(0.01, color="black", ls="--", alpha=0.7)
-        ax.axhline(0.005, color="gray", ls=":", alpha=0.5)
-        ax.axhline(0.001, color="gray", ls=":", alpha=0.5)
-        ax.text(0.11, 0.011, "fmax=0.01 (default gate)", fontsize=7)
+        ax.axhline(0.05, color=palette_color(7), ls=":", alpha=0.5)
+        ax.axhline(0.01, color=palette_color(7), ls="--", alpha=0.7)
+        ax.axhline(0.005, color=palette_color(7), ls=":", alpha=0.5)
+        ax.axhline(0.001, color=palette_color(7), ls=":", alpha=0.5)
+        ax.text(0.11, 0.011, "fmax=0.01 (default criterion)", fontsize=7)
         ax.set_xlabel("cumulative wall-time (s, log)")
         ax.set_ylabel(r"$f_{\max}$ median (eV/Å, log)")
         ax.set_title(f"{noise}pm noise", fontsize=11)
@@ -469,7 +473,7 @@ def plot_pareto(summary_df: pd.DataFrame):
             x = row["total_wall_s"].iloc[0]
             y = row["n_conv"].iloc[0]
             ax.scatter(x, y, color=color, label=label, s=80, marker=marker,
-                       edgecolor="black", linewidth=0.6)
+                       edgecolor=palette_color(7), linewidth=0.6)
             ax.annotate(label, (x, y), fontsize=6, alpha=0.7,
                         xytext=(3, 3), textcoords="offset points")
         ax.set_xscale("log")

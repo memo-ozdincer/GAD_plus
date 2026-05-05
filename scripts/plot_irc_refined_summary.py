@@ -4,7 +4,7 @@
 Reads the saved IRC validation parquet outputs and writes:
 1. A stacked-bar summary of what happened at each noise level.
 2. A threshold-sweep plot showing how many refined index-1 candidates
-   would pass under looser post-refinement fmax gates.
+   would pass under looser post-refinement fmax criteria.
 """
 from __future__ import annotations
 
@@ -17,6 +17,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 RUNS = "/lustre07/scratch/memoozd/gadplus/runs/irc_validation_300"
 OUT = "/lustre06/project/6033559/memoozd/GAD_plus/figures"
 os.makedirs(OUT, exist_ok=True)
@@ -25,12 +29,12 @@ NOISE_LEVELS = [0, 10, 50]
 THRESHOLDS = [0.005, 0.0055, 0.006, 0.0065, 0.007, 0.008, 0.01]
 
 COLORS = {
-    "gate_failed": "#BDBDBD",
-    "unintended": "#D55E00",
-    "topology_half_only": "#E69F00",
-    "half_intended": "#56B4E9",
-    "intended": "#009E73",
-    "sweep": "#0072B2",
+    "criterion_failed": palette_color(7),
+    "unintended": palette_color(1),
+    "topology_half_only": palette_color(8),
+    "half_intended": palette_color(9),
+    "intended": palette_color(2),
+    "sweep": palette_color(0),
 }
 
 
@@ -42,7 +46,7 @@ def panel_outcomes(ax: plt.Axes) -> None:
     x = np.arange(len(NOISE_LEVELS))
     width = 0.72
 
-    gate_failed = []
+    criterion_failed = []
     unintended = []
     topology_half_only = []
     half_intended = []
@@ -50,7 +54,7 @@ def panel_outcomes(ax: plt.Axes) -> None:
 
     for noise in NOISE_LEVELS:
         df = _load(noise)
-        gate_failed.append(int((df["error"] == "ts_quality_gate_failed").sum()))
+        criterion_failed.append(int((df["error"] == "ts_quality_gate_failed").sum()))
         ok = df[df["error"].isna()].copy()
         intended.append(int(ok["intended"].fillna(False).sum()))
         half_mask = ok["half_intended"].fillna(False)
@@ -61,7 +65,7 @@ def panel_outcomes(ax: plt.Axes) -> None:
 
     bottom = np.zeros(len(NOISE_LEVELS))
     for label, values, color in [
-        ("TS gate failed", gate_failed, COLORS["gate_failed"]),
+        ("TS criterion failed", criterion_failed, COLORS["criterion_failed"]),
         ("Unintended", unintended, COLORS["unintended"]),
         ("Topology-half only", topology_half_only, COLORS["topology_half_only"]),
         ("Half-intended", half_intended, COLORS["half_intended"]),
@@ -85,15 +89,15 @@ def panel_threshold_sweep(ax: plt.Axes) -> None:
         cand = df[df["refined_force_max"].notna()].copy()
         counts = []
         for thr in THRESHOLDS:
-            pass_gate = (cand["refined_force_max"] < thr) & cand["refined_n_neg"].eq(1)
-            counts.append(int(pass_gate.sum()))
+            passes_criterion = (cand["refined_force_max"] < thr) & cand["refined_n_neg"].eq(1)
+            counts.append(int(passes_criterion.sum()))
         ax.plot(THRESHOLDS, counts, marker="o", linewidth=2, label=f"{noise} pm")
 
-    ax.axvline(0.005, color="gray", linestyle="--", alpha=0.6)
+    ax.axvline(0.005, color=palette_color(7), linestyle="--", alpha=0.6)
     ax.axvline(0.006, color=COLORS["sweep"], linestyle=":", alpha=0.8)
-    ax.text(0.00502, 2.0, "old refine gate", rotation=90, va="bottom", ha="left", fontsize=9, color="gray")
-    ax.text(0.00602, 2.0, "new refine gate", rotation=90, va="bottom", ha="left", fontsize=9, color=COLORS["sweep"])
-    ax.set_xlabel("Post-refinement fmax gate")
+    ax.text(0.00502, 2.0, "old refine criterion", rotation=90, va="bottom", ha="left", fontsize=9, color=palette_color(7))
+    ax.text(0.00602, 2.0, "new refine criterion", rotation=90, va="bottom", ha="left", fontsize=9, color=COLORS["sweep"])
+    ax.set_xlabel("Post-refinement fmax criterion")
     ax.set_ylabel("Refined index-1 TS admitted")
     ax.set_title("Threshold Sensitivity of Saved Results")
     ax.set_xlim(min(THRESHOLDS) - 0.0001, max(THRESHOLDS) + 0.0002)

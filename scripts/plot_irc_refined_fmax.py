@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Plot refined fmax distributions for attempted vs gate-failed IRC rows."""
+"""Plot refined fmax distributions for attempted vs criterion-failed IRC rows."""
 from __future__ import annotations
 
 import os
@@ -11,14 +11,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 RUNS = "/lustre07/scratch/memoozd/gadplus/runs/irc_validation_300"
 OUT = "/lustre06/project/6033559/memoozd/GAD_plus/figures"
 os.makedirs(OUT, exist_ok=True)
 
 NOISE_LEVELS = [0, 10, 50]
 COLORS = {
-    "attempted": "#0072B2",
-    "failed": "#D55E00",
+    "attempted": palette_color(0),
+    "failed": palette_color(1),
 }
 
 
@@ -50,10 +54,10 @@ def main() -> None:
         if len(failed):
             ax.scatter(2 + rng.normal(0, 0.04, len(failed)), failed, s=18, c=COLORS["failed"], alpha=0.85)
 
-        ax.axhline(0.005, color="gray", linestyle="--", alpha=0.7)
-        ax.axhline(0.006, color="#009E73", linestyle=":", alpha=0.85)
+        ax.axhline(0.005, color=palette_color(7), linestyle="--", alpha=0.7)
+        ax.axhline(0.006, color=palette_color(2), linestyle=":", alpha=0.85)
         ax.set_xticks([1, 2])
-        ax.set_xticklabels(["IRC ran", "Gate failed"])
+        ax.set_xticklabels(["IRC ran", "Criterion failed"])
         ax.set_title(f"{noise} pm")
         ax.grid(True, axis="y", alpha=0.2)
 

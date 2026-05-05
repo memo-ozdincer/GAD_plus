@@ -56,7 +56,7 @@ Output dirs: `gad_no_eckart/`, `sella_2000/`, `round3/` (for 200pm GAD).
 
 Post-completion: run `sella_hip --all-endpoints` IRC on each new TS set (3 more arrays, ~1h each in parallel).
 
-Going-forward convergence criterion for GAD: `n_neg==1 ∧ fmax<0.01` (matches Sella, fair comparison). Historical gad_dt003 data keeps its old `n_neg==1 ∧ force_norm<0.01` gate; we can retroactively compute fmax from traj parquets if needed.
+Going-forward convergence criterion for GAD: `n_neg==1 ∧ fmax<0.01` (matches Sella, fair comparison). Historical gad_dt003 data keeps its old `n_neg==1 ∧ force_norm<0.01` criterion; we can retroactively compute fmax from traj parquets if needed.
 
 ---
 
@@ -99,7 +99,7 @@ same noise distribution, which is the statistically meaningful thing.
 
 ## 2. IRC-as-convergence-criterion (run IRC on *every* sample endpoint)
 
-**Why:** The current `n_neg == 1 ∧ force_norm < 0.01` convergence gate is a
+**Why:** The current `n_neg == 1 ∧ force_norm < 0.01` convergence criterion is a
 local check — it certifies a saddle but says nothing about which
 reaction the saddle connects. An IRC-based criterion is stronger:
 ``the TS is valid iff IRC from it connects two real minima that match
@@ -114,7 +114,7 @@ down the precise criterion. Open questions:
   - "both endpoints are vibrational minima and have different bond graphs"?
     (chemically-meaningful saddle even if labels don't match)
   - Some weighted combination?
-- **Do we still require the local gate?**
+- **Do we still require the local criterion?**
   I.e. is the new criterion `IRC-pass` alone, or
   `IRC-pass ∧ (n_neg == 1 ∧ force_norm < threshold)`?
 - **What IRC integrator is definitive?**

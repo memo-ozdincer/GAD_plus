@@ -42,7 +42,7 @@ case $T in
             --start-from reactant --output-dir "$OUTDIR"
         ;;
     2)
-        # Sella cart+Eckart libdef (best Sella) from reactant
+        # Sella cart+Eckart, delta0=0.10, gamma=0.40 from reactant
         OUTDIR=/lustre07/scratch/memoozd/gadplus/runs/test_reactant/sella_carteck_libdef
         mkdir -p "$OUTDIR"
         python -u scripts/sella_baseline.py --fmax 0.01 --noise 0.0 \

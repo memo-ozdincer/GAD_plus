@@ -24,6 +24,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True, parents=True)
 RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs")
@@ -32,18 +36,27 @@ ANL = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 NOISES = [10, 30, 50, 100, 150, 200]
 
 # ---- Color palette: GAD = warm, Sella variants = cool family ----
-C_GAD_LINE   = "#1f77b4"   # canonical GAD
-C_GAD_TUNED  = "#ff7f0e"   # tuned GAD (dt=0.007)
-C_SELLA_LIB  = "#d62728"   # libdef cartesian, every-step H
-C_SELLA_DEF  = "#9467bd"   # default cartesian
-C_SELLA_INT  = "#8c564b"   # internal coords
-C_SELLA_D3   = "#e377c2"   # cadence d=3
-C_SELLA_NOH  = "#7f7f7f"   # no Hessian
-C_GAD_DT3    = "#1f77b4"
-C_GAD_DT5    = "#2ca02c"
-C_GAD_DT7    = "#ff7f0e"
-C_GAD_AD     = "#d62728"
-C_GAD_LOW    = "#9467bd"
+C_GAD_LINE   = palette_color(0)   # canonical GAD
+C_GAD_TUNED  = palette_color(1)   # tuned GAD (dt=0.007)
+C_SELLA_LIB  = palette_color(3)   # cartesian+Eckart, delta0=0.10, gamma=0.40
+C_SELLA_DEF  = palette_color(4)   # cartesian+Eckart, delta0=0.048, gamma=0
+C_SELLA_INT  = palette_color(5)   # internal coords
+C_SELLA_D3   = palette_color(6)   # cadence d=3
+C_SELLA_NOH  = palette_color(7)   # no Hessian
+C_GAD_DT3    = palette_color(0)
+C_GAD_DT5    = palette_color(2)
+C_GAD_DT7    = palette_color(1)
+C_GAD_AD     = palette_color(3)
+C_GAD_LOW    = palette_color(4)
+
+SELLA_CART_LS_H1 = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, H/step)"
+SELLA_CART_NOLS_H1 = r"Sella cart+Eckart ($\delta_0$=0.048, $\gamma$=0, H/step)"
+SELLA_INT_NOLS_H1 = r"Sella internal ($\delta_0$=0.048, $\gamma$=0, H/step)"
+SELLA_CART_LS_H3 = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, H/3)"
+SELLA_CART_LS_H10 = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, H/10)"
+SELLA_CART_LS_H25 = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, H/25)"
+SELLA_CART_LS_NOH = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, no HIP H)"
+SELLA_CART_LS_5K = r"Sella cart+Eckart ($\delta_0$=0.10, $\gamma$=0.40, 5k steps)"
 
 
 def topo_pct(method_dir: str, noise: int) -> float | None:
@@ -57,13 +70,13 @@ def topo_pct(method_dir: str, noise: int) -> float | None:
     except Exception: return None
 
 
-def conv_pct(summary_path, gate: str = "n_neg=1 ∧ fmax<0.01") -> float | None:
+def conv_pct(summary_path, criterion: str = "n_neg=1 ∧ fmax<0.01") -> float | None:
     if summary_path is None or not os.path.exists(summary_path): return None
     cols = set(duckdb.execute(f"DESCRIBE SELECT * FROM '{summary_path}'").df()["column_name"])
     fmax_col = "final_fmax" if "final_fmax" in cols else "final_force_max"
-    if "fmax<0.05" in gate:
+    if "fmax<0.05" in criterion:
         cond = f"final_n_neg=1 AND {fmax_col}<0.05"
-    elif "fmax<0.01" in gate:
+    elif "fmax<0.01" in criterion:
         cond = f"final_n_neg=1 AND {fmax_col}<0.01"
     else: return None
     try:
@@ -84,7 +97,7 @@ def find_summary(mdir: Path, noise: int) -> str | None:
 def fig_narrative_irc():
     """One figure, two panels:
        (A) Most-faithful framing: best-of-each, both tuned, both with HIP H every step
-       (B) Sella-as-multiple-optimizers: libdef cart, default cart, internal, every-step nohess
+       (B) Sella-as-multiple-optimizers: same method family with different coordinates / step controls
     """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
 
@@ -92,8 +105,7 @@ def fig_narrative_irc():
     ax = axes[0]
     methods = [
         ("GAD dt=0.007 (5k steps, our best)", "gad_dt007_fmax", C_GAD_TUNED, "o", "-"),
-        ("Sella libdef (cart+Eckart, $\\delta_0$=0.1, $\\gamma$=0.4, every-step HIP H)",
-         "sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
+        (SELLA_CART_LS_H1, "sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
     ]
     for label, mdir, color, marker, ls in methods:
         ys = [topo_pct(mdir, n) for n in NOISES]
@@ -111,19 +123,16 @@ def fig_narrative_irc():
     a_y_g = topo_pct("gad_dt007_fmax", 200) or 0
     a_y_s = topo_pct("sella_carteck_libdef", 200) or 0
     ax.annotate(f"+{a_y_g - a_y_s:.1f}pp", xy=(200, (a_y_g+a_y_s)/2),
-                xytext=(170, 30), fontsize=11, fontweight="bold", color="#444",
-                arrowprops=dict(arrowstyle='->', color="#444", linewidth=1.2))
+                xytext=(170, 30), fontsize=11, fontweight="bold", color=palette_color(7),
+                arrowprops=dict(arrowstyle='->', color=palette_color(7), linewidth=1.2))
 
     # --- Panel B: Sella variants are different optimizers ---
     ax = axes[1]
     methods = [
         ("GAD dt=0.007 (best, reference)",     "gad_dt007_fmax", C_GAD_TUNED, "o", "-"),
-        ("Sella libdef (cart+Eckart, our canonical)",
-         "sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
-        ("Sella default (cart+Eckart, library $\\delta_0,\\gamma$)",
-         "sella_carteck_default", C_SELLA_DEF, "v", "--"),
-        ("Sella internal (different coord system)",
-         "sella_internal_default", C_SELLA_INT, "^", ":"),
+        (SELLA_CART_LS_H1, "sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
+        (SELLA_CART_NOLS_H1, "sella_carteck_default", C_SELLA_DEF, "v", "--"),
+        (SELLA_INT_NOLS_H1, "sella_internal_default", C_SELLA_INT, "^", ":"),
     ]
     for label, mdir, color, marker, ls in methods:
         ys = [topo_pct(mdir, n) for n in NOISES]
@@ -150,31 +159,31 @@ def fig_narrative_irc():
 # 2. fig_narrative_conv — companion: raw conv at two thresholds
 # =============================================================================
 def fig_narrative_conv():
-    """3 panels: fmax<0.05 (Sella library default gate), fmax<0.01 (our canonical),
+    """2 panels: fmax<0.05 and fmax<0.01,
        both ∧ n_neg=1.
     """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
     methods = [
         ("GAD dt=0.007 (5k)", lambda n: find_summary(RUNS / "test_dtgrid/gad_dt007_fmax", n), C_GAD_TUNED, "o", "-"),
-        ("Sella libdef (cart, every-step H, our canonical)",
+        (SELLA_CART_LS_H1,
          lambda n: find_summary(RUNS / "test_set/sella_carteck_libdef", n), C_SELLA_LIB, "s", "-"),
-        ("Sella default (cart, library $\\delta_0,\\gamma$)",
+        (SELLA_CART_NOLS_H1,
          lambda n: find_summary(RUNS / "test_set/sella_carteck_default", n), C_SELLA_DEF, "v", "--"),
-        ("Sella internal default (different coord system)",
+        (SELLA_INT_NOLS_H1,
          lambda n: find_summary(RUNS / "test_set/sella_internal_default", n), C_SELLA_INT, "^", ":"),
-        ("Sella libdef d=3 (HIP H every 3 steps; library default)",
+        (SELLA_CART_LS_H3,
          lambda n: find_summary(RUNS / "test_hessfreq/sella_carteck_libdef_d3", n), C_SELLA_D3, "D", "-."),
     ]
 
-    for ax, gate, title in zip(axes,
+    for ax, criterion, title in zip(axes,
         ["fmax<0.05", "fmax<0.01"],
-        ["(A) Loose gate $f_\\max<0.05$ (Sella library default)",
-         "(B) Strict gate $f_\\max<0.01$ (our canonical)"]):
+        ["(A) Loose criterion $f_\\max<0.05$",
+         "(B) Strict criterion $f_\\max<0.01$ (our canonical)"]):
         for label, getter, color, marker, ls in methods:
             ys = []
             for n in NOISES:
                 p = getter(n)
-                ys.append(conv_pct(p, gate=f"n_neg=1 ∧ {gate}") if p else None)
+                ys.append(conv_pct(p, criterion=f"n_neg=1 ∧ {criterion}") if p else None)
             ax.plot(NOISES, ys, ls, marker=marker, color=color, linewidth=2.0,
                     markersize=8, markerfacecolor="white", markeredgewidth=1.8, label=label)
         ax.set_title(title, fontsize=11, fontweight="bold")
@@ -186,7 +195,7 @@ def fig_narrative_conv():
             ax.set_ylabel("Conv rate ($n_{\\rm neg}{=}1\\ \\wedge\\ f_\\max{<}T$, %)", fontsize=11)
         ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
 
-    fig.suptitle("Raw convergence: GAD vs Sella variants at two convergence gates (test, n=287)",
+    fig.suptitle("Raw convergence: GAD vs Sella variants at two convergence criteria (test, n=287)",
                  fontsize=13, fontweight="bold", y=1.02)
     fig.tight_layout()
     for ext in ("pdf", "png"):
@@ -199,23 +208,23 @@ def fig_narrative_conv():
 # 3. fig_sella_variants — Sella across all hyperparam axes
 # =============================================================================
 def fig_sella_variants():
-    """Sella variants grouped: hparam (libdef vs default), coord (cart vs internal),
+    """Sella variants grouped by step control, coordinates,
        Hessian cadence (every 1/3/5/10/25/never)."""
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.8), sharey=True)
 
-    # Panel A: hparams (libdef vs default)
+    # Panel A: step-control parameters
     ax = axes[0]
     methods = [
-        ("libdef ($\\delta_0$=0.1, $\\gamma$=0.4)",
+        (r"$\delta_0$=0.10, $\gamma$=0.40",
          lambda n: find_summary(RUNS / "test_set/sella_carteck_libdef", n), C_SELLA_LIB, "s"),
-        ("default ($\\delta_0$=0.048, $\\gamma$=0)",
+        (r"$\delta_0$=0.048, $\gamma$=0",
          lambda n: find_summary(RUNS / "test_set/sella_carteck_default", n), C_SELLA_DEF, "v"),
     ]
     for label, getter, color, marker in methods:
         ys = [conv_pct(getter(n), "n_neg=1 ∧ fmax<0.01") for n in NOISES]
         ax.plot(NOISES, ys, "-", marker=marker, color=color, linewidth=2.0,
                 markersize=8, markerfacecolor="white", markeredgewidth=1.8, label=label)
-    ax.set_title("Sella, Cartesian + Eckart\nhyperparameter only differs", fontsize=10, fontweight="bold")
+    ax.set_title("Sella, Cartesian + Eckart\nstep-control parameters differ", fontsize=10, fontweight="bold")
     ax.set_xlabel("TS-noise (pm)")
     ax.set_ylabel("Conv ($f_\\max{<}0.01\\,\\wedge\\,n_{\\rm neg}{=}1$, %)")
     ax.set_xticks(NOISES); ax.set_ylim(0, 100); ax.grid(alpha=0.3)
@@ -224,16 +233,16 @@ def fig_sella_variants():
     # Panel B: coord system
     ax = axes[1]
     methods = [
-        ("Cartesian + Eckart (our canonical)",
+        (r"Cartesian+Eckart ($\delta_0$=0.10, $\gamma$=0.40)",
          lambda n: find_summary(RUNS / "test_set/sella_carteck_libdef", n), C_SELLA_LIB, "s"),
-        ("Internal coords (Sella library default)",
+        (r"Internal coords ($\delta_0$=0.048, $\gamma$=0)",
          lambda n: find_summary(RUNS / "test_set/sella_internal_default", n), C_SELLA_INT, "^"),
     ]
     for label, getter, color, marker in methods:
         ys = [conv_pct(getter(n), "n_neg=1 ∧ fmax<0.01") for n in NOISES]
         ax.plot(NOISES, ys, "-", marker=marker, color=color, linewidth=2.0,
                 markersize=8, markerfacecolor="white", markeredgewidth=1.8, label=label)
-    ax.set_title("Sella, libdef hparams\ncoord system differs (algorithm change)",
+    ax.set_title("Sella coordinate system\nand step control differ",
                  fontsize=10, fontweight="bold")
     ax.set_xlabel("TS-noise (pm)")
     ax.set_xticks(NOISES); ax.set_ylim(0, 100); ax.grid(alpha=0.3)
@@ -242,13 +251,13 @@ def fig_sella_variants():
     # Panel C: Hessian cadence
     ax = axes[2]
     cadences = [
-        (1,  "every step (canonical, our setup)", C_SELLA_LIB,  "s",
+        (1,  "H/step", C_SELLA_LIB,  "s",
          lambda n: find_summary(RUNS / "test_set/sella_carteck_libdef", n)),
-        (3,  "every 3 steps (Sella library default)", C_SELLA_D3, "D",
+        (3,  "H/3", C_SELLA_D3, "D",
          lambda n: find_summary(RUNS / "test_hessfreq/sella_carteck_libdef_d3", n)),
-        (10, "every 10 steps", "#bcbd22", "P",
+        (10, "H/10", palette_color(8), "P",
          lambda n: find_summary(RUNS / "test_hessfreq/sella_carteck_libdef_d10", n)),
-        (25, "every 25 steps", "#17becf", "X",
+        (25, "H/25", palette_color(9), "X",
          lambda n: find_summary(RUNS / "test_hessfreq/sella_carteck_libdef_d25", n)),
         (None, "no HIP H (BFGS only)", C_SELLA_NOH, "*", None),
     ]
@@ -267,13 +276,13 @@ def fig_sella_variants():
         ys = [conv_pct(getter(n), "n_neg=1 ∧ fmax<0.01") for n in NOISES]
         ax.plot(NOISES, ys, "-", marker=marker, color=color, linewidth=2.0,
                 markersize=8, markerfacecolor="white", markeredgewidth=1.8, label=label)
-    ax.set_title("Sella, libdef + Cartesian\nHIP Hessian injection cadence",
+    ax.set_title("Sella, Cartesian+Eckart, $\\delta_0$=0.10, $\\gamma$=0.40\nHIP Hessian injection cadence",
                  fontsize=10, fontweight="bold")
     ax.set_xlabel("TS-noise (pm)")
     ax.set_xticks(NOISES); ax.set_ylim(0, 100); ax.grid(alpha=0.3)
     ax.legend(loc="upper right", fontsize=8)
 
-    fig.suptitle("Sella's hyperparameter axes: same gate ($n_{\\rm neg}{=}1\\,\\wedge\\,f_\\max{<}0.01$), test n=287",
+    fig.suptitle("Sella's hyperparameter axes: same criterion ($n_{\\rm neg}{=}1\\,\\wedge\\,f_\\max{<}0.01$), test n=287",
                  fontsize=12, fontweight="bold", y=1.02)
     fig.tight_layout()
     for ext in ("pdf", "png"):
@@ -291,12 +300,12 @@ def fig_gad_lineage():
     # Panel A: dt grid (5k steps)
     ax = axes[0]
     dts = [
-        ("dt=0.003", "test_dtgrid/gad_dt003_fmax", "#08306b", "o"),
-        ("dt=0.004", "test_dtgrid/gad_dt004_fmax", "#2171b5", "D"),
-        ("dt=0.005", "test_dtgrid/gad_dt005_fmax", "#41ab5d", "s"),
-        ("dt=0.006", "test_dtgrid/gad_dt006_fmax", "#bdd7e7", "p"),
+        ("dt=0.003", "test_dtgrid/gad_dt003_fmax", palette_color(0), "o"),
+        ("dt=0.004", "test_dtgrid/gad_dt004_fmax", palette_color(9), "D"),
+        ("dt=0.005", "test_dtgrid/gad_dt005_fmax", palette_color(2), "s"),
+        ("dt=0.006", "test_dtgrid/gad_dt006_fmax", palette_color(9), "p"),
         ("dt=0.007", "test_dtgrid/gad_dt007_fmax", C_GAD_TUNED, "^"),
-        ("dt=0.008 (unstable)", "test_dtgrid/gad_dt008_fmax", "#d62728", "v"),
+        ("dt=0.008 (unstable)", "test_dtgrid/gad_dt008_fmax", palette_color(3), "v"),
     ]
     for label, mdir, color, marker in dts:
         ys = [conv_pct(find_summary(RUNS / mdir, n), "n_neg=1 ∧ fmax<0.01") for n in NOISES]
@@ -312,7 +321,7 @@ def fig_gad_lineage():
     ax = axes[1]
     methods = [
         ("dt=0.007, 5000 steps (canonical)", "test_dtgrid/gad_dt007_fmax", C_GAD_TUNED, "o", "-"),
-        ("dt=0.003, 5000 steps", "test_dtgrid/gad_dt003_fmax", "#1f77b4", "s", "--"),
+        ("dt=0.003, 5000 steps", "test_dtgrid/gad_dt003_fmax", palette_color(0), "s", "--"),
         ("adaptive_dt (clamped, 2000)", "test_set/gad_adaptive_dt", C_GAD_AD, "v", ":"),
     ]
     for label, mdir, color, marker, ls in methods:
@@ -322,8 +331,8 @@ def fig_gad_lineage():
     # Low-dt overlay (partial coverage)
     import re, glob
     for label, mdir, color, marker in [
-        ("dt=$10^{-3}$, 20k steps (partial)", "test_lowdt/gad_dt001_fmax", "#9467bd", "P"),
-        ("dt=$5{\\times}10^{-4}$, 40k steps (partial)", "test_lowdt/gad_dt0005_fmax", "#e377c2", "X"),
+        ("dt=$10^{-3}$, 20k steps (partial)", "test_lowdt/gad_dt001_fmax", palette_color(4), "P"),
+        ("dt=$5{\\times}10^{-4}$, 40k steps (partial)", "test_lowdt/gad_dt0005_fmax", palette_color(6), "X"),
     ]:
         ys = []
         for n in NOISES:
@@ -361,26 +370,26 @@ def fig_full_sweep_grid():
 
     # GAD on the left, Sella on the right
     gad_methods = [
-        ("GAD dt=0.003 (5k, canonical)", "test_dtgrid/gad_dt003_fmax", "#08306b", "o", "-"),
-        ("GAD dt=0.005 (5k)", "test_dtgrid/gad_dt005_fmax", "#2171b5", "D", "-"),
-        ("GAD dt=0.007 (5k, our best)", "test_dtgrid/gad_dt007_fmax", "#ff7f0e", "^", "-"),
-        ("GAD dt=0.008 (5k, unstable)", "test_dtgrid/gad_dt008_fmax", "#d62728", "v", "--"),
-        ("GAD adaptive_dt (clamp, broken)", "test_set/gad_adaptive_dt", "#7f7f7f", "x", ":"),
-        ("GAD dt=$10^{-3}$ (20k, partial)", "test_lowdt/gad_dt001_fmax", "#9467bd", "P", "-."),
+        ("GAD dt=0.003 (5k, canonical)", "test_dtgrid/gad_dt003_fmax", palette_color(0), "o", "-"),
+        ("GAD dt=0.005 (5k)", "test_dtgrid/gad_dt005_fmax", palette_color(9), "D", "-"),
+        ("GAD dt=0.007 (5k, our best)", "test_dtgrid/gad_dt007_fmax", palette_color(1), "^", "-"),
+        ("GAD dt=0.008 (5k, unstable)", "test_dtgrid/gad_dt008_fmax", palette_color(3), "v", "--"),
+        ("GAD adaptive_dt (clamp, broken)", "test_set/gad_adaptive_dt", palette_color(7), "x", ":"),
+        ("GAD dt=$10^{-3}$ (20k, partial)", "test_lowdt/gad_dt001_fmax", palette_color(4), "P", "-."),
     ]
     sella_methods = [
-        ("Sella libdef (cart, every-step H, our canonical)", "test_set/sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
-        ("Sella default (cart, library $\\delta_0,\\gamma$)", "test_set/sella_carteck_default", C_SELLA_DEF, "v", "--"),
-        ("Sella internal default (different coord)", "test_set/sella_internal_default", C_SELLA_INT, "^", ":"),
-        ("Sella libdef, d=3 (library cadence)", "test_hessfreq/sella_carteck_libdef_d3", C_SELLA_D3, "D", "-."),
-        ("Sella libdef, d=10", "test_hessfreq/sella_carteck_libdef_d10", "#bcbd22", "P", "-."),
-        ("Sella libdef, d=25", "test_hessfreq/sella_carteck_libdef_d25", "#17becf", "X", "-."),
-        ("Sella libdef, 5k steps (matched-budget)", "test_sella_extended/carteck_libdef_5k", "#9edae5", "*", "-"),
+        (SELLA_CART_LS_H1, "test_set/sella_carteck_libdef", C_SELLA_LIB, "s", "-"),
+        (SELLA_CART_NOLS_H1, "test_set/sella_carteck_default", C_SELLA_DEF, "v", "--"),
+        (SELLA_INT_NOLS_H1, "test_set/sella_internal_default", C_SELLA_INT, "^", ":"),
+        (SELLA_CART_LS_H3, "test_hessfreq/sella_carteck_libdef_d3", C_SELLA_D3, "D", "-."),
+        (SELLA_CART_LS_H10, "test_hessfreq/sella_carteck_libdef_d10", palette_color(8), "P", "-."),
+        (SELLA_CART_LS_H25, "test_hessfreq/sella_carteck_libdef_d25", palette_color(9), "X", "-."),
+        (SELLA_CART_LS_5K, "test_sella_extended/carteck_libdef_5k", palette_color(9), "*", "-"),
     ]
 
     for ax, methods, title in zip(axes, [gad_methods, sella_methods],
                                    ["GAD family (test n=287, fmax<0.01 ∧ n_neg=1)",
-                                    "Sella family (same gate, test n=287)"]):
+                                    "Sella family (same criterion, test n=287)"]):
         for label, mdir, color, marker, ls in methods:
             ys = [conv_pct(find_summary(RUNS / mdir, n), "n_neg=1 ∧ fmax<0.01") for n in NOISES]
             ax.plot(NOISES, ys, ls, marker=marker, color=color, linewidth=1.8,
@@ -392,9 +401,9 @@ def fig_full_sweep_grid():
                 df = pd.read_csv(ANL / "sella_nohess_partial.csv")
                 df = df[df["method"]=="carteck_nohess"].sort_values("noise_pm")
                 ax.plot(df["noise_pm"], df["ours_TS_pct_partial"], ":", marker="*",
-                        color="#000", linewidth=1.5, markersize=10,
+                        color=palette_color(7), linewidth=1.5, markersize=10,
                         markerfacecolor="white", markeredgewidth=1.5,
-                        label="Sella libdef, NO HIP H (partial)", alpha=0.7)
+                        label=SELLA_CART_LS_NOH + " (partial)", alpha=0.7)
             except Exception:
                 pass
         ax.set_title(title, fontsize=11, fontweight="bold")

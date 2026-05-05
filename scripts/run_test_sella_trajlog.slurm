@@ -9,7 +9,8 @@
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/testsellatraj_%A_%a.err
 #SBATCH --array=0-5
 
-# Per-step Sella trajectory logging on test split, libdef config.
+# Per-step Sella trajectory logging on test split.
+# Uses Sella cart+Eckart with delta0=0.10, gamma=0.40.
 # 6 noise levels × n=287 × max_steps=2000.
 # Used for the dynamics figure (Sella's full descent curves on test).
 

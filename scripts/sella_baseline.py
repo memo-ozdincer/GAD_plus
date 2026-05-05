@@ -9,8 +9,8 @@ Usage:
   python scripts/sella_baseline.py --fmax 0.01 --noise 0.05 --n-samples 300
 
 Three comparison modes:
-  --fmax 0.03   Sella default threshold
-  --fmax 0.01   Match our GAD force_threshold
+  --fmax 0.03   Loose force threshold
+  --fmax 0.01   Canonical force threshold for GAD/Sella comparisons
   --fmax 0.001  Very tight, then retroactively apply n_neg==1 + force<0.01
 """
 from __future__ import annotations
@@ -151,7 +151,8 @@ def main():
                         help="Initial geometry: noised TS (default), reactant, product, or linear midpoint.")
     parser.add_argument("--diag-every", type=int, default=1,
                         help="Force full Hessian recompute every N steps (Sella's diag_every_n). "
-                             "1 (default) = every step (HIP injection); 3 = Sella library default; "
+                             "1 (this script's default) = every step (HIP injection); "
+                             "3 = upstream Sella nsteps_per_diag default; "
                              "use a large number (e.g. 99999) to disable forced recomputes and let "
                              "Sella decide via nsteps_per_diag.")
     parser.add_argument("--output-dir", type=str, default=None)

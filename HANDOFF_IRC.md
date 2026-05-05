@@ -162,7 +162,7 @@ Alternatively, update [scripts/irc_validate.py:100](scripts/irc_validate.py#L100
 
 - Do not tune the algorithm hyperparameters unless explicitly approved. We're measuring, not hyperparameter-sweeping.
 - Do not change the scoring criterion (RMSD threshold, topology check). Keep it consistent with the baseline `sella_baseline` runs so numbers are directly comparable.
-- Do not re-enable refinement or TS-quality gates in [scripts/irc_validate.py](scripts/irc_validate.py). The current script is deliberately the trust-converged baseline.
+- Do not re-enable refinement or TS-quality criteria in [scripts/irc_validate.py](scripts/irc_validate.py). The current script is deliberately the trust-converged baseline.
 - Do not commit without asking. Just push analysis CSVs / logs if helpful.
 
 ## Quick reference — file map

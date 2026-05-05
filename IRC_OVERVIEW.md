@@ -14,7 +14,7 @@ The current workflow is:
    - `force_norm`
    - `fmax`
 5. If enabled, refine the TS candidate with projected GAD.
-6. Apply the TS quality gate.
+6. Apply the TS quality criterion.
 7. If the candidate passes, run forward and reverse IRC using Sella's IRC routine.
 8. Compare the two IRC endpoints to the dataset-labeled reactant/product using:
    - aligned geometry (`aligned_rmsd_by_element`)
@@ -102,7 +102,7 @@ Current defaults in that script:
 - pre-IRC screen: `fmax < 0.01`
 - refinement enabled
 - refinement: `600` steps at `dt=0.003`
-- refined gate: `fmax < 0.006`
+- refined criterion: `fmax < 0.006`
 - noise array: `0, 10, 50 pm`
 
 `run_geodesic_irc.slurm` is a mixed script:
@@ -163,7 +163,7 @@ The row gets:
 This means:
 - a candidate TS was selected
 - optionally refined
-- but the final TS still did not satisfy the quality gate
+- but the final TS still did not satisfy the quality criterion
 - so IRC was never run
 
 ### 2. Post-IRC unintended result

@@ -327,7 +327,7 @@ Two observations:
 \includegraphics[width=\textwidth]{figures/fig_sella_ts_quality_vs_outcome.pdf}
 \caption{$|\lambda_0|$ at TS convergence vs the GAD step at which it
 converged. TOPO-failed runs are not concentrated in any single region;
-they spread across both axes --- no simple TS-side quality gate would
+they spread across both axes --- no simple TS-side quality criterion would
 pre-filter them.}
 \end{figure}
 
@@ -446,11 +446,11 @@ saddles where it matters most. Investigation deferred to backburner.
 
 \section*{Addendum B --- IRC on \emph{all} GAD endpoints (no convergence filter)}
 
-The headline sweep restricts to TSs that pass the local gate
+The headline sweep restricts to TSs that pass the local criterion
 ($n_{\text{neg}}=1 \wedge \|\mathbf{F}\|<0.01$). Dropping that filter
 and running \texttt{sella\_hip} IRC on the final-step coordinates of
 \emph{every} gad\_dt003 trajectory (converged or not) tests whether the
-local gate is actually doing meaningful work and gives a preview of
+local criterion is actually doing meaningful work and gives a preview of
 ``IRC-as-convergence-criterion''.
 
 \begin{center}
@@ -476,7 +476,7 @@ all     & 1759 & 79.3 & 55.0 & 92.1 & $-12.8$\,pp & 15.2 \\
 \caption{\textbf{\texttt{sella\_hip} IRC on \emph{all} \texttt{gad\_dt003}
 sample endpoints --- bond-graph topology criterion.} Denominator = full
 300 samples per noise level (259 at 200\,pm, since only 259 GAD
-trajectories existed there). No local-gate filter applied. Same
+trajectories existed there). No local-criterion filter applied. Same
 intended/half/unintended definition as the headline charts.}
 \end{figure}
 
@@ -496,18 +496,18 @@ sample endpoints --- endpoint vibrational quality.} Same denominator;
 both / one / neither endpoint at a true minimum ($n_{\text{neg,vib}} = 0$).}
 \end{figure}
 
-\textbf{Interpretation of the gate's marginal value.}
+\textbf{Interpretation of the criterion's marginal value.}
 \begin{itemize}[nosep,leftmargin=1.5em]
-\item At low noise (10--50\,pm) the gate barely moves the needle:
+\item At low noise (10--50\,pm) the criterion barely moves the needle:
       dropping it loses 1.7--3.4\,pp of topology success. GAD converges
       almost every sample, and even non-converged tails are close enough
       to a real TS that IRC still finds the right minima.
-\item The gate's value ramps steeply with noise: at 100\,pm it saves
+\item The criterion's value ramps steeply with noise: at 100\,pm it saves
       7.6\,pp, at 150\,pm 21\,pp, at 200\,pm \textbf{32.5\,pp}. Samples
       where GAD failed to converge at high noise are genuinely stuck on
       bad parts of the PES, and IRC from them doesn't recover.
 \item This calibrates the proposed ``IRC-as-convergence-criterion''
-      direction: at low noise the local gate and an IRC gate will
+      direction: at low noise the local criterion and an IRC criterion will
       disagree on $\sim$2\% of samples; at high noise they'll disagree
       on nearly a third.
 \end{itemize}
@@ -636,7 +636,7 @@ endpoints --- strict RMSD criterion ($<0.3$\,\AA).}}
 endpoints --- endpoint vibrational quality.}}
 \end{figure}
 
-\textbf{Sella's local gate is critical at high noise.} The TOPO drop
+\textbf{Sella's local criterion is critical at high noise.} The TOPO drop
 from the converged subset to the full 300-sample pool mirrors what we
 saw for GAD in Addendum B, but \emph{stronger}:
 

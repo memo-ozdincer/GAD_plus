@@ -16,9 +16,9 @@
 #   no_hessian    (never)      -> runs/test_set/sella_carteck_nohess (timed out)
 #
 # This sweep fills in the middle: diag_every ∈ {3, 5, 10, 25}.
-# Default Sella library: nsteps_per_diag=3 (every 3 steps).
+# Upstream Sella nsteps_per_diag default: 3 (every 3 steps).
 #
-# 4 frequencies × 6 noise = 24 tasks. carteck_libdef config (best Sella).
+# 4 frequencies × 6 noise = 24 tasks. Uses delta0=0.10, gamma=0.40.
 
 set -euo pipefail
 module purge

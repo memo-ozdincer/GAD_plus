@@ -17,12 +17,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 
-C_INTENDED = "#2ca02c"
-C_HALF     = "#f0b432"
-C_UNINT    = "#d62728"
+C_INTENDED = palette_color(2)
+C_HALF     = palette_color(8)
+C_UNINT    = palette_color(3)
 
 
 def save(fig, name):
@@ -58,7 +62,7 @@ def stacked_bars(irc, int_col, half_col, title, subtitle, name, noises):
         if a > 6:
             ax.text(x[i], a / 2, f"{a:.1f}%", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
         if b > 6:
-            ax.text(x[i], a + b / 2, f"{b:.1f}%", ha="center", va="center", fontsize=9, color="black")
+            ax.text(x[i], a + b / 2, f"{b:.1f}%", ha="center", va="center", fontsize=9, color=palette_color(7))
         if c > 6:
             ax.text(x[i], a + b + c / 2, f"{c:.1f}%", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
     for i, n in enumerate(ns):
@@ -97,7 +101,7 @@ def endpoint_bars(irc, title, subtitle, name, noises):
 
     for i, (a, b, c) in enumerate(zip(pb, po, pn)):
         if a > 6: ax.text(x[i], a/2, f"{a:.1f}%", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
-        if b > 3: ax.text(x[i], a + b/2, f"{b:.1f}%", ha="center", va="center", fontsize=8.5, color="black")
+        if b > 3: ax.text(x[i], a + b/2, f"{b:.1f}%", ha="center", va="center", fontsize=8.5, color=palette_color(7))
         if c > 3: ax.text(x[i], a + b + c/2, f"{c:.1f}%", ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
     for i, n in enumerate(ns):
         ax.text(x[i], 101.5, f"n={n}", ha="center", va="bottom", fontsize=9)
@@ -114,6 +118,7 @@ def endpoint_bars(irc, title, subtitle, name, noises):
 
 def main():
     plt.rcParams.update({"font.size": 10, "axes.titlesize": 11, "text.usetex": False})
+    apply_plot_style()
     input_dir = sys.argv[1]
     prefix = sys.argv[2]
     label_detail = sys.argv[3] if len(sys.argv) > 3 else "IRC validation"

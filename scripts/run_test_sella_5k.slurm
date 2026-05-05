@@ -12,7 +12,8 @@
 # Sella with matched 5000-step budget (vs GAD's 5000) — for "fair comparison"
 # headline. Also one 10000-step row at 200pm for extra-stretched case.
 #
-# 6 noise × 2 budgets (5000, 10000) = 12 cells × n=287, libdef config.
+# 6 noise × 2 budgets (5000, 10000) = 12 cells × n=287.
+# Uses Sella cart+Eckart with delta0=0.10, gamma=0.40.
 
 set -euo pipefail
 module purge

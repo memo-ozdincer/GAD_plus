@@ -13,7 +13,7 @@
 #
 # Configs:
 #   0 = sella_internal_fmax0.01     (match our force threshold, internal coords)
-#   1 = sella_internal_fmax0.03     (Sella default, internal coords)
+#   1 = sella_internal_fmax0.03     (internal coords)
 #   2 = sella_internal_fmax0.001    (tight, for retroactive n_neg check)
 #   3 = sella_cartesian_fmax0.01    (Cartesian coords, our threshold)
 #

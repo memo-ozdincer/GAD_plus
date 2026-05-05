@@ -68,7 +68,7 @@ def is_ts_converged(
 def compute_cascade_n_neg(evals_vib: torch.Tensor) -> dict[str, int]:
     """Count negative eigenvalues at each diagnostic threshold.
 
-    This is purely diagnostic — never used as a convergence gate.
+    This is purely diagnostic — never used as a convergence criterion.
     Helps distinguish "optimizer found good geometry but evaluation too strict"
     from "optimizer genuinely failed".
     """

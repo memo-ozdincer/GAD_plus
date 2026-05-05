@@ -10,7 +10,7 @@ These produce the data backing the current `IRC_COMPREHENSIVE_2026-04-20.pdf`.
 
 | Slurm | Method | Output | Notes |
 |---|---|---|---|
-| `run_gad_eckart_fmax.slurm` | `gad_dt003_fmax` (Eckart, fmax<0.01) | `runs/gad_eckart_fmax/` | Canonical GAD Eckart with matched fmax gate |
+| `run_gad_eckart_fmax.slurm` | `gad_dt003_fmax` (Eckart, fmax<0.01) | `runs/gad_eckart_fmax/` | Canonical GAD Eckart with matched fmax criterion |
 | `run_gad_no_eckart.slurm` | `gad_dt003_no_eckart` (raw H, fmax<0.01) | `runs/gad_no_eckart/` | Raw-Hessian GAD baseline |
 | `run_sella_2000_both.slurm` | Sella cart+Eckart **and** internal | `runs/sella_2000/` | 2-config × 6-noise array, 2000 steps, coords saved |
 | `run_sella_2000_cart_no_eckart.slurm` | Sella cartesian no-Eckart | `runs/sella_2000/` | 6-noise array, 2000 steps, coords saved |

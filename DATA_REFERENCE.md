@@ -175,13 +175,13 @@ contain:
 |--------|------|-------------|
 | ts_pick_mode | string | Candidate selection mode, e.g. `best_nneg1` |
 | ts_force_criterion | string | Pre-IRC screening metric (`force_norm` or `fmax`) |
-| ts_force_threshold | double | Pre-IRC gate threshold |
+| ts_force_threshold | double | Pre-IRC criterion threshold |
 | candidate_step | int64 | Step chosen from the source trajectory |
 | candidate_n_neg_logged | int64 | Logged `n_neg` from the trajectory row |
 | ts_force_norm_recomputed | double | Recomputed force norm at selected TS |
 | ts_force_max_recomputed | double | Recomputed `fmax` at selected TS |
 | ts_n_neg_recomputed | int64 | Recomputed projected saddle order |
-| ts_quality_ok | bool | Whether the selected TS passed the initial gate |
+| ts_quality_ok | bool | Whether the selected TS passed the initial criterion |
 
 #### Optional TS refinement
 
@@ -190,14 +190,14 @@ contain:
 | refine_ts | bool | Whether refinement was enabled |
 | refine_steps | int64 | Refinement step budget |
 | refine_dt | double | Refinement timestep |
-| refine_force_criterion | string | Refinement gate metric |
-| refine_force_threshold | double | Post-refinement gate threshold |
+| refine_force_criterion | string | Refinement criterion metric |
+| refine_force_threshold | double | Post-refinement criterion threshold |
 | refine_converged | bool | Whether refinement itself converged |
 | refine_total_steps | int64 | Steps used by refinement |
 | refined_force_norm | double | Force norm after refinement |
 | refined_force_max | double | `fmax` after refinement |
 | refined_n_neg | int64 | Projected saddle order after refinement |
-| refined_quality_ok | bool | Whether the refined TS passed the gate |
+| refined_quality_ok | bool | Whether the refined TS passed the criterion |
 
 #### IRC outcome labels
 

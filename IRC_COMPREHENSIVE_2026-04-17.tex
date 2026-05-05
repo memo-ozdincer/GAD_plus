@@ -35,11 +35,11 @@
 
 \begin{document}
 \begin{center}\fbox{\parbox{0.95\textwidth}{\small\textbf{SUPERSEDED 2026-04-20.}
-This report covers \texttt{sella\_hip} IRC on \texttt{gad\_dt003} (Eckart, force\_norm gate)
+This report covers \texttt{sella\_hip} IRC on \texttt{gad\_dt003} (Eckart, force\_norm criterion)
 TSs only. The current canonical report is
 \texttt{IRC\_COMPREHENSIVE\_2026-04-20.pdf} which extends to 5 methods
 (\texttt{gad\_dt003} Eckart \& no-Eckart, Sella cart$\pm$Eckart, Sella internal),
-all at 2000 steps, and adds the matched-fmax convergence gate. Kept for record.}}\end{center}
+all at 2000 steps, and adds the matched-fmax convergence criterion. Kept for record.}}\end{center}
 \vskip0.5em
 \maketitle
 \thispagestyle{empty}
@@ -208,15 +208,15 @@ final geometry) confirm the TS is chemically correct?
   \label{fig:gad_irc}
 \end{subfigure}
 \caption{\textbf{Main results for GAD (dt=0.003, Eckart-projected).} Left:
-local gate. Right: independent IRC verdict on every sample. The two
+local criterion. Right: independent IRC verdict on every sample. The two
 agree in broad shape; both drop at high noise.}
 \end{figure}
 
 \textbf{GAD commentary.} The convergence rate stays above 85\% until
 100\,pm, then drops steadily: 71.3\% at 150\,pm, 47.7\% at 200\,pm. The
-IRC TOPO rate tracks the gate closely at low noise (both $\approx$94\%)
-but the IRC rate actually drops \emph{slower} than the gate --- at
-150\,pm GAD's local gate says 71.3\% converged, while IRC-TOPO on
+IRC TOPO rate tracks the criterion closely at low noise (both $\approx$94\%)
+but the IRC rate actually drops \emph{slower} than the criterion --- at
+150\,pm GAD's local criterion says 71.3\% converged, while IRC-TOPO on
 \emph{all} samples (including the 28.7\% GAD considered failed) finds
 69.7\% chemically correct. GAD's ``failures'' are often TSs that are
 almost-good-enough and IRC confirms.
@@ -247,16 +247,16 @@ almost-good-enough and IRC confirms.
   \label{fig:sella_irc}
 \end{subfigure}
 \caption{\textbf{Main results for Sella (cart+eckart, fmax=0.01).} Left:
-local gate. Right: independent IRC verdict. Sharp drop after 100\,pm on
-both sides --- the IRC rate actually drops \emph{faster} than the gate,
+local criterion. Right: independent IRC verdict. Sharp drop after 100\,pm on
+both sides --- the IRC rate actually drops \emph{faster} than the criterion,
 implying Sella's unconverged tail is not close to valid TSs.}
 \end{figure}
 
 \textbf{Sella commentary.} Sella's convergence rate is nearly flat
 through 100\,pm ($\geq$76\%), then collapses: 49.7\% at 150\,pm,
-25.7\% at 200\,pm. Unlike GAD, the IRC-TOPO rate tracks the gate
+25.7\% at 200\,pm. Unlike GAD, the IRC-TOPO rate tracks the criterion
 tightly or falls \emph{below} it at high noise --- 49\% IRC-TOPO at
-150\,pm (vs 49.7\% gate), 24\% IRC-TOPO at 200\,pm (vs 25.7\% gate).
+150\,pm (vs 49.7\% criterion), 24\% IRC-TOPO at 200\,pm (vs 25.7\% criterion).
 When Sella gives up, it gives up on genuinely stuck samples.
 
 \FloatBarrier
@@ -288,19 +288,19 @@ When Sella gives up, it gives up on genuinely stuck samples.
 \newpage
 % =================================================================
 \FloatBarrier
-\section{The Gate-vs-IRC Sample Overlap}
+\section{The Criterion-vs-IRC Sample Overlap}
 % =================================================================
 
-\emph{How well does the local convergence gate predict IRC success on
+\emph{How well does the local convergence criterion predict IRC success on
 the same sample?} We cross every sample against two independent
-booleans: local-gate-passed and IRC-TOPO-intended.
+booleans: local-criterion-passed and IRC-TOPO-intended.
 
 \begin{figure}[!htbp]
 \centering
 \begin{subfigure}[t]{0.48\textwidth}
   \includegraphics[width=\textwidth]{figures/fig_gate_vs_irc_gad.pdf}
   \caption{\textbf{GAD.} Per-sample breakdown by
-  (local-gate pass) $\times$ (IRC-TOPO pass).}
+  (local-criterion pass) $\times$ (IRC-TOPO pass).}
 \end{subfigure}
 \hfill
 \begin{subfigure}[t]{0.48\textwidth}
@@ -309,9 +309,9 @@ booleans: local-gate-passed and IRC-TOPO-intended.
   explodes at 150\,pm and 200\,pm --- Sella stalls far from a real TS
   \emph{and} IRC can't recover.}
 \end{subfigure}
-\caption{\textbf{The ``gate only'' and ``IRC only'' categories
-quantify disagreement.} For GAD, at 200\,pm, 28 samples pass the gate
-but fail IRC (gate over-claims); 9 fail the gate but pass IRC (gate
+\caption{\textbf{The ``criterion only'' and ``IRC only'' categories
+quantify disagreement.} For GAD, at 200\,pm, 28 samples pass the criterion
+but fail IRC (criterion over-claims); 9 fail the criterion but pass IRC (criterion
 under-claims). For Sella, ``neither'' dominates everything above 100\,pm
 --- the Sella stall is catastrophic, not just a slightly-failed TS.}
 \end{figure}
@@ -324,7 +324,7 @@ Per-sample quadrant counts at every noise level:
 \begin{tabular}{l|rrrr|rrrr}
 \toprule
 & \multicolumn{4}{c|}{\textbf{GAD}} & \multicolumn{4}{c}{\textbf{Sella}} \\
-Noise & both & gate only & IRC only & neither & both & gate only & IRC only & neither \\
+Noise & both & criterion only & IRC only & neither & both & criterion only & IRC only & neither \\
 \midrule
 10\,pm  & 268 & 16 & 10 &   6 & 260 & 15 & 17 &   8 \\
 30\,pm  & 267 & 16 & 11 &   6 & 257 & 15 & 19 &   9 \\
@@ -336,7 +336,7 @@ Noise & both & gate only & IRC only & neither & both & gate only & IRC only & ne
 \end{tabular}
 \end{center}
 
-\textbf{Agreement.} The gates agree with IRC-TOPO on most samples
+\textbf{Agreement.} The criteria agree with IRC-TOPO on most samples
 (both + neither). At 10\,pm: $(268+6)/300 = 91.3$\% agreement for GAD,
 $(260+8)/300 = 89.3$\% for Sella. At 200\,pm: GAD retains $(115+107)/259 = 85.7$\%
 agreement, while Sella drops to $(65+216)/300 = 93.7$\% agreement
@@ -447,7 +447,7 @@ minimum.}
 \FloatBarrier
 \subsection{IRC on \emph{converged-only} TSs (the ``high number'' view)}
 
-Filtering the IRC to only the samples that passed the local gate
+Filtering the IRC to only the samples that passed the local criterion
 recovers the previously-reported 92\% TOPO. This view was the original
 headline before we widened to all-endpoints.
 

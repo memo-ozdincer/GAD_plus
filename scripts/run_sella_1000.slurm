@@ -12,7 +12,7 @@
 # 4 configs x 6 noise levels = 24 parallel jobs. 300 samples each.
 #
 # Configs:
-#   0 = internal, no eckart     (Sella default recommendation)
+#   0 = internal, no eckart
 #   1 = internal, eckart        (Eckart-projected Hessian + internal coords)
 #   2 = cartesian, no eckart    (raw HIP Hessian in Cartesian)
 #   3 = cartesian, eckart       (Eckart-projected Hessian in Cartesian)

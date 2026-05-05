@@ -74,7 +74,7 @@ Run `squeue -u memoozd` to see live state.
 | 60153126 | Midpoint single-ended (4 cells) | PENDING | `runs/test_midpoint/{gad_dt003,gad_dt007,sella_carteck_libdef,sella_internal_default}/` — start from R+P midpoint, 0pm noise, 10000 steps |
 | 60154004 | Huge-noise probe (16 cells, n=50) | PENDING | `runs/test_huge/*` at 300/500/1000/2000pm. Tests Sella's wrong-saddle mode + Sella-5k vs 2k step budget + GAD/HIP robustness at huge displacement |
 | 60154183 | Sella matched-budget (12 cells)   | DONE 8/12 | `runs/test_sella_extended/carteck_libdef_{5k,10k}/` — 5k cells done; 10k high-noise timed out. **Result: step budget is NOT bottleneck (5k=2k within 2pp).** |
-| 60314225 | NR-GAD polish (12 cells, n=80)    | **DONE 2026-05-04** | All 12 cells COMPLETED in 1.9–4.3h. **Negative result: NR underperforms vanilla GAD by 14–40pp at every noise; 0% conv at strict gate (no sample broke fmax<1e-3, min observed=0.0055).** See FINDINGS §20 + tex §"NR-polish negative result". |
+| 60314225 | NR-GAD polish (12 cells, n=80)    | **DONE 2026-05-04** | All 12 cells COMPLETED in 1.9–4.3h. **Negative result: NR underperforms vanilla GAD by 14–40pp at every noise; 0% conv at strict criterion (no sample broke fmax<1e-3, min observed=0.0055).** See FINDINGS §20 + tex §"NR-polish negative result". |
 | 60314226 | Midpoint single-ended (4 cells)   | RUNNING (~7h left) | RELAUNCH of 60153126 — 96G mem, 18h. Awaiting completion. |
 | 60316944 | Sella high-noise recovery (6 cells) | RUNNING 3/6 (~1.25h left) | 3 cells COMPLETED (carteck_default 150/200pm, carteck_libdef 200pm — numbers unchanged from existing tables, just refreshed). 3 still RUNNING: internal_default 100/150/200pm. **150/200pm are new data** (previously truncated) — integrate into headline tables when they land. |
 
@@ -105,7 +105,7 @@ per produced TS.
 
 ## Critical finding (added 2026-05-01): Sella collapses without HIP Hessian
 
-| method | noise | n done | conv (Sella's gate) | conv (n_neg=1 ∧ F<0.01) |
+| method | noise | n done | conv (Sella's criterion) | conv (n_neg=1 ∧ F<0.01) |
 |---|---|---|---|---|
 | carteck_nohess | 10pm | 30 | 10.0% | 10.0% |
 | carteck_nohess | 30pm | 29 | 3.4%  | 3.4% |
@@ -122,7 +122,7 @@ per produced TS.
 
 vs. with HIP Hessian (full 287, source `runs/test_set/sella_carteck_libdef/summary_*.parquet`):
 Sella libdef 95% / 85% / 80% / 70% / 54% / 23%. (See `analysis_2026_04_29/threshold_sweep.csv`,
-`threshold=0.01`, `gate=conv_fmax_pct`, `method='Sella libdef'`.)
+`threshold=0.01`, `criterion=conv_fmax_pct`, `method='Sella libdef'`.)
 
 Drop on the order of **80pp at 10pm** without the analytic Hessian. **Sella's
 strength on T1x is entirely from the injected MLIP Hessian.** The QN+BFGS path

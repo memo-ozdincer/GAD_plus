@@ -3,15 +3,15 @@
 
 Produces:
   Per-method (5 methods):
-    fig_method_{slug}_conv_line.pdf    — conv-rate line chart (method's native gate)
+    fig_method_{slug}_conv_line.pdf    — conv-rate line chart (method's native criterion)
     fig_method_{slug}_irc_bars_topo    — IRC TOPO proportional stacked bars
   Main comparisons:
     fig_cmp_conv_5methods              — 5-method convergence rate line chart (old criterion)
     fig_cmp_irc_topo_5methods          — 5-method IRC TOPO-intended line chart (main narrative, uncluttered)
     fig_cmp_irc_all_classes_5methods   — APPENDIX: cluttered, all 3 outcomes per method (18 lines)
     fig_cmp_irc_rmsd_all_classes_5methods — same for RMSD
-  Gate-vs-IRC overlap:
-    fig_gate_vs_irc_{slug}             — per-method gate/IRC sample overlap
+  Criterion-vs-IRC overlap:
+    fig_gate_vs_irc_{slug}             — per-method criterion/IRC sample overlap
 """
 from __future__ import annotations
 
@@ -25,13 +25,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
-C_INT  = "#2ca02c"
-C_HALF = "#f0b432"
-C_UN   = "#d62728"
+C_INT  = palette_color(2)
+C_HALF = palette_color(8)
+C_UN   = palette_color(3)
 
 # method_key -> (summary_paths, conv_col, irc_dir, color, marker, label)
 METHODS = {
@@ -40,31 +44,31 @@ METHODS = {
       + [f"/lustre07/scratch/memoozd/gadplus/runs/round3/summary_gad_dt003_{n}pm.parquet" for n in [100,150,200]],
         "converged",
         "/lustre07/scratch/memoozd/gadplus/runs/irc_sellahip_allendpoints",
-        "#1f77b4", "o", "GAD Eckart",
+        palette_color(0), "o", "GAD Eckart",
     ),
     "gad_no_eckart": (
         [f"/lustre07/scratch/memoozd/gadplus/runs/gad_no_eckart/summary_gad_dt003_no_eckart_{n}pm.parquet" for n in NOISES],
         "converged",
         "/lustre07/scratch/memoozd/gadplus/runs/irc_gad_no_eckart",
-        "#17becf", "D", "GAD no-Eckart",
+        palette_color(9), "D", "GAD no-Eckart",
     ),
     "sella_carte_2k": (
         [f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_cartesian_eckart_fmax0p01_{n}pm.parquet" for n in NOISES],
         "conv_nneg1_fmax001",
         "/lustre07/scratch/memoozd/gadplus/runs/irc_sella_carte_2000",
-        "#d62728", "s", "Sella cart+Eckart",
+        palette_color(3), "s", "Sella cart+Eckart",
     ),
     "sella_cart_2k": (
         [f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_cartesian_fmax0p01_{n}pm.parquet" for n in NOISES],
         "conv_nneg1_fmax001",
         "/lustre07/scratch/memoozd/gadplus/runs/irc_sella_cart_2000",
-        "#ff7f0e", "^", "Sella cart no-Eckart",
+        palette_color(1), "^", "Sella cart no-Eckart",
     ),
     "sella_int_2k": (
         [f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_internal_fmax0p01_{n}pm.parquet" for n in NOISES],
         "conv_nneg1_fmax001",
         "/lustre07/scratch/memoozd/gadplus/runs/irc_sella_int_2000",
-        "#9467bd", "v", "Sella internal",
+        palette_color(4), "v", "Sella internal",
     ),
 }
 
@@ -144,7 +148,7 @@ def fig_irc_bars_topo(method_key):
     ax.bar(x, pu, 0.65, bottom=np.array(pi)+np.array(ph), label="unintended", color=C_UN, edgecolor="white", linewidth=0.6)
     for i, (a, b, c) in enumerate(zip(pi, ph, pu)):
         if a > 6: ax.text(x[i], a/2, f"{a:.1f}%", ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
-        if b > 6: ax.text(x[i], a+b/2, f"{b:.1f}%", ha="center", va="center", fontsize=8.5, color="black")
+        if b > 6: ax.text(x[i], a+b/2, f"{b:.1f}%", ha="center", va="center", fontsize=8.5, color=palette_color(7))
         if c > 6: ax.text(x[i], a+b+c/2, f"{c:.1f}%", ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
     for i, n in enumerate(ns):
         ax.text(x[i], 101, f"n={n}", ha="center", va="bottom", fontsize=8.5)
@@ -173,7 +177,7 @@ def fig_cmp_conv_5methods():
         ax.plot(xs, rates, "-", color=color, marker=marker, linewidth=2.1, markersize=8,
                 markerfacecolor="white", markeredgewidth=1.8, label=label)
     ax.set_xlabel("TS noise (pm)", fontsize=11)
-    ax.set_ylabel("convergence rate (%, native gate)", fontsize=11)
+    ax.set_ylabel("convergence rate (%, native criterion)", fontsize=11)
     ax.set_xticks(NOISES)
     ax.set_ylim(0, 105)
     ax.grid(alpha=0.3)
@@ -239,9 +243,9 @@ def fig_cmp_irc_all_classes(criterion="topo"):
     save(fig, f"fig_cmp_irc_{criterion}_all_classes_5methods")
 
 
-# ---------------- Gate vs IRC overlap per method ----------------
+# ---------------- Criterion vs IRC overlap per method ----------------
 
-def fig_gate_overlap(method_key):
+def fig_criterion_overlap(method_key):
     paths, conv_col, irc_dir, color, marker, label = METHODS[method_key]
     summary = {}
     for p, noise in zip(paths, NOISES):
@@ -271,8 +275,8 @@ def fig_gate_overlap(method_key):
         ns_arr.append(n)
         mat[:, i] = [100*both/n, 100*g_only/n, 100*i_only/n, 100*nei/n]
     fig, ax = plt.subplots(figsize=(8, 4.8))
-    colors = [C_INT, C_HALF, "#9467bd", C_UN]
-    cats = ["both", "gate only", "IRC only", "neither"]
+    colors = [C_INT, C_HALF, palette_color(4), C_UN]
+    cats = ["both", "criterion only", "IRC only", "neither"]
     bottom = np.zeros(len(NOISES))
     for i, (c, cat) in enumerate(zip(colors, cats)):
         vals = mat[i]
@@ -294,10 +298,11 @@ def fig_gate_overlap(method_key):
 
 def main():
     plt.rcParams.update({"font.size": 10, "text.usetex": False})
+    apply_plot_style()
     for method_key in METHODS:
         fig_conv_line(method_key)
         fig_irc_bars_topo(method_key)
-        fig_gate_overlap(method_key)
+        fig_criterion_overlap(method_key)
     fig_cmp_conv_5methods()
     fig_cmp_irc_topo_5methods()
     fig_cmp_irc_all_classes("topo")

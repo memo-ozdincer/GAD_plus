@@ -15,15 +15,19 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 IRC_DIR = "/lustre07/scratch/memoozd/gadplus/runs/irc_sellahip_full"
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
 # Consistent palette across all criteria charts
-C_INTENDED = "#2ca02c"   # green
-C_HALF     = "#f0b432"   # amber
-C_UNINT    = "#d62728"   # red
+C_INTENDED = palette_color(2)   # green
+C_HALF     = palette_color(8)   # amber
+C_UNINT    = palette_color(3)   # red
 
 
 def save(fig, name: str) -> None:
@@ -73,7 +77,7 @@ def stacked_bars(
                     ha="center", va="center", fontsize=9, color="white", fontweight="bold")
         if nh > 6:
             ax.text(x[noise_i], ni + nh / 2, f"{nh:.1f}%",
-                    ha="center", va="center", fontsize=9, color="black")
+                    ha="center", va="center", fontsize=9, color=palette_color(7))
         if nu > 6:
             ax.text(x[noise_i], ni + nh + nu / 2, f"{nu:.1f}%",
                     ha="center", va="center", fontsize=9, color="white", fontweight="bold")
@@ -126,7 +130,7 @@ def endpoint_quality_bars(irc: pd.DataFrame) -> None:
                     ha="center", va="center", fontsize=9, color="white", fontweight="bold")
         if po > 3:
             ax.text(x[noise_i], pb + po / 2, f"{po:.1f}%",
-                    ha="center", va="center", fontsize=8.5, color="black")
+                    ha="center", va="center", fontsize=8.5, color=palette_color(7))
         if pn > 3:
             ax.text(x[noise_i], pb + po + pn / 2, f"{pn:.1f}%",
                     ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
@@ -150,6 +154,7 @@ def main() -> None:
         "axes.titlesize": 11,
         "text.usetex": False,
     })
+    apply_plot_style()
     irc = duckdb.execute(f"SELECT * FROM '{IRC_DIR}/*.parquet'").df()
     print(f"loaded {len(irc)} rows")
 

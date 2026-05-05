@@ -37,7 +37,7 @@ IRC validation via \texttt{sella\_hip}}
 \textbf{TL;DR.} Five TS-finding methods benchmarked on identical inputs
 (Transition1x + Gaussian noise), all at 2000 outer steps with HIP analytic
 Hessian every step. All evaluated under matched
-$n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ gate (canonical) plus an
+$n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ criterion (canonical) plus an
 independent \texttt{sella\_hip} IRC validation.
 
 \textbf{At TS-finding (canonical fmax<0.01):} 200\,pm convergence rates:
@@ -49,10 +49,10 @@ GAD Eckart 47.0\%, GAD no-Eckart 45.7\%, Sella Cart$\pm$Eckart 22--25\%,
 Sella internal 19\%.
 
 \textbf{Three findings (one is a correction).}
-(1) Under the matched fmax gate, \textbf{Sella Cartesian beats GAD by $\sim$4 pp at low noise}
+(1) Under the matched fmax criterion, \textbf{Sella Cartesian beats GAD by $\sim$4 pp at low noise}
 (10--50\,pm), but GAD takes over decisively at 100\,pm and above
 (crossover $\sim$80--100\,pm). The earlier ``GAD always wins'' picture was
-inflated by GAD's looser force\_norm gate.
+inflated by GAD's looser force\_norm criterion.
 (2) \textbf{Eckart projection contributes essentially nothing} for GAD
 under fmax: same convergence rate ($\pm$1\,pp), same IRC outcomes
 ($>$95\% per-sample agreement), same step efficiency (within 5\%).
@@ -87,7 +87,7 @@ All use 2000 outer-step budget, HIP analytic Hessian every step.
 \begin{center}
 \begin{tabular}{lll}
 \toprule
-Name & Dynamics & Convergence gate \\
+Name & Dynamics & Convergence criterion \\
 \midrule
 \texttt{gad\_dt003\_fmax} Eckart        & projected GAD, dt=0.003, Eckart-proj H            & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
 \texttt{gad\_dt003\_no\_eckart}         & raw GAD (no Eckart projection), dt=0.003          & $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$ \\
@@ -98,8 +98,8 @@ Sella internal                          & Sella QN, internal coords (Sella libra
 \end{tabular}
 \end{center}
 
-\textbf{All methods now share the same matched $f_{\max}{<}0.01$ gate.} The earlier-reported
-\texttt{gad\_dt003} numbers (force\_norm-gated) are kept as a sub-section in §\ref{sec:fmax_vs_fnorm}
+\textbf{All methods now share the same matched $f_{\max}{<}0.01$ criterion.} The earlier-reported
+\texttt{gad\_dt003} numbers (force\_norm-criterion) are kept as a sub-section in §\ref{sec:fmax_vs_fnorm}
 for completeness but are no longer the canonical row.
 
 $f_{\max} = \max_i |\mathbf{f}_i|$, $\|\mathbf{F}\|_{\text{mean}} = \frac{1}{N}\sum_i |\mathbf{f}_i|$.
@@ -248,15 +248,15 @@ $\sim$20\,pp. \textbf{The crossover is at $\sim$75--100\,pm.}
 
 \paragraph{Observation 1: IRC rescues a handful of non-converged samples
 for GAD.} At high noise GAD Eckart's IRC TOPO (86.3\% at 100\,pm, 69.7\%
-at 150\,pm) is very close to its local-gate convergence (87.3\% and
+at 150\,pm) is very close to its local-criterion convergence (87.3\% and
 71.3\%). Some samples that GAD considered ``not converged'' were in fact
-near-TSs whose IRC still validated; others that GAD locally gated were
+near-TSs whose IRC still validated; others that GAD accepted by the local criterion were
 valid-but-wrong minima. Net effect: IRC rate is within 2\,pp of local
-gate.
+criterion.
 
 \paragraph{Observation 2: Sella's IRC rate drops \emph{below} its local
-gate at mid-high noise.} At 100\,pm Sella cart+Eckart has local gate
-76.3\% but IRC TOPO only 76.7\% (essentially equal). At 200\,pm: gate
+criterion at mid-high noise.} At 100\,pm Sella cart+Eckart has local criterion
+76.3\% but IRC TOPO only 76.7\% (essentially equal). At 200\,pm: criterion
 25.7\% vs IRC 24.7\%. Sella's failures are ``genuinely stuck'' —
 not near a valid TS. This was already flagged in the 2026-04-17 analysis
 and is confirmed across all 2000-step Sella variants.
@@ -372,12 +372,12 @@ intrinsically), 2000 steps, HIP Hessian every step.}}
 
 The original Round~1 result was ``Eckart projection is the main unlock
 for GAD''. We re-examined this carefully under the matched
-$f_{\max}{<}0.01$ gate; both ``unlock'' and the previously-reported
+$f_{\max}{<}0.01$ criterion; both ``unlock'' and the previously-reported
 ``$1.33\times$ step efficiency'' \textbf{do not survive the corrected
 analysis}.
 
 \begin{center}
-\textbf{Same-sample step efficiency, matched fmax gate.} \\[0.3em]
+\textbf{Same-sample step efficiency, matched fmax criterion.} \\[0.3em]
 \begin{tabular}{rcccc}
 \toprule
 Noise & $n$ shared & Eckart median steps & no-Eckart median steps & ratio (N/E) \\
@@ -404,11 +404,11 @@ explanation) is in Appendix~\ref{sec:eckart_appendix}.
 \newpage
 \clearpage
 % =================================================================
-\section{Gate vs IRC Sample Overlap}
+\section{Criterion vs IRC Sample Overlap}
 % =================================================================
 
 For each method and noise level, every sample falls into one of four
-quadrants: \{local gate pass, IRC TOPO pass\}. This quantifies whether
+quadrants: \{local criterion pass, IRC TOPO pass\}. This quantifies whether
 a method's ``converged'' label agrees with IRC's verdict.
 
 \begin{figure}[H]
@@ -437,11 +437,11 @@ a method's ``converged'' label agrees with IRC's verdict.
 \includegraphics[width=\textwidth]{figures/fig_gate_vs_irc_sella_int_2k.pdf}
 \caption{Sella internal}
 \end{subfigure}
-\caption{\textbf{Per-method gate vs.\ IRC-TOPO overlap, all 5 methods.}
-Green (``both''): gate-converged AND IRC-TOPO passes. Yellow
-(``gate only''): gate says converged, IRC disagrees (over-claim by
-local gate). Purple (``IRC only''): gate says failed, IRC says
-chemically correct (under-claim by local gate). Red (``neither''):
+\caption{\textbf{Per-method criterion vs.\ IRC-TOPO overlap, all 5 methods.}
+Green (``both''): criterion-converged AND IRC-TOPO passes. Yellow
+(``criterion only''): criterion says converged, IRC disagrees (over-claim by
+local criterion). Purple (``IRC only''): criterion says failed, IRC says
+chemically correct (under-claim by local criterion). Red (``neither''):
 both agree the sample failed. The red region grows sharply with noise
 for Sella and internal; stays small for GAD.}
 \end{figure}
@@ -468,7 +468,7 @@ Sella internal              & 4.3 & 5.6 & 10.3 & 46.7 & 117.4 & 151.7 \\
 \end{center}
 
 \begin{center}
-\textbf{Valid TSs per GPU-hour (local gate)} \\[0.3em]
+\textbf{Valid TSs per GPU-hour (local criterion)} \\[0.3em]
 \begin{tabular}{l|cccccc}
 \toprule
 Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
@@ -599,7 +599,7 @@ dt=0.003, 2000-step budget, identical noise seed). Only difference is the source
 of $\mathbf{v}_1$: Eckart uses the lowest-eigenvalue eigenvector of
 $P_{\text{Eck}} M^{-1/2} H M^{-1/2} P_{\text{Eck}}$; no-Eckart uses the
 lowest-eigenvalue eigenvector of the raw $M^{-1/2} H M^{-1/2}$.
-The convergence gate is $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
+The convergence criterion is $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
 in both cases; the $n_{\text{neg}}$ check itself is always Eckart-projected
 (safety rail in \texttt{gad\_search.py}).
 
@@ -684,10 +684,10 @@ Noise & $n$ shared & Eckart med & no-Eckart med & ratio N/E & 25--75\% (Eck $\to
 
 \textbf{No-Eckart is consistently 3--9\% faster (in steps), not slower.}
 The earlier-reported $1.33\times$ Eckart advantage was an artifact of
-comparing across mismatched gates: old GAD Eckart used force\_norm$<$0.01
-(looser) while no-Eckart used fmax$<$0.01 (stricter). The looser gate
+comparing across mismatched criteria: old GAD Eckart used force\_norm$<$0.01
+(looser) while no-Eckart used fmax$<$0.01 (stricter). The looser criterion
 fires earlier in the trajectory, so Eckart "looked" faster. Under
-matched gates the relationship inverts mildly.
+matched criteria the relationship inverts mildly.
 
 \begin{figure}[H]
 \centering
@@ -840,14 +840,14 @@ a few pp at any noise level we've tested.
 \end{itemize}
 
 \clearpage
-\subsection{$f_{\max}$ vs $\|\mathbf{F}\|_{\text{mean}}$ gate --- brief comparison}
+\subsection{$f_{\max}$ vs $\|\mathbf{F}\|_{\text{mean}}$ criterion --- brief comparison}
 \label{sec:fmax_vs_fnorm}
 
 The historical \texttt{gad\_dt003} data uses
 $\|\mathbf{F}\|_{\text{mean}} = \frac{1}{N}\sum_i |\mathbf{f}_i|$ as the
 force criterion. The canonical 2026-04-20 tables use $f_{\max} = \max_i |\mathbf{f}_i|$.
 For an $N$-atom molecule, $f_{\max} \geq \|\mathbf{F}\|_{\text{mean}}$ by 2--4$\times$,
-so fmax<0.01 is the strict gate. Switching from force\_norm to fmax produces a
+so fmax<0.01 is the strict criterion. Switching from force\_norm to fmax produces a
 $\sim$7\,pp drop in convergence rate, consistent across all noise levels:
 
 \begin{center}
@@ -868,20 +868,20 @@ Noise & force\_norm \% & fmax \% & $\Delta$ (drop, pp) \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.7\textwidth]{figures/fig_fmax_vs_fnorm.pdf}
-\caption{\textbf{GAD Eckart convergence rate under the two gates.}
-Same dynamics, same trajectories, two thresholds. The fmax gate is the
+\caption{\textbf{GAD Eckart convergence rate under the two criteria.}
+Same dynamics, same trajectories, two thresholds. The fmax criterion is the
 canonical choice: it matches Sella's criterion (clean apples-to-apples)
 and is more stringent (no straggling-atom force above 0.01). The
 historical force\_norm row in older reports should be read as
 $\sim$7\,pp upward-biased relative to a canonical fmax measurement.}
 \end{figure}
 
-\textbf{IRC outcomes are insensitive to the choice of gate.} Validating
+\textbf{IRC outcomes are insensitive to the choice of criterion.} Validating
 the same TS sets through \texttt{sella\_hip} IRC yields nearly identical
-TOPO-intended rates whether we use the force\_norm-gated set or the
-fmax-gated set: 92.7/92.7/89.7/86.3/69.7/47.9 vs 93.0/93.0/90.7/86.7/70.0/47.0.
+TOPO-intended rates whether we use the force\_norm-criterion set or the
+fmax-criterion set: 92.7/92.7/89.7/86.3/69.7/47.9 vs 93.0/93.0/90.7/86.7/70.0/47.0.
 Differences are within $\pm$1\,pp, well inside per-sample stochasticity.
-This is the strongest argument that \emph{the choice of gate does not
+This is the strongest argument that \emph{the choice of criterion does not
 change the chemistry of the TS GAD finds}, only the bookkeeping of which
 samples are labeled "converged".
 
@@ -899,9 +899,9 @@ the consolidated ranking (see \texttt{EXPERIMENT\_LOG.md} Round~7):
 \texttt{gad\_dt002} (3000-step,
 $dt{=}0.002$ --- the top raw TS-finder under
 $\|\mathbf{F}\|_{\text{mean}}{<}0.01$) and \texttt{gad\_projected} (the
-Round~1 baseline, 300-step, $dt{=}0.01$). Both pools were gated on
+Round~1 baseline, 300-step, $dt{=}0.01$). Both pools were selected by
 $\|\mathbf{F}\|_{\text{mean}}{<}0.01$, so this is also a second data
-point on how much the looser gate inflates downstream IRC.
+point on how much the looser criterion inflates downstream IRC.
 
 Session: 29 array tasks dispatched, 6 retry tasks ran $\sim$16\,h
 overnight at $n{=}100$ cells; 35 IRC cells produced in total.
@@ -918,13 +918,13 @@ Method & 10\,pm & 30\,pm & 50\,pm & 100\,pm & 150\,pm & 200\,pm \\
 \end{tabular}
 \end{center}
 
-These rates are $\sim$20--30\,pp below the fmax-gated GAD Eckart numbers
+These rates are $\sim$20--30\,pp below the fmax-criterion GAD Eckart numbers
 in the main body (92.7 / 89.7 / 86.3\,\% TOPO at 10/50/100\,pm). Both
 backfill methods used the looser $\|\mathbf{F}\|_{\text{mean}}{<}0.01$
-gate, so their TS pools include marginally-converged candidates that
+criterion, so their TS pools include marginally-converged candidates that
 pass force\_norm but not fmax; those drift on IRC. This independently
-confirms the recommendation in the gate-comparison appendix:
-$f_{\max}{<}0.01$ is the right gate for downstream IRC, not just for
+confirms the recommendation in the criterion-comparison appendix:
+$f_{\max}{<}0.01$ is the right criterion for downstream IRC, not just for
 fair comparison with Sella. The rerun of \texttt{gad\_dt002} under fmax
 is on the backburner --- expected $\sim$+25--30\,pp on IRC TOPO.
 
@@ -976,7 +976,7 @@ This report                  & \texttt{IRC\_COMPREHENSIVE\_2026-04-20.tex/pdf} \
       computing at report time.
 \item Rigorous predictor-corrector IRC sits at $\sim$52\% TOPO regardless
       of noise (on GAD Eckart converged TSs). Backburner for investigation.
-\item Potential backfill of GAD Eckart numbers under $f_{\max}{<}0.01$ gate
+\item Potential backfill of GAD Eckart numbers under $f_{\max}{<}0.01$ criterion
       for strict apples-to-apples comparison (currently uses $\|\mathbf{F}\|_{\text{mean}}$).
 \end{itemize}
 

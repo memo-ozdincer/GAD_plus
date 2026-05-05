@@ -27,11 +27,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 
 _COLORS = {
-    "intended": "#2ca02c",      # green
-    "half": "#ff7f0e",          # orange
-    "unintended": "#d62728",    # red
+    "intended": palette_color(2),      # green
+    "half": palette_color(1),          # orange
+    "unintended": palette_color(3),    # red
 }
 
 
@@ -57,7 +61,7 @@ def _bar_chart_per_noise(df, out_dir):
                color=_COLORS["unintended"], label="unintended")
         if pct_err.max() > 0:
             ax.bar(x, pct_err, width, bottom=pct_int + pct_half + pct_unint,
-                   color="#7f7f7f", label="error")
+                   color=palette_color(7), label="error")
 
         for i, (pi, ph, pu, nn) in enumerate(zip(
                 pct_int, pct_half, pct_unint, sub["n"])):

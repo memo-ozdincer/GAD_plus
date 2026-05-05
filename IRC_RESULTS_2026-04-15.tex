@@ -58,7 +58,7 @@ It covered 30 converged TS candidates each at noise levels 0, 10, and 50 pm.
 \begin{center}
 \begin{tabular}{lrrrrrr}
 \toprule
-Noise & Total & IRC ran & Gate failed & Intended & Half & Topology-half only / Unintended \\
+Noise & Total & IRC ran & Criterion failed & Intended & Half & Topology-half only / Unintended \\
 \midrule
 0 pm  & 30 & 15 & 15 & 1 & 3 & 1 / 10 \\
 10 pm & 30 &  7 & 23 & 0 & 2 & 1 / 4 \\
@@ -68,7 +68,7 @@ Noise & Total & IRC ran & Gate failed & Intended & Half & Topology-half only / U
 \end{center}
 
 \textbf{Headline:} the dominant failure mode is now \texttt{ts\_quality\_gate\_failed},
-not code failure. The looser refined gate did recover one fully intended case at
+not code failure. The looser refined criterion did recover one fully intended case at
 0 pm and increased IRC attempts there (15 instead of 12), but the attempted cases
 still become progressively worse with noise: a few mixed / half-intended outcomes
 at low noise and mostly unintended behavior by 50 pm.
@@ -79,7 +79,7 @@ at low noise and mostly unintended behavior by 50 pm.
 \includegraphics[width=\textwidth]{figures/fig_irc_refined_summary.png}
 \captionof{figure}{\textbf{Left:} outcome breakdown of the refined rerun.
 \textbf{Right:} number of refined index-1 candidates that would pass under looser
-post-refinement $f_{\max}$ gates, using the already-saved results.}
+post-refinement $f_{\max}$ criteria, using the already-saved results.}
 \end{center}
 
 \textbf{Interpretation}
@@ -88,7 +88,7 @@ post-refinement $f_{\max}$ gates, using the already-saved results.}
       fewer candidates survive TS screening, and the surviving ones connect less
       cleanly to the labeled endpoints.
 \item Even 0 pm is only partially ``clean'' under the stricter pipeline: one
-      intended case, a few half-intended cases, and many gate failures. This means
+      intended case, a few half-intended cases, and many criterion failures. This means
       the old convergence notion (\(n_{\text{neg}}=1\) plus loose force screening)
       was broad enough that some nominally converged points were not clean TSs by
       stricter \(f_{\max}\)-based standards.
@@ -97,13 +97,13 @@ post-refinement $f_{\max}$ gates, using the already-saved results.}
       change.
 \end{itemize}
 
-\section*{Why The Force Gate Was Too Strict}
+\section*{Why The Force Criterion Was Too Strict}
 
 \begin{center}
 \includegraphics[width=\textwidth]{figures/fig_irc_refined_fmax.png}
 \captionof{figure}{Refined TS \(f_{\max}\) for rows that actually ran IRC versus rows
-that were skipped by the TS-quality gate. Dashed gray: old refined gate \(0.005\).
-Dotted green: new refined gate \(0.006\).}
+that were skipped by the TS-quality criterion. Dashed gray: old refined criterion \(0.005\).
+Dotted green: new refined criterion \(0.006\).}
 \end{center}
 
 \textbf{Most important observation:}
@@ -119,12 +119,12 @@ after correcting that.
 
 That old policy meant some \emph{improved} refined TSs were being rejected even
 though their \(f_{\max}\) was smaller than already-accepted unrefined TSs. The
-current rerun used the corrected post-refinement gate \(f_{\max}<0.006\).
+current rerun used the corrected post-refinement criterion \(f_{\max}<0.006\).
 
 \begin{center}
 \begin{tabular}{lrrr}
 \toprule
-Noise & Max accepted pre-gate \(f_{\max}\) & Min rejected refined \(f_{\max}\) & Median rejected refined \(f_{\max}\) \\
+Noise & Max accepted pre-criterion \(f_{\max}\) & Min rejected refined \(f_{\max}\) & Median rejected refined \(f_{\max}\) \\
 \midrule
 0 pm  & 0.009748 & 0.006202 & 0.006533 \\
 10 pm & 0.009941 & 0.006007 & 0.006357 \\
@@ -139,7 +139,7 @@ Noise & Max accepted pre-gate \(f_{\max}\) & Min rejected refined \(f_{\max}\) &
 \item The current rerun confirms that \(f_{\max}<0.006\) is a reasonable next
       operating point: it increases attempted IRC at 0 pm and recovers one intended
       case without simply reverting to the original \(0.01\) screen.
-\item The remaining failed-gate rows are now clustered around
+\item The remaining failed-criterion rows are now clustered around
       \(0.0062\text{--}0.0065\), which is tighter and more interpretable than the
       old \(0.0052\text{--}0.0059\) bottleneck.
 \end{itemize}
@@ -167,7 +167,7 @@ Noise & Rows hitting 600-step refinement cap & Mean refinement steps \\
 \end{tabular}
 \end{center}
 
-So the main gain from the latest rerun came from the looser refined gate rather
+So the main gain from the latest rerun came from the looser refined criterion rather
 than dramatically longer refinement trajectories; most cases did not use the full
 600-step budget.
 
@@ -204,7 +204,7 @@ internal IRC integration step.
 \item The main issue is TS admissibility, not numerical IRC crashes.
 \item Noise degrades both TS quality and endpoint agreement.
 \item The latest rerun under \(f_{\max}<0.006\) is better at 0 pm, but high-noise
-      cases remain dominated by gate failures and unintended endpoints.
+      cases remain dominated by criterion failures and unintended endpoints.
 \item The next decision point is not ``whether to loosen from 0.005'' anymore;
       that is already done. The next question is whether further loosening or a
       different TS-selection/refinement strategy is justified.

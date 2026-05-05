@@ -9,7 +9,7 @@
 #SBATCH --error=/lustre07/scratch/memoozd/gadplus/logs/irclibdef_%A_%a.err
 #SBATCH --array=0-5
 
-# IRC validation on the tuned-Sella (libdef: delta0=0.1, gamma=0.4)
+# IRC validation on Sella cart+Eckart with delta0=0.10, gamma=0.40.
 # summaries from sella_tune. n=100 per cell. Used to populate the IRC
 # row of the new tex with the "best Sella" canonical numbers.
 

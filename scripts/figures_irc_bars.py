@@ -23,6 +23,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True, parents=True)
 RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs/test_irc")
@@ -32,18 +36,21 @@ NOISES = [10, 30, 50, 100, 150, 200]
 # Methods (display label, source dir, color hue for the stack)
 # Order matters: shows in the legend & x-axis grouping.
 METHODS = [
-    ("GAD dt=0.003 (5k)",   "gad_dt003_fmax",         "#08306b"),
-    ("GAD dt=0.005 (5k)",   "gad_dt005_fmax",         "#2171b5"),
-    ("GAD dt=0.007 (5k)",   "gad_dt007_fmax",         "#ff7f0e"),
-    ("Sella libdef",        "sella_carteck_libdef",   "#d62728"),
-    ("Sella default",       "sella_carteck_default",  "#9467bd"),
-    ("Sella internal",      "sella_internal_default", "#8c564b"),
+    ("GAD dt=0.003 (5k)",   "gad_dt003_fmax",         palette_color(0)),
+    ("GAD dt=0.005 (5k)",   "gad_dt005_fmax",         palette_color(9)),
+    ("GAD dt=0.007 (5k)",   "gad_dt007_fmax",         palette_color(1)),
+    ("Sella cart+Eckart, δ0=0.10 γ=0.40 H/step",
+     "sella_carteck_libdef", palette_color(3)),
+    ("Sella cart+Eckart, δ0=0.048 γ=0 H/step",
+     "sella_carteck_default", palette_color(4)),
+    ("Sella internal, δ0=0.048 γ=0 H/step",
+     "sella_internal_default", palette_color(5)),
 ]
 
 # Stack colors — same hues for both panels:
-C_INT  = "#2ca02c"   # green: both endpoints match
-C_HALF = "#ffbb78"   # peach: one endpoint matches
-C_UNI  = "#bdbdbd"   # gray: neither
+C_INT  = palette_color(2)   # green: both endpoints match
+C_HALF = palette_color(1)   # peach: one endpoint matches
+C_UNI  = palette_color(7)   # gray: neither
 
 
 def get_irc_counts(method_dir: str, noise: int, kind: str = "topo") -> dict | None:
@@ -90,8 +97,8 @@ def draw_panel(ax, kind: str, title: str, ylabel: bool = True):
             x = i + method_offsets[j]
             if r is None or r["n_total"] == 0:
                 # Missing cell: draw an outlined empty bar
-                ax.bar(x, 0, bar_w, color="white", edgecolor="lightgray", linewidth=0.5)
-                ax.text(x, 1, "—", ha="center", va="bottom", fontsize=6, color="gray")
+                ax.bar(x, 0, bar_w, color="white", edgecolor=palette_color(7), linewidth=0.5)
+                ax.text(x, 1, "—", ha="center", va="bottom", fontsize=6, color=palette_color(7))
                 continue
             n = r["n_total"]
             p_int  = 100 * r["n_int"]  / n
@@ -127,9 +134,9 @@ def draw_panel(ax, kind: str, title: str, ylabel: bool = True):
 
     # Stack legend (intended/half/unintended) inside the panel
     stack_handles = [
-        Patch(facecolor=C_INT,  edgecolor="black", linewidth=0.5, label="intended (both R+P)"),
-        Patch(facecolor=C_HALF, edgecolor="black", linewidth=0.5, label="half (one of R/P)"),
-        Patch(facecolor=C_UNI,  edgecolor="black", linewidth=0.5, alpha=0.55, label="unintended"),
+        Patch(facecolor=C_INT,  edgecolor=palette_color(7), linewidth=0.5, label="intended (both R+P)"),
+        Patch(facecolor=C_HALF, edgecolor=palette_color(7), linewidth=0.5, label="half (one of R/P)"),
+        Patch(facecolor=C_UNI,  edgecolor=palette_color(7), linewidth=0.5, alpha=0.55, label="unintended"),
     ]
     leg2 = ax.legend(handles=stack_handles, loc="lower right", fontsize=8,
                      title="stack fill = outcome", title_fontsize=8, framealpha=0.95)

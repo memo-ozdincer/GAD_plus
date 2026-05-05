@@ -22,14 +22,18 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
 # Consistent 3-color palette
-C_GAD       = "#1f77b4"
-C_SELLA_CE  = "#d62728"
-C_SELLA_INT = "#9467bd"
+C_GAD       = palette_color(0)
+C_SELLA_CE  = palette_color(3)
+C_SELLA_INT = palette_color(4)
 
 METHODS_3M = {
     "gad_eckart": (
@@ -124,7 +128,7 @@ def fig_cmp_irc_topo_3m():
 def fig_irc_intended_grouped_3m():
     """Grouped + stacked bar chart: 3 methods per noise, each bar partitioned
     into intended / half-intended / unintended (proportional, sums to 100%)."""
-    C_INT, C_HALF, C_UN = "#2ca02c", "#f0b432", "#d62728"
+    C_INT, C_HALF, C_UN = palette_color(2), palette_color(8), palette_color(3)
 
     method_data = {}
     for k, (_, _, irc_dir, color, marker, label) in METHODS_3M.items():
@@ -187,7 +191,7 @@ def fig_gad_stepsize_vs_step():
     """GAD median per-step displacement vs step, faceted by noise.
 
     Reads disp_from_last from the gad_eckart_fmax/ trajectories (canonical
-    fmax-gated GAD pool, Round 6). 6 panels, one per noise level.
+    fmax-criterion GAD pool, Round 6). 6 panels, one per noise level.
     """
     base = "/lustre07/scratch/memoozd/gadplus/runs/gad_eckart_fmax"
     fig, axes = plt.subplots(2, 3, figsize=(13, 6.8), sharey=True, sharex=False)

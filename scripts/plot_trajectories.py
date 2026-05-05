@@ -20,6 +20,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 
 def load_data(traj_dir: str):
     """Load summary and trajectory data via DuckDB."""
@@ -70,7 +74,7 @@ def plot_trajectory(traj_df, title: str, output_path: str):
 
     # Energy vs step
     ax = axes[0, 0]
-    ax.plot(steps, traj_df["energy"].values, "b-", linewidth=1)
+    ax.plot(steps, traj_df["energy"].values, "-", color=palette_color(0), linewidth=1)
     ax.set_xlabel("Step")
     ax.set_ylabel("Energy (eV)")
     ax.set_title("Energy")
@@ -78,8 +82,8 @@ def plot_trajectory(traj_df, title: str, output_path: str):
 
     # Force norm vs step
     ax = axes[0, 1]
-    ax.semilogy(steps, traj_df["force_norm"].values, "r-", linewidth=1)
-    ax.axhline(y=0.01, color="g", linestyle="--", alpha=0.7, label="threshold (0.01)")
+    ax.semilogy(steps, traj_df["force_norm"].values, "-", color=palette_color(3), linewidth=1)
+    ax.axhline(y=0.01, color=palette_color(2), linestyle="--", alpha=0.7, label="threshold (0.01)")
     ax.set_xlabel("Step")
     ax.set_ylabel("Force norm (eV/A)")
     ax.set_title("Force convergence")
@@ -88,8 +92,8 @@ def plot_trajectory(traj_df, title: str, output_path: str):
 
     # n_neg vs step
     ax = axes[1, 0]
-    ax.plot(steps, traj_df["n_neg"].values, "k-", linewidth=1, drawstyle="steps-post")
-    ax.axhline(y=1, color="g", linestyle="--", alpha=0.7, label="target (n_neg=1)")
+    ax.plot(steps, traj_df["n_neg"].values, "-", color=palette_color(7), linewidth=1, drawstyle="steps-post")
+    ax.axhline(y=1, color=palette_color(2), linestyle="--", alpha=0.7, label="target (n_neg=1)")
     ax.set_xlabel("Step")
     ax.set_ylabel("n_neg")
     ax.set_title("Negative eigenvalue count")
@@ -99,9 +103,9 @@ def plot_trajectory(traj_df, title: str, output_path: str):
 
     # Eigenvalues vs step
     ax = axes[1, 1]
-    ax.plot(steps, traj_df["eig0"].values, "b-", linewidth=1, label="eig0 (lowest)")
-    ax.plot(steps, traj_df["eig1"].values, "r-", linewidth=1, label="eig1")
-    ax.axhline(y=0, color="k", linestyle="-", alpha=0.3)
+    ax.plot(steps, traj_df["eig0"].values, "-", color=palette_color(0), linewidth=1, label="eig0 (lowest)")
+    ax.plot(steps, traj_df["eig1"].values, "-", color=palette_color(3), linewidth=1, label="eig1")
+    ax.axhline(y=0, color=palette_color(7), linestyle="-", alpha=0.3)
     ax.set_xlabel("Step")
     ax.set_ylabel("Eigenvalue")
     ax.set_title("Lowest eigenvalues")

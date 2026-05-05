@@ -117,7 +117,7 @@ producing **44% more converged TS**. Above n_conv = 89 at 200pm, Sella
   (n_neg=0 minimum). P-RFO already converged successfully, just to the
   wrong critical point. More steps don't help.
 - GAD's failures at 200pm: 62% plateau-orbit (right basin, n_neg=1, just
-  fmax≈0.05 above gate). These would converge with a Newton polish (but
+  fmax≈0.05 above criterion). These would converge with a Newton polish (but
   see §20 — naive NR-polish doesn't work).
 
 **GAD truncated to 2k step budget (matched to Sella):** at 200pm raw
@@ -297,7 +297,7 @@ is "single-ended" (no path or product reference needed).
 **What this section claims.** A single ``best'' GAD and a single ``best''
 Sella per noise level, and the head-to-head delta. Built from
 \texttt{analysis_2026_04_29/threshold_sweep.csv} at threshold=0.01,
-gate=\texttt{conv_fmax_pct} (= n_neg=1 ∧ fmax<0.01).
+criterion=\texttt{conv_fmax_pct} (= n_neg=1 ∧ fmax<0.01).
 
 ### The "best" config for each method
 
@@ -316,7 +316,7 @@ is **a different optimizer** from cartesian — different coordinate
 system, different trust-region semantics. Listed separately because
 combining them as "Sella" would conflate two algorithms.
 
-### Head-to-head best vs best (loose gate, fmax<0.01 ∧ n_neg=1)
+### Head-to-head best vs best (loose criterion, fmax<0.01 ∧ n_neg=1)
 
 | noise (pm) | GAD dt=0.007 (5k) | Sella libdef (cart, every-step H) | gap (GAD − Sella) |
 |---|---|---|---|
@@ -342,7 +342,7 @@ reader can pick which is fair.
 **GAD:** dt=0.007 (sweet-spot picked from in-house sweep), 5000 steps.
 **Sella:** libdef hyperparams ($\delta_0{=}0.1, \gamma{=}0.4$) tuned in
 our hyperparameter grid; HIP Hessian every step. Same coordinate system
-(Cartesian + Eckart projection) for both. Same convergence gate
+(Cartesian + Eckart projection) for both. Same convergence criterion
 (fmax<0.01 ∧ n_neg=1).
 
 This is the comparison reported above (Section 9). Both methods are
@@ -356,7 +356,7 @@ $\Rightarrow$ runs `runs/test_set/gad_dt003_fmax/`.
 
 **Sella:** library defaults — internal coords, $\delta_0{=}0.048,
 \gamma{=}0$, `nsteps_per_diag=3` (Hessian every 3 steps, not every
-step), fmax=**0.05** (Sella's library default convergence gate, not
+step), fmax=**0.05** (Sella's library default convergence criterion, not
 0.01). $\Rightarrow$ partly the `Sella internal` row (still 4/6 noise
 levels), but the every-3-steps-Hessian configuration is **still landing**
 in the Hessian-frequency sweep (job 60147671).
@@ -636,9 +636,9 @@ in flight.
 
 ## 13. Threshold spectrum: where does GAD win across criteria? (added 2026-05-01)
 
-**What this is.** The user asked: ``we have multiple thresholds and gates,
+**What this is.** The user asked: ``we have multiple thresholds and criteria,
 where does GAD outperform?'' Below is best-GAD vs best-Sella head-to-head
-at every (threshold, gate) we measured. Best-GAD = max across $dt$ in
+at every (threshold, criterion) we measured. Best-GAD = max across $dt$ in
 $\{0.003, 0.005, 0.007\}$; best-Sella = max across $\{$default, libdef,
 internal default$\}$ Cartesian variants.
 
@@ -646,7 +646,7 @@ internal default$\}$ Cartesian variants.
 
 ### Threshold T = 0.05 eV/Å (Sella's library default)
 
-| gate | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+| criterion | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |---|---|---|---|---|---|---|
 | n_neg=1 ∧ fmax<T          | GAD 98.6 / Sella 98.6 / **+0** | 98.3 / 98.3 / +0 | 95.1 / 95.1 / +0 | 82.9 / 83.3 / −0.3 | 72.1 / 66.2 / **+5.9** | 68.3 / 46.0 / **+22.3** |
 | n_neg=1 ∧ ‖F‖_mean<T      | 99.0 / 98.6 / +0.3 | 98.6 / 98.3 / +0.3 | 96.5 / 95.1 / +1.4 | 88.5 / 84.7 / **+3.8** | 80.5 / 68.3 / **+12.2** | 73.9 / 47.7 / **+26.1** |
@@ -654,7 +654,7 @@ internal default$\}$ Cartesian variants.
 
 ### Threshold T = 0.01 eV/Å (our canonical)
 
-| gate | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+| criterion | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |---|---|---|---|---|---|---|
 | n_neg=1 ∧ fmax<T          | 89.2 / 92.7 / −3.5 | 88.9 / 92.0 / −3.1 | 85.7 / 88.2 / −2.4 | 72.8 / 70.7 / **+2.1** | 58.2 / 54.0 / **+4.2** | 44.6 / 27.2 / **+17.4** |
 | n_neg=1 ∧ ‖F‖_mean<T      | 95.8 / 96.5 / −0.7 | 95.5 / 96.2 / −0.7 | 92.0 / 92.0 / 0.0 | 78.7 / 75.6 / **+3.1** | 64.8 / 57.1 / **+7.7** | 55.7 / 31.4 / **+24.4** |
@@ -662,7 +662,7 @@ internal default$\}$ Cartesian variants.
 
 ### Threshold T = 0.005 eV/Å (tight, half our canonical)
 
-| gate | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
+| criterion | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |---|---|---|---|---|---|---|
 | n_neg=1 ∧ fmax<T          | 0 / 35.9 / **−35.9** | 0 / 33.1 / **−33.1** | 0 / 34.1 / **−34.1** | 0 / 24.7 / **−24.7** | 0 / 15.7 / **−15.7** | 0 / 7.0 / **−7.0** |
 | n_neg=1 ∧ ‖F‖_mean<T      | 17.4 / 82.6 / −65.2 | 18.1 / 82.2 / −64.1 | 16.0 / 78.7 / −62.7 | 12.9 / 59.9 / −47.0 | 9.8 / 46.3 / −36.6 | 8.0 / 22.3 / −14.3 |
@@ -699,7 +699,7 @@ GROUP BY threshold, noise_pm ORDER BY threshold, noise_pm;
 
 We pass `fmax=0.01` as the IRC convergence threshold. Sella's library
 default is fmax=0.05 (5× looser); we're already running at the stricter
-gate. So if Sella declares converged, it's at fmax<0.01 — no early-stopping
+criterion. So if Sella declares converged, it's at fmax<0.01 — no early-stopping
 issue. Most Sella runs at 200pm hit the **2000-step cap** without
 declaring convergence.
 
@@ -747,8 +747,8 @@ near small. More step budget won't help — Sella is at the wrong attractor.
 **GAD's high-noise failure mode is plateau-orbit.** At 200pm, **99 of
 159 GAD failures (62\%)** are $n_{\text{neg}}=1$ with $f_{\max}<0.05$
 but $\ge 0.01$ — i.e., GAD found the right saddle and is orbiting it
-at fmax just above the convergence gate. Median fail fmax = **0.046**:
-forces are only 5× the gate, not 50×. **More step budget would help GAD
+at fmax just above the convergence criterion. Median fail fmax = **0.046**:
+forces are only 5× the criterion, not 50×. **More step budget would help GAD
 at 200pm**, but the plateau eventually limits how far it can go (as
 the low-dt experiment showed).
 
@@ -785,7 +785,7 @@ the low-dt experiment showed).
    Job 60151717 tests this (preliminary results pending).
 2. **Smaller dt with 20k step budget** — diminishing returns, see §7b.
 3. **Mode tracking k=8** — may reduce mode-flips on the orbit.
-   *Untested on test split with this gate.*
+   *Untested on test split with this criterion.*
 
 **Sources:**
 - Failure-mode counts: query `analysis_2026_04_29/test_summary_full.csv`
@@ -980,7 +980,7 @@ gracefully, or does one collapse first?
 
 **Setup:** Job 60154004, n=50 per cell (small probe), 4 noise × 4 methods.
 
-### Strict gate (n_neg=1 ∧ fmax<0.01)
+### Strict criterion (n_neg=1 ∧ fmax<0.01)
 
 | method | 300pm | 500pm | 1000pm | 2000pm |
 |---|---|---|---|---|
@@ -989,7 +989,7 @@ gracefully, or does one collapse first?
 | Sella libdef 2k   | 14.0% | 6.0% | 0.0% | 0.0% |
 | Sella libdef 5k   | 20.0% | 6.0% | 0.0% | 0.0% |
 
-### Loose gate (n_neg=1 ∧ fmax<0.05)
+### Loose criterion (n_neg=1 ∧ fmax<0.05)
 
 | method | 300pm | 500pm | 1000pm | 2000pm |
 |---|---|---|---|---|
@@ -1000,10 +1000,10 @@ gracefully, or does one collapse first?
 
 **Reading the data:**
 - **GAD's lead persists at huge noise.** At 300pm, GAD 22% vs Sella 20%
-  (strict); at 500pm, GAD 8% vs Sella 6%. On loose gate, GAD has +12pp
+  (strict); at 500pm, GAD 8% vs Sella 6%. On loose criterion, GAD has +12pp
   at 300pm (44 vs 30) and +24pp at 500pm (42 vs 18).
-- **Both methods saturate beyond 1000pm.** Strict-gate conv goes to 0%;
-  loose gate hangs on at ~5-20% but is mostly random-baseline.
+- **Both methods saturate beyond 1000pm.** Strict-criterion conv goes to 0%;
+  loose criterion hangs on at ~5-20% but is mostly random-baseline.
 - **Sella step-budget continues to NOT help.** 5k vs 2k at 300pm: 20%
   vs 14% strict (+6pp from going to 5k), but at 500/1000/2000 the
   matched-budget gives no benefit.

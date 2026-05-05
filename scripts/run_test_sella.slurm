@@ -12,7 +12,7 @@
 # Sella on T1x TEST split (287 samples). Three configs x 6 noise = 18 tasks.
 #   sella_carteck_default : current (delta0=0.048, gamma=0)
 #   sella_carteck_libdef  : tuning winner (delta0=0.1, gamma=0.4)
-#   sella_internal_default: Sella default internal coords (no Eckart)
+#   sella_internal_default: internal coords, delta0=0.048, gamma=0 (no Eckart)
 
 set -euo pipefail
 module purge

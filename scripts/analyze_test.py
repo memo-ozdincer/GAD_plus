@@ -8,7 +8,7 @@ interest. Robust to missing cells.
 Usage:
   python scripts/analyze_test.py
   python scripts/analyze_test.py --show-irc
-  python scripts/analyze_test.py --threshold 1e-4   # strict (paper) gate
+  python scripts/analyze_test.py --threshold 1e-4   # strict (paper) criterion
 
 Threshold options: 1e-4, 1e-3, 1e-2 (default), all (prints all 3).
 """

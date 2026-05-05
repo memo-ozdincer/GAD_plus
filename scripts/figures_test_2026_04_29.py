@@ -20,17 +20,24 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 BASE = Path("/lustre07/scratch/memoozd/gadplus/runs")
 OUT  = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 ANL  = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT.mkdir(exist_ok=True, parents=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
-C_GAD003 = "#1f77b4"
-C_GAD007 = "#17becf"
-C_SELLA_LIB = "#d62728"
-C_SELLA_DEF = "#ff7f0e"
-C_SELLA_INT = "#9467bd"
+C_GAD003 = palette_color(0)
+C_GAD007 = palette_color(9)
+C_SELLA_LIB = palette_color(3)
+C_SELLA_DEF = palette_color(1)
+C_SELLA_INT = palette_color(4)
+
+SELLA_CART_LS_H1 = "Sella cart+Eckart, δ0=0.10 γ=0.40 H/step"
+SELLA_INT_NOLS_H1 = "Sella internal, δ0=0.048 γ=0 H/step"
 
 
 def _save(fig, name):
@@ -64,8 +71,8 @@ def conv_at(path, threshold, kind="fmax"):
 
 METHODS_3M = {
     "GAD dt=0.007 (5k)":  (BASE / "test_dtgrid/gad_dt007_fmax", C_GAD007, "o"),
-    "Sella libdef":       (BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB, "s"),
-    "Sella internal":     (BASE / "test_set/sella_internal_default", C_SELLA_INT, "v"),
+    SELLA_CART_LS_H1:     (BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB, "s"),
+    SELLA_INT_NOLS_H1:    (BASE / "test_set/sella_internal_default", C_SELLA_INT, "v"),
 }
 
 
@@ -99,19 +106,19 @@ def fig_conv_3thresh():
 def fig_dtgrid():
     """GAD dt grid at fmax<0.01 — one line per dt."""
     fig, ax = plt.subplots(figsize=(8.5, 5))
-    dts = [("0.003", "#1f77b4"), ("0.004", "#17becf"), ("0.005", "#2ca02c"),
-           ("0.006", "#bcbd22"), ("0.007", "#ff7f0e"), ("0.008", "#d62728")]
+    dts = [("0.003", palette_color(0)), ("0.004", palette_color(9)), ("0.005", palette_color(2)),
+           ("0.006", palette_color(8)), ("0.007", palette_color(1)), ("0.008", palette_color(3))]
     for dt, color in dts:
         mdir = BASE / f"test_dtgrid/gad_dt{dt.replace('.','').replace('00','0')[1:]}_fmax"
         # safer: hardcode mapping
     # Use hardcoded dirs
     methods = [
-        ("dt=0.003", BASE / "test_dtgrid/gad_dt003_fmax", "#1f77b4", "o"),
-        ("dt=0.004", BASE / "test_dtgrid/gad_dt004_fmax", "#17becf", "D"),
-        ("dt=0.005", BASE / "test_dtgrid/gad_dt005_fmax", "#2ca02c", "s"),
-        ("dt=0.006", BASE / "test_dtgrid/gad_dt006_fmax", "#bcbd22", "p"),
-        ("dt=0.007", BASE / "test_dtgrid/gad_dt007_fmax", "#ff7f0e", "^"),
-        ("dt=0.008", BASE / "test_dtgrid/gad_dt008_fmax", "#d62728", "v"),
+        ("dt=0.003", BASE / "test_dtgrid/gad_dt003_fmax", palette_color(0), "o"),
+        ("dt=0.004", BASE / "test_dtgrid/gad_dt004_fmax", palette_color(9), "D"),
+        ("dt=0.005", BASE / "test_dtgrid/gad_dt005_fmax", palette_color(2), "s"),
+        ("dt=0.006", BASE / "test_dtgrid/gad_dt006_fmax", palette_color(8), "p"),
+        ("dt=0.007", BASE / "test_dtgrid/gad_dt007_fmax", palette_color(1), "^"),
+        ("dt=0.008", BASE / "test_dtgrid/gad_dt008_fmax", palette_color(3), "v"),
     ]
     for label, mdir, color, marker in methods:
         xs, ys = [], []
@@ -138,8 +145,8 @@ def fig_threshold_curves():
     thresh_grid = np.geomspace(1e-4, 0.1, 30)
     methods = [
         ("GAD dt=0.007", BASE / "test_dtgrid/gad_dt007_fmax", C_GAD007),
-        ("Sella libdef", BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB),
-        ("Sella internal", BASE / "test_set/sella_internal_default", C_SELLA_INT),
+        (SELLA_CART_LS_H1, BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB),
+        (SELLA_INT_NOLS_H1, BASE / "test_set/sella_internal_default", C_SELLA_INT),
     ]
     fig, axes = plt.subplots(2, 3, figsize=(13, 6.5), sharey=True, sharex=True)
     axes = axes.flatten()
@@ -156,8 +163,8 @@ def fig_threshold_curves():
             for t in thresh_grid:
                 rates.append(100 * ((df["nn"] == 1) & (df["fmax"] < t)).sum() / len(df))
             ax.semilogx(thresh_grid, rates, color=color, linewidth=2, label=label)
-        ax.axvline(0.05, color="gray", linestyle=":", alpha=0.5, label="Sella default")
-        ax.axvline(0.01, color="gray", linestyle="--", alpha=0.5, label="Our canonical")
+        ax.axvline(0.05, color=palette_color(7), linestyle=":", alpha=0.5, label="fmax=0.05")
+        ax.axvline(0.01, color=palette_color(7), linestyle="--", alpha=0.5, label="Our canonical")
         ax.set_title(f"{n} pm")
         ax.set_xlabel("fmax threshold")
         ax.set_ylim(0, 105)
@@ -176,7 +183,7 @@ def fig_steps_hist():
     axes = axes.flatten()
     methods = [
         ("GAD dt=0.007", BASE / "test_dtgrid/gad_dt007_fmax", C_GAD007),
-        ("Sella libdef", BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB),
+        (SELLA_CART_LS_H1, BASE / "test_set/sella_carteck_libdef", C_SELLA_LIB),
     ]
     for ax, n in zip(axes, NOISES):
         for label, mdir, color in methods:

@@ -16,6 +16,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 NOISES = [10, 30, 50, 100, 150, 200]
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
@@ -24,15 +28,15 @@ OUT.mkdir(exist_ok=True)
 METHODS = {
     "GAD Eckart":       ([f"/lustre07/scratch/memoozd/gadplus/runs/round2/summary_gad_dt003_{n}pm.parquet" for n in [10,30,50]]
                        + [f"/lustre07/scratch/memoozd/gadplus/runs/round3/summary_gad_dt003_{n}pm.parquet" for n in [100,150,200]],
-                         "converged", "#1f77b4", "o"),
+                         "converged", palette_color(0), "o"),
     "GAD no-Eckart":    ([f"/lustre07/scratch/memoozd/gadplus/runs/gad_no_eckart/summary_gad_dt003_no_eckart_{n}pm.parquet" for n in NOISES],
-                         "converged", "#17becf", "D"),
+                         "converged", palette_color(9), "D"),
     "Sella cart+Eckart":([f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_cartesian_eckart_fmax0p01_{n}pm.parquet" for n in NOISES],
-                         "conv_nneg1_fmax001", "#d62728", "s"),
+                         "conv_nneg1_fmax001", palette_color(3), "s"),
     "Sella cart no-Eckart":([f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_cartesian_fmax0p01_{n}pm.parquet" for n in NOISES],
-                         "conv_nneg1_fmax001", "#ff7f0e", "^"),
+                         "conv_nneg1_fmax001", palette_color(1), "^"),
     "Sella internal":   ([f"/lustre07/scratch/memoozd/gadplus/runs/sella_2000/summary_sella_internal_fmax0p01_{n}pm.parquet" for n in NOISES],
-                         "conv_nneg1_fmax001", "#9467bd", "v"),
+                         "conv_nneg1_fmax001", palette_color(4), "v"),
 }
 
 LINES = []
@@ -149,6 +153,7 @@ for label, glob in IRC_SETS.items():
 log("\n\nGENERATING FIGURES...")
 
 plt.rcParams.update({"font.size": 10, "text.usetex": False})
+apply_plot_style()
 
 
 def save(fig, name):
@@ -233,14 +238,14 @@ for i, noise in enumerate(NOISES):
 
 x = np.arange(len(NOISES))
 w = 0.35
-ax.bar(x - w/2, gad_delta, w, color="#1f77b4", label="GAD (Eckart − no Eckart)")
-ax.bar(x + w/2, sella_delta, w, color="#d62728", label="Sella cart (Eckart − no Eckart)")
-ax.axhline(0, color="black", lw=0.8)
+ax.bar(x - w/2, gad_delta, w, color=palette_color(0), label="GAD (Eckart − no Eckart)")
+ax.bar(x + w/2, sella_delta, w, color=palette_color(3), label="Sella cart (Eckart − no Eckart)")
+ax.axhline(0, color=palette_color(7), lw=0.8)
 for i, (g, s) in enumerate(zip(gad_delta, sella_delta)):
     if not np.isnan(g):
-        ax.text(i - w/2, g + (0.2 if g >= 0 else -0.6), f"{g:+.1f}", ha="center", fontsize=9, color="#1f77b4")
+        ax.text(i - w/2, g + (0.2 if g >= 0 else -0.6), f"{g:+.1f}", ha="center", fontsize=9, color=palette_color(0))
     if not np.isnan(s):
-        ax.text(i + w/2, s + (0.2 if s >= 0 else -0.6), f"{s:+.1f}", ha="center", fontsize=9, color="#d62728")
+        ax.text(i + w/2, s + (0.2 if s >= 0 else -0.6), f"{s:+.1f}", ha="center", fontsize=9, color=palette_color(3))
 ax.set_xticks(x); ax.set_xticklabels([f"{n} pm" for n in NOISES])
 ax.set_xlabel("TS noise (pm)", fontsize=11)
 ax.set_ylabel("Δ conv. rate from Eckart projection (pp)", fontsize=11)
@@ -250,8 +255,8 @@ save(fig, "fig_eckart_delta")
 
 # Fig 5: Sella coord system (cart vs int at equal treatment — both no-Eckart)
 fig, ax = plt.subplots(figsize=(8, 5))
-for m, color, marker in [("Sella cart no-Eckart", "#ff7f0e", "^"),
-                          ("Sella internal", "#9467bd", "v")]:
+for m, color, marker in [("Sella cart no-Eckart", palette_color(1), "^"),
+                          ("Sella internal", palette_color(4), "v")]:
     df = all_tables[m]
     xs, ys = [], []
     for i, noise in enumerate(NOISES):

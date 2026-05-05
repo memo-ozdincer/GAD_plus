@@ -28,16 +28,20 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 NOISES = [10, 30, 50, 100, 150, 200]
 
 # Palette
-C_INTENDED = "#2ca02c"
-C_HALF     = "#f0b432"
-C_UNINT    = "#d62728"
-C_GAD      = "#1f77b4"
-C_SELLA    = "#d62728"
+C_INTENDED = palette_color(2)
+C_HALF     = palette_color(8)
+C_UNINT    = palette_color(3)
+C_GAD      = palette_color(0)
+C_SELLA    = palette_color(3)
 
 
 def save(fig, name):
@@ -122,7 +126,7 @@ def fig_irc_bars(irc, int_col, half_col, color_int, color_half, color_un, name):
 
     for i, (a, b, c) in enumerate(zip(pi, ph, pu)):
         if a > 6: ax.text(x[i], a/2, f"{a:.1f}%", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
-        if b > 6: ax.text(x[i], a + b/2, f"{b:.1f}%", ha="center", va="center", fontsize=9, color="black")
+        if b > 6: ax.text(x[i], a + b/2, f"{b:.1f}%", ha="center", va="center", fontsize=9, color=palette_color(7))
         if c > 6: ax.text(x[i], a + b + c/2, f"{c:.1f}%", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
     for i, n in enumerate(ns):
         ax.text(x[i], 101.5, f"n={n}", ha="center", va="bottom", fontsize=9)
@@ -196,10 +200,10 @@ def fig_irc_overlay(gad_irc, sella_irc):
     save(fig, "fig_irc_overlay")
 
 
-def fig_gate_overlap(gad_summary, gad_irc, sella_summary, sella_irc):
+def fig_criterion_overlap(gad_summary, gad_irc, sella_summary, sella_irc):
     """Per-sample 4-quadrant breakdown: converged vs IRC-TOPO-pass."""
-    cats = ["both", "gate only", "IRC only", "neither"]
-    colors = ["#2ca02c", "#f0b432", "#9467bd", "#d62728"]
+    cats = ["both", "criterion only", "IRC only", "neither"]
+    colors = [palette_color(2), palette_color(8), palette_color(4), palette_color(3)]
 
     def compute_pcts(summary, irc_df, conv_col):
         mat = np.zeros((4, len(NOISES)))
@@ -289,6 +293,7 @@ def fig_step_distributions(gad_summary, sella_summary):
 
 def main():
     plt.rcParams.update({"font.size": 10, "text.usetex": False})
+    apply_plot_style()
 
     print("Loading data...")
     gad_summary = load_gad_summary()
@@ -313,8 +318,8 @@ def main():
     fig_conv_overlay(gad_summary, sella_summary)
     fig_irc_overlay(gad_irc_allep, sella_irc_allep)
 
-    # Gate overlap
-    fig_gate_overlap(gad_summary, gad_irc_allep, sella_summary, sella_irc_allep)
+    # Criterion overlap
+    fig_criterion_overlap(gad_summary, gad_irc_allep, sella_summary, sella_irc_allep)
 
     # Wall time / steps
     fig_walltime_steps(gad_summary, sella_summary)

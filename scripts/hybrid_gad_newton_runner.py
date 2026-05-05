@@ -108,7 +108,7 @@ def parse_args():
     p.add_argument("--output-dir", required=True)
     p.add_argument("--device", default="cuda")
     p.add_argument("--force-threshold", type=float, default=0.01,
-                   help="fmax convergence gate (with n_neg=1)")
+                   help="fmax convergence criterion (with n_neg=1)")
     return p.parse_args()
 
 

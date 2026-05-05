@@ -6,6 +6,7 @@ Reads all summary parquets from runs/hybrid_gad_newton/<tag>/, builds:
   analysis_2026_04_29/hybrid_gad_newton_pivot.md     # readable tables
   figures/fig_hybrid_conv_vs_tr.pdf                  # conv_pct vs trust_radius (per cell, per noise)
   figures/fig_hybrid_steps_vs_tr.pdf                 # median steps vs trust_radius
+  figures/fig_hybrid_wall_vs_tr.pdf                  # wall-time per converged TS vs trust_radius
   figures/fig_hybrid_switch_compare.pdf              # switch=True vs False side-by-side
   figures/fig_hybrid_method_compare.pdf              # 5-cell × 2-noise heatmap
   figures/fig_hybrid_step_phases.pdf                 # last_method (gad / newton) breakdown
@@ -20,6 +21,12 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+from plotting_style import apply_plot_style, palette
+
+apply_plot_style()
 
 OUT_CSV = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT_FIG = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
@@ -28,13 +35,82 @@ RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs/hybrid_gad_newton")
 
 NOISES = [10, 100]
 TRS = [0.005, 0.01, 0.02, 0.05, 0.10]
+PALETTE = palette(n_colors=5)
 CELL_LABELS = {
-    "hybrid_swfalse":               ("hybrid (no Eckart, force-switch)",        "#1f77b4", "o"),
-    "hybrid_eckart_swfalse":        ("hybrid_eckart, switch=False (force-switch)", "#2ca02c", "s"),
-    "hybrid_eckart_swtrue":         ("hybrid_eckart, switch=True (eig-clear)",     "#d62728", "^"),
-    "hybrid_damped_eckart_swfalse": ("hybrid_damped_eckart, switch=False",         "#9467bd", "D"),
-    "hybrid_damped_eckart_swtrue":  ("hybrid_damped_eckart, switch=True",          "#ff7f0e", "v"),
+    "hybrid_swfalse":               ("Hybrid, force switch",          PALETTE[0], "o"),
+    "hybrid_eckart_swfalse":        ("Eckart, force switch",          PALETTE[1], "s"),
+    "hybrid_eckart_swtrue":         ("Eckart, eig switch",            PALETTE[2], "^"),
+    "hybrid_damped_eckart_swfalse": ("Damped Eckart, force switch",   PALETTE[3], "D"),
+    "hybrid_damped_eckart_swtrue":  ("Damped Eckart, eig switch",     PALETTE[4], "v"),
 }
+METHOD_ORDER = list(CELL_LABELS)
+SWITCH_COLORS = {
+    "False": PALETTE[0],
+    "True": PALETTE[3],
+}
+
+
+def configure_plot_style() -> None:
+    apply_plot_style()
+    plt.rcParams.update({
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.titleweight": "bold",
+        "figure.dpi": 140,
+        "savefig.dpi": 220,
+        "legend.frameon": False,
+    })
+
+
+def save_figure(
+    fig,
+    stem: str,
+    *,
+    rect: tuple[float, float, float, float] | None = None,
+) -> None:
+    if rect is None:
+        fig.tight_layout()
+    else:
+        fig.tight_layout(rect=rect)
+    for ext in ("pdf", "png"):
+        fig.savefig(OUT_FIG / f"{stem}.{ext}", bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {stem}")
+
+
+def format_trust_axis(ax) -> None:
+    ax.set_xscale("log")
+    ax.set_xticks(TRS)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:g}"))
+    ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+    ax.set_xlabel("trust radius (Å)")
+
+
+def add_shared_legend(fig, axes, *, ncol: int = 3) -> None:
+    handles = []
+    labels = []
+    for ax in np.ravel(axes):
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        for handle, label in zip(ax_handles, ax_labels):
+            if label not in labels:
+                handles.append(handle)
+                labels.append(label)
+    if handles:
+        fig.legend(
+            handles, labels, loc="lower center", ncol=ncol, bbox_to_anchor=(0.5, 0.0)
+        )
+
+
+def highlight_best(ax, sub: pd.DataFrame, y_col: str, *, label: str) -> None:
+    scored = sub[sub[y_col].notna()]
+    if scored.empty:
+        return
+    best = scored.loc[scored[y_col].idxmax()]
+    ax.scatter(best["trust_radius"], best[y_col], s=120, facecolor="none",
+               edgecolor=palette_color(7), linewidth=1.2, zorder=5)
+    ax.annotate(label.format(best=best), (best["trust_radius"], best[y_col]),
+                xytext=(8, 8), textcoords="offset points", fontsize=8,
+                fontweight="bold", arrowprops={"arrowstyle": "-", "lw": 0.7})
 
 
 def parse_dir_name(dirname: str) -> dict | None:
@@ -106,7 +182,7 @@ def build_summary() -> pd.DataFrame:
 
 def plot_conv_vs_tr(df: pd.DataFrame):
     """One row × 2 cols (10pm, 100pm); each line = method."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), sharey=True)
     for ax, noise in zip(axes, NOISES):
         sub = df[df["noise_pm"] == noise]
         if sub.empty: continue
@@ -114,54 +190,69 @@ def plot_conv_vs_tr(df: pd.DataFrame):
             cell = sub[sub["method"] == key].sort_values("trust_radius")
             if cell.empty: continue
             ax.plot(cell["trust_radius"], cell["conv_pct"],
-                    marker=marker, color=color, label=label, lw=1.7, markersize=8)
-            for _, r in cell.iterrows():
-                ax.annotate(f"{r['conv_pct']:.0f}", (r["trust_radius"], r["conv_pct"]),
-                            xytext=(2, 4), textcoords="offset points", fontsize=6)
-        ax.set_xscale("log")
-        ax.set_xlabel("trust_radius (Å)")
-        ax.set_ylabel("conv % ($n_{neg}{=}1 \\wedge f_{\\max}{<}0.01$)" if noise == NOISES[0] else "")
-        ax.set_title(f"{noise} pm noise, n=287")
+                    marker=marker, color=color, label=label, lw=2.0, markersize=7.5,
+                    markeredgecolor="white", markeredgewidth=0.7)
+        highlight_best(ax, sub, "conv_pct", label="best {best[conv_pct]:.0f}%")
+        format_trust_axis(ax)
+        ax.set_ylabel("converged (%)" if noise == NOISES[0] else "")
+        ax.set_title(f"{noise} pm noise")
         ax.set_ylim(0, 105)
-        ax.grid(alpha=0.3)
-        if noise == NOISES[0]:
-            ax.legend(fontsize=8, loc="lower right", framealpha=0.95)
-    fig.suptitle("Hybrid GAD-Newton sweep — convergence vs trust_radius",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout()
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT_FIG / f"fig_hybrid_conv_vs_tr.{ext}", bbox_inches="tight", dpi=140)
-    plt.close(fig); print("wrote fig_hybrid_conv_vs_tr")
+        ax.grid(True, which="both", axis="both", alpha=0.25)
+    add_shared_legend(fig, axes, ncol=3)
+    fig.suptitle("Hybrid GAD-Newton: convergence vs trust radius", fontsize=13)
+    fig.supxlabel(
+        "$n_{neg}=1$ and $f_{max}<0.01$ over n=287 trajectories", y=0.08, fontsize=10
+    )
+    save_figure(fig, "fig_hybrid_conv_vs_tr", rect=(0, 0.18, 1, 0.93))
 
 
 def plot_steps_vs_tr(df: pd.DataFrame):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), sharey=True)
     for ax, noise in zip(axes, NOISES):
         sub = df[df["noise_pm"] == noise]
         if sub.empty: continue
         for key, (label, color, marker) in CELL_LABELS.items():
             cell = sub[sub["method"] == key].sort_values("trust_radius")
+            cell = cell[cell["med_step_conv"].notna()]
             if cell.empty: continue
             ax.plot(cell["trust_radius"], cell["med_step_conv"],
-                    marker=marker, color=color, label=label, lw=1.7, markersize=8)
-        ax.set_xscale("log"); ax.set_yscale("log")
-        ax.set_xlabel("trust_radius (Å)")
-        ax.set_ylabel("median steps to converge (log)" if noise == NOISES[0] else "")
+                    marker=marker, color=color, label=label, lw=2.0, markersize=7.5,
+                    markeredgecolor="white", markeredgewidth=0.7)
+        format_trust_axis(ax)
+        ax.set_yscale("log")
+        ax.set_ylabel("median steps to convergence" if noise == NOISES[0] else "")
         ax.set_title(f"{noise} pm noise")
-        ax.grid(alpha=0.3)
-        if noise == NOISES[0]:
-            ax.legend(fontsize=8, loc="upper right", framealpha=0.95)
-    fig.suptitle("Hybrid GAD–Newton — median steps to converge vs trust_radius",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout()
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT_FIG / f"fig_hybrid_steps_vs_tr.{ext}", bbox_inches="tight", dpi=140)
-    plt.close(fig); print("wrote fig_hybrid_steps_vs_tr")
+        ax.grid(True, which="both", axis="both", alpha=0.25)
+    add_shared_legend(fig, axes, ncol=3)
+    fig.suptitle("Hybrid GAD-Newton: median steps to convergence", fontsize=13)
+    save_figure(fig, "fig_hybrid_steps_vs_tr", rect=(0, 0.14, 1, 0.93))
+
+
+def plot_wall_vs_tr(df: pd.DataFrame):
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), sharey=True)
+    for ax, noise in zip(axes, NOISES):
+        sub = df[df["noise_pm"] == noise]
+        if sub.empty: continue
+        for key, (label, color, marker) in CELL_LABELS.items():
+            cell = sub[sub["method"] == key].sort_values("trust_radius")
+            cell = cell[cell["wall_per_conv_s"].notna()]
+            if cell.empty: continue
+            ax.plot(cell["trust_radius"], cell["wall_per_conv_s"],
+                    marker=marker, color=color, label=label, lw=2.0, markersize=7.5,
+                    markeredgecolor="white", markeredgewidth=0.7)
+        format_trust_axis(ax)
+        ax.set_yscale("log")
+        ax.set_ylabel("wall time per converged TS (s)" if noise == NOISES[0] else "")
+        ax.set_title(f"{noise} pm noise")
+        ax.grid(True, which="both", axis="both", alpha=0.25)
+    add_shared_legend(fig, axes, ncol=3)
+    fig.suptitle("Hybrid GAD-Newton: wall time per converged transition state", fontsize=13)
+    save_figure(fig, "fig_hybrid_wall_vs_tr", rect=(0, 0.14, 1, 0.93))
 
 
 def plot_switch_compare(df: pd.DataFrame):
     """For each method-family (eckart, damped_eckart): switch=True vs False curves."""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9), sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.2), sharey=True)
     families = [
         ("hybrid_eckart", "Hybrid Eckart"),
         ("hybrid_damped_eckart", "Hybrid Damped Eckart"),
@@ -169,66 +260,56 @@ def plot_switch_compare(df: pd.DataFrame):
     for j, noise in enumerate(NOISES):
         for i, (family, fam_label) in enumerate(families):
             ax = axes[i, j]
-            for sw, color in [("False", "#1f77b4"), ("True", "#d62728")]:
+            for sw, color in SWITCH_COLORS.items():
                 key = f"{family}_sw{sw.lower()}"
-                cell = df[(df["method"] == key) & (df["noise_pm"] == noise)].sort_values("trust_radius")
+                cell = df[(df["method"] == key) & (df["noise_pm"] == noise)].sort_values(
+                    "trust_radius"
+                )
                 if cell.empty: continue
                 ax.plot(cell["trust_radius"], cell["conv_pct"],
-                        marker="o", color=color, lw=2.0, markersize=8,
+                        marker="o", color=color, lw=2.0, markersize=7.5,
+                        markeredgecolor="white", markeredgewidth=0.7,
                         label=f"switch={sw}")
-            ax.set_xscale("log")
-            ax.set_xlabel("trust_radius (Å)")
+            format_trust_axis(ax)
             if j == 0:
-                ax.set_ylabel("conv %")
-            ax.set_title(f"{fam_label} — {noise}pm")
-            ax.grid(alpha=0.3); ax.set_ylim(0, 105)
-            ax.legend(fontsize=9, loc="lower right")
-    fig.suptitle("switch_based_on_hessian_eigval — does using eigenvalue-clear-index1 vs $\\|F\\|<10^{-3}$ trigger help?",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout()
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT_FIG / f"fig_hybrid_switch_compare.{ext}", bbox_inches="tight", dpi=140)
-    plt.close(fig); print("wrote fig_hybrid_switch_compare")
+                ax.set_ylabel("converged (%)")
+            ax.set_title(f"{fam_label}: {noise} pm noise")
+            ax.grid(True, which="both", axis="both", alpha=0.25)
+            ax.set_ylim(0, 105)
+    add_shared_legend(fig, axes, ncol=2)
+    fig.suptitle("Switch criterion comparison: force threshold vs Hessian eigenvalue", fontsize=13)
+    save_figure(fig, "fig_hybrid_switch_compare", rect=(0, 0.11, 1, 0.94))
 
 
 def plot_method_heatmap(df: pd.DataFrame):
     """5 method × 5 trust_radius heatmap of conv_pct, two panels (10pm, 100pm)."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
-    for ax, noise in zip(axes, NOISES):
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), sharey=True)
+    for i_ax, (ax, noise) in enumerate(zip(axes, NOISES)):
         sub = df[df["noise_pm"] == noise]
         if sub.empty: continue
         # Pivot: rows=method, cols=trust_radius, values=conv_pct
         pv = sub.pivot(index="method", columns="trust_radius", values="conv_pct").reindex(
-            list(CELL_LABELS.keys()))
+            METHOD_ORDER)
         if pv.empty: continue
-        im = ax.imshow(pv.values, aspect="auto", cmap="RdYlGn", vmin=0, vmax=100,
-                       interpolation="nearest")
-        ax.set_xticks(range(len(pv.columns)))
-        ax.set_xticklabels([f"{tr:g}" for tr in pv.columns])
-        ax.set_yticks(range(len(pv.index)))
-        ax.set_yticklabels([CELL_LABELS.get(m, (m,))[0] for m in pv.index],
-                           fontsize=8)
-        ax.set_xlabel("trust_radius (Å)")
+        plot_data = pv.rename(
+            index={key: label for key, (label, _, _) in CELL_LABELS.items()}
+        )
+        sns.heatmap(
+            plot_data, ax=ax, cmap="RdYlGn", vmin=0, vmax=100, annot=True,
+            fmt=".0f", linewidths=0.6, linecolor="white",
+            cbar=i_ax == len(NOISES) - 1, cbar_kws={"label": "converged (%)"}
+        )
+        ax.set_xlabel("trust radius (Å)")
         ax.set_title(f"{noise} pm noise")
-        for i in range(len(pv.index)):
-            for j in range(len(pv.columns)):
-                v = pv.values[i, j]
-                if not np.isnan(v):
-                    ax.text(j, i, f"{v:.0f}", ha="center", va="center",
-                            color="white" if v < 50 else "black",
-                            fontsize=9, fontweight="bold")
-        plt.colorbar(im, ax=ax, label="conv %")
-    fig.suptitle("Hybrid GAD-Newton sweep: full grid (5 methods × 5 trust radii)",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout()
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT_FIG / f"fig_hybrid_method_compare.{ext}", bbox_inches="tight", dpi=140)
-    plt.close(fig); print("wrote fig_hybrid_method_compare")
+        ax.tick_params(axis="x", rotation=0)
+        ax.tick_params(axis="y", rotation=0)
+    fig.suptitle("Hybrid GAD-Newton: convergence across method and trust radius", fontsize=13)
+    save_figure(fig, "fig_hybrid_method_compare", rect=(0, 0, 1, 0.93))
 
 
 def plot_phase_breakdown(df: pd.DataFrame):
     """frac_used_newton: shows which trust radii actually triggered the Newton phase."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), sharey=True)
     for ax, noise in zip(axes, NOISES):
         sub = df[df["noise_pm"] == noise]
         if sub.empty: continue
@@ -236,20 +317,16 @@ def plot_phase_breakdown(df: pd.DataFrame):
             cell = sub[sub["method"] == key].sort_values("trust_radius")
             if cell.empty: continue
             ax.plot(cell["trust_radius"], cell["frac_used_newton"]*100,
-                    marker=marker, color=color, label=label, lw=1.7, markersize=8)
-        ax.set_xscale("log")
-        ax.set_xlabel("trust_radius (Å)")
-        ax.set_ylabel("% of samples using Newton on the LAST step" if noise == NOISES[0] else "")
+                    marker=marker, color=color, label=label, lw=2.0, markersize=7.5,
+                    markeredgecolor="white", markeredgewidth=0.7)
+        format_trust_axis(ax)
+        ax.set_ylabel("samples ending with Newton step (%)" if noise == NOISES[0] else "")
         ax.set_title(f"{noise} pm noise")
-        ax.set_ylim(-5, 105); ax.grid(alpha=0.3)
-        if noise == NOISES[0]:
-            ax.legend(fontsize=8, loc="upper right", framealpha=0.95)
-    fig.suptitle("Did the hybrid switch fire? (% samples whose terminating step used Newton)",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout()
-    for ext in ("pdf", "png"):
-        fig.savefig(OUT_FIG / f"fig_hybrid_step_phases.{ext}", bbox_inches="tight", dpi=140)
-    plt.close(fig); print("wrote fig_hybrid_step_phases")
+        ax.set_ylim(-5, 105)
+        ax.grid(True, which="both", axis="both", alpha=0.25)
+    add_shared_legend(fig, axes, ncol=3)
+    fig.suptitle("Hybrid GAD-Newton: how often the Newton phase fires", fontsize=13)
+    save_figure(fig, "fig_hybrid_step_phases", rect=(0, 0.14, 1, 0.93))
 
 
 # =================================================================
@@ -355,6 +432,7 @@ def write_pivot_md(df: pd.DataFrame):
 
 
 def main():
+    configure_plot_style()
     print("=== Building summary ===")
     df = build_summary()
     if df.empty:
@@ -364,6 +442,7 @@ def main():
     print()
     plot_conv_vs_tr(df)
     plot_steps_vs_tr(df)
+    plot_wall_vs_tr(df)
     plot_switch_compare(df)
     plot_method_heatmap(df)
     plot_phase_breakdown(df)

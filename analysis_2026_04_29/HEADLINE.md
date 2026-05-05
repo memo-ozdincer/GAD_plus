@@ -62,7 +62,7 @@ same coord system, same step budget): see headline table above.
 
 **Framing B — most-out-of-the-box** (GAD canonical dt=0.003, Sella library
 defaults d=3 + fmax<0.05 + internal coords): GAD 88.2/87.1/84.7/69.3/51.6/34.8
-vs Sella default 94.4/90.6/84.7/63.8/--/-- (fmax<0.05 gate). Same shape;
+vs Sella default 94.4/90.6/84.7/63.8/--/-- (fmax<0.05 criterion). Same shape;
 GAD wins at high noise.
 
 ## Key sources

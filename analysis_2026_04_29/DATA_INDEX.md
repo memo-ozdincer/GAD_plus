@@ -121,7 +121,7 @@ Parsed from timed-out slurm logs. Built by `scripts/parse_nohess_logs.py`.
 | `n_conv` | of completed, how many converged |
 | `conv_pct_partial` | n_conv / n_completed × 100 |
 | `conv_pct_lb` | n_conv / 287 × 100 (lower bound assuming unprocessed all failed) |
-| `n_ours_TS`, `ours_TS_pct_partial` | same for `n_neg=1 ∧ force<0.01` gate |
+| `n_ours_TS`, `ours_TS_pct_partial` | same for `n_neg=1 ∧ force<0.01` criterion |
 | `median_steps`, `median_wall_s`, `median_fmax` | compute summary |
 
 ---

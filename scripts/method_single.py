@@ -128,7 +128,7 @@ METHOD_CONFIGS = {
         use_projection=False,
         force_criterion="fmax", force_threshold=0.01,
     ),
-    # gad_dt003 with the new fmax-based criterion (same dynamics as gad_dt003, different gate)
+    # gad_dt003 with the new fmax-based criterion (same dynamics as gad_dt003, different criterion)
     "gad_dt003_fmax": dict(
         runner="gad", dt=0.003, k_track=0, adaptive=False, max_disp=0.35,
         force_criterion="fmax", force_threshold=0.01,
@@ -232,7 +232,7 @@ METHOD_CONFIGS = {
         force_threshold=1e-4,
     ),
     "nr_gad_polish_dt007_loose": dict(
-        # Same dynamics, looser gate (matches our other comparisons).
+        # Same dynamics, looser criterion (matches our other comparisons).
         runner="pingpong",
         dt=0.007,
         k_track=0,
@@ -271,7 +271,7 @@ METHOD_CONFIGS = {
         force_criterion="fmax",
         force_threshold=1e-4,
     ),
-    # === 2026-04-28: bigger GAD dt sweep, matched fmax<0.01 gate ===
+    # === 2026-04-28: bigger GAD dt sweep, matched fmax<0.01 criterion ===
     # Matches Round 6 canonical setup but tests larger step sizes for
     # fairness against Sella's quasi-Newton ~10^-2 Å step.
     "gad_dt005_fmax": dict(

@@ -45,6 +45,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 OUT_CSV = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT_FIG = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs/test_dtgrid")
@@ -189,15 +193,15 @@ def plot_phase_breakdown(summary: pd.DataFrame):
         "wrong_basin", "converged", "other",
     ]
     COLORS = {
-        "descent_smooth": "#1f77b4",
-        "descent_curved": "#aec7e8",
-        "tightening_safe": "#2ca02c",
-        "tightening_ill": "#d62728",
-        "plateau": "#ff7f0e",
-        "above_basin": "#9467bd",
-        "wrong_basin": "#8c564b",
-        "converged": "#bcbd22",
-        "other": "#7f7f7f",
+        "descent_smooth": palette_color(0),
+        "descent_curved": palette_color(9),
+        "tightening_safe": palette_color(2),
+        "tightening_ill": palette_color(3),
+        "plateau": palette_color(1),
+        "above_basin": palette_color(4),
+        "wrong_basin": palette_color(5),
+        "converged": palette_color(8),
+        "other": palette_color(7),
     }
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
     for ax, (label, _) in zip(axes, GAD_METHODS):
@@ -217,8 +221,8 @@ def plot_phase_breakdown(summary: pd.DataFrame):
             if phase not in pivot.columns: continue
             vals = pivot[phase].values
             ax.bar(x, vals, bottom=bottom,
-                   color=COLORS.get(phase, "#888"),
-                   edgecolor="black", linewidth=0.3,
+                   color=COLORS.get(phase, palette_color(7)),
+                   edgecolor=palette_color(7), linewidth=0.3,
                    label=phase if label == GAD_METHODS[0][0] else None)
             bottom += vals
         ax.set_xticks(x)
@@ -251,11 +255,11 @@ def plot_eig1_per_phase(summary: pd.DataFrame):
         sub = sub[sub["phase"].isin(PHASES)].sort_values("phase")
         x = np.arange(len(sub))
         for i, (_, r) in enumerate(sub.iterrows()):
-            color = "#1f77b4"
+            color = palette_color(0)
             ax.plot([i, i], [r["p10_abs_eig1"], r["p90_abs_eig1"]],
                     color=color, lw=2.0, alpha=0.4)
             ax.plot(i, r["p50_abs_eig1"], "o", color=color, markersize=8,
-                    markeredgecolor="black", markeredgewidth=0.5)
+                    markeredgecolor=palette_color(7), markeredgewidth=0.5)
             ax.text(i, r["p90_abs_eig1"]*1.2 if r["p90_abs_eig1"]>0 else 1e-2,
                     f"{r['p50_abs_eig1']:.2f}",
                     ha="center", fontsize=6)
@@ -264,7 +268,7 @@ def plot_eig1_per_phase(summary: pd.DataFrame):
                            fontsize=7)
         ax.set_yscale("log")
         ax.set_ylabel("|λ_1| (log)")
-        ax.axhline(0.1, color="red", ls="--", alpha=0.6, label="threshold")
+        ax.axhline(0.1, color=palette_color(3), ls="--", alpha=0.6, label="threshold")
         ax.set_title(f"{noise}pm noise, GAD dt=0.007", fontsize=10)
         ax.grid(alpha=0.3, axis="y")
     fig.suptitle("$|\\lambda_1|$ distribution per phase\n"
@@ -293,11 +297,11 @@ def plot_step_safety(safety: pd.DataFrame):
         p50s = [r["p50_scale_v0"], r["p50_scale_v1"]]
         p90s = [r["p90_scale_v0"], r["p90_scale_v1"]]
         x = np.arange(len(cats))
-        ax.bar(x, p50s, color="#1f77b4", label="P50",
-               edgecolor="black", linewidth=0.3)
-        ax.bar(x + 0.4, p90s, 0.4, color="#d62728", label="P90",
-               edgecolor="black", linewidth=0.3)
-        ax.axhline(1.0, color="black", ls="--", lw=1.0,
+        ax.bar(x, p50s, color=palette_color(0), label="P50",
+               edgecolor=palette_color(7), linewidth=0.3)
+        ax.bar(x + 0.4, p90s, 0.4, color=palette_color(3), label="P90",
+               edgecolor=palette_color(7), linewidth=0.3)
+        ax.axhline(1.0, color=palette_color(7), ls="--", lw=1.0,
                    label="Δx_natural = Δx_actual")
         ax.set_yscale("log")
         ax.set_xticks(x + 0.2)

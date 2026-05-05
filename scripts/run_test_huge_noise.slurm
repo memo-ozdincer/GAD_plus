@@ -10,7 +10,8 @@
 #SBATCH --array=0-15
 
 # Huge-noise probe — small n=50 sample to see what happens at 300/500/1000/2000pm.
-# 4 noise levels × 4 methods (GAD dt=0.003, GAD dt=0.007, Sella libdef, Sella libdef-extended-steps)
+# 4 noise levels × 4 methods (GAD dt=0.003, GAD dt=0.007,
+# Sella cart+Eckart delta0=0.10 gamma=0.40 at 2k and 5k steps)
 # = 16 cells. Just a sniff test — not a full sweep. Looks at:
 #   - Sella's failure mode at huge noise (does it remain "wrong saddle"?)
 #   - GAD's failure mode at huge noise (does the plateau hold?)

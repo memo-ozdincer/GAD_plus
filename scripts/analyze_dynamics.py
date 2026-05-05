@@ -18,7 +18,7 @@ Methods covered (where trajectory parquets exist):
   GAD dt=0.003, dt=0.005, dt=0.007 (test)
   GAD adaptive_dt (test)
   GAD low-dt: dt=1e-3, 5e-4, 1e-4 (test, partial)
-  Sella libdef (train, 100pm only)
+  Sella cart+Eckart with delta0=0.10, gamma=0.40 (train, 100pm only)
 """
 from __future__ import annotations
 
@@ -32,6 +32,10 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
 
 BASE = Path("/lustre07/scratch/memoozd/gadplus/runs")
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
@@ -48,11 +52,11 @@ STEP_CAP = 5000                # max step to retain for visualization
 # Method labels deliberately have NO commas so the CSV is duckdb-queryable
 # without quote-detection edge cases.
 METHODS = {
-    "gad_dt003_5k":  (BASE / "test_dtgrid/gad_dt003_fmax",  "#1f77b4", "-",  SAMPLES_PER_CELL),
-    "gad_dt005_5k":  (BASE / "test_dtgrid/gad_dt005_fmax",  "#2ca02c", "-",  SAMPLES_PER_CELL),
-    "gad_dt007_5k":  (BASE / "test_dtgrid/gad_dt007_fmax",  "#ff7f0e", "-",  SAMPLES_PER_CELL),
-    "gad_adaptive_dt": (BASE / "test_set/gad_adaptive_dt",  "#d62728", "--", SAMPLES_PER_CELL),
-    "gad_dt001_20k": (BASE / "test_lowdt/gad_dt001_fmax",   "#9467bd", ":",  SAMPLES_PER_CELL),
+    "gad_dt003_5k":  (BASE / "test_dtgrid/gad_dt003_fmax",  palette_color(0), "-",  SAMPLES_PER_CELL),
+    "gad_dt005_5k":  (BASE / "test_dtgrid/gad_dt005_fmax",  palette_color(2), "-",  SAMPLES_PER_CELL),
+    "gad_dt007_5k":  (BASE / "test_dtgrid/gad_dt007_fmax",  palette_color(1), "-",  SAMPLES_PER_CELL),
+    "gad_adaptive_dt": (BASE / "test_set/gad_adaptive_dt",  palette_color(3), "--", SAMPLES_PER_CELL),
+    "gad_dt001_20k": (BASE / "test_lowdt/gad_dt001_fmax",   palette_color(4), ":",  SAMPLES_PER_CELL),
 }
 
 # Display names (used only in legend, not in CSV).
@@ -62,14 +66,14 @@ DISPLAY = {
     "gad_dt007_5k": "GAD dt=0.007 (5k)",
     "gad_adaptive_dt": "GAD adaptive dt",
     "gad_dt001_20k": "GAD dt=1e-3 (20k)",
-    "sella_libdef_train_trajlog": "Sella libdef (train trajlog)",
-    "sella_libdef_test_trajlog":  "Sella libdef (test trajlog)",
+    "sella_libdef_train_trajlog": "Sella cart+Eckart δ0=0.10 γ=0.40 (train trajlog)",
+    "sella_libdef_test_trajlog":  "Sella cart+Eckart δ0=0.10 γ=0.40 (test trajlog)",
 }
 
 # Sella trajectory data: train (1 noise) + test (6 noise once 60148863 lands).
 SELLA_TRAJLOG = {
-    "sella_libdef_train_trajlog":  (BASE / "sella_trajlog/carteck_libdef",                "#17becf", "-",  SAMPLES_PER_CELL),
-    "sella_libdef_test_trajlog":   (BASE / "test_sella_trajlog/carteck_libdef",           "#0080A0", "-",  SAMPLES_PER_CELL),
+    "sella_libdef_train_trajlog":  (BASE / "sella_trajlog/carteck_libdef",                palette_color(9), "-",  SAMPLES_PER_CELL),
+    "sella_libdef_test_trajlog":   (BASE / "test_sella_trajlog/carteck_libdef",           palette_color(9), "-",  SAMPLES_PER_CELL),
 }
 
 
@@ -194,8 +198,8 @@ def main():
             ax.fill_between(sub["step"], sub["fmax_p25"], sub["fmax_p75"],
                             color=color, alpha=0.12)
         for t in THRESHOLDS:
-            ax.axhline(t, color="gray", linestyle=":", alpha=0.4, linewidth=0.8)
-            ax.text(ax.get_xlim()[1] * 0.99, t * 1.05, f"{t}", color="gray",
+            ax.axhline(t, color=palette_color(7), linestyle=":", alpha=0.4, linewidth=0.8)
+            ax.text(ax.get_xlim()[1] * 0.99, t * 1.05, f"{t}", color=palette_color(7),
                     fontsize=7, ha="right", va="bottom")
         ax.set_yscale("log")
         ax.set_xlabel("step")
@@ -223,7 +227,7 @@ def main():
             ax.plot(sub["step"], sub["fnorm_p50"], color=color, linestyle=ls,
                     linewidth=1.8, label=DISPLAY.get(label, label), alpha=0.9)
         for t in THRESHOLDS:
-            ax.axhline(t, color="gray", linestyle=":", alpha=0.4, linewidth=0.8)
+            ax.axhline(t, color=palette_color(7), linestyle=":", alpha=0.4, linewidth=0.8)
         ax.set_yscale("log")
         ax.set_xlabel("step")
         ax.set_title(f"{n} pm")

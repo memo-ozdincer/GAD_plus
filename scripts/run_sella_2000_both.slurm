@@ -13,7 +13,7 @@
 # 2 configs (internal-no-eckart, cartesian-eckart) x 6 noise levels.
 #
 # Array layout: task_id = config_idx * 6 + noise_idx
-#   config 0 = internal (Sella default; no Eckart, internal dof-removal)
+#   config 0 = internal (no Eckart, internal dof-removal)
 #   config 1 = cartesian + eckart (previous best)
 # Noise: 0=10pm 1=30pm 2=50pm 3=100pm 4=150pm 5=200pm
 

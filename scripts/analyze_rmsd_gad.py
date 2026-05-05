@@ -22,6 +22,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 BASE = Path("/lustre07/scratch/memoozd/gadplus/runs")
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 FIG = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
@@ -87,11 +91,11 @@ def main():
     fig, axes = plt.subplots(2, 3, figsize=(13, 6.5))
     axes = axes.flatten()
     palette = {
-        "GAD dt=0.003 (5k)":  "#1f77b4",
-        "GAD dt=0.007 (5k)":  "#17becf",
-        "Sella libdef":       "#d62728",
-        "Sella default":      "#ff7f0e",
-        "Sella internal":     "#9467bd",
+        "GAD dt=0.003 (5k)":  palette_color(0),
+        "GAD dt=0.007 (5k)":  palette_color(9),
+        "Sella cart+Eckart, delta0=0.10 gamma=0.40 H/step": palette_color(3),
+        "Sella cart+Eckart, delta0=0.048 gamma=0 H/step": palette_color(1),
+        "Sella internal, delta0=0.048 gamma=0 H/step": palette_color(4),
     }
     for ax, noise in zip(axes, NOISES):
         for label, color in palette.items():

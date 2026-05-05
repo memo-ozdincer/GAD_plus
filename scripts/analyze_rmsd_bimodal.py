@@ -31,7 +31,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import torch
 
+from plotting_style import apply_plot_style, palette_color
+
 sys.path.insert(0, "/lustre06/project/6033559/memoozd/GAD_plus/src")
+apply_plot_style()
 
 BASE = Path("/lustre07/scratch/memoozd/gadplus/runs")
 OUT_DIR = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
@@ -126,9 +129,12 @@ def main():
     print(f"  {len(ts_coords)} samples")
 
     methods = {
-        "Sella default":  (BASE / "test_set/sella_carteck_default", "conv_nneg1_fmax001"),
-        "Sella libdef":   (BASE / "test_set/sella_carteck_libdef", "conv_nneg1_fmax001"),
-        "Sella internal": (BASE / "test_set/sella_internal_default", "conv_nneg1_fmax001"),
+        "Sella cart+Eckart, delta0=0.048 gamma=0 H/step":
+            (BASE / "test_set/sella_carteck_default", "conv_nneg1_fmax001"),
+        "Sella cart+Eckart, delta0=0.10 gamma=0.40 H/step":
+            (BASE / "test_set/sella_carteck_libdef", "conv_nneg1_fmax001"),
+        "Sella internal, delta0=0.048 gamma=0 H/step":
+            (BASE / "test_set/sella_internal_default", "conv_nneg1_fmax001"),
     }
     # GAD methods don't have coords_flat in summary; they live in traj parquets.
     # Pull from sella_baseline-saved Sella summaries (which DO have coords_flat).
@@ -151,7 +157,7 @@ def main():
     # ============ Saddle-quality table ============
     print("\nSaddle-quality breakdown:")
     print("=" * 100)
-    print(f"{'method':<18} {'noise':>5} {'n':>4}  "
+    print(f"{'method':<52} {'noise':>5} {'n':>4}  "
           f"{'sad+fmax<.01':>14} {'sad+fmax<1e-4':>15} "
           f"{'sad-only':>10} {'false_min':>10}  {'med_RMSD':>9}")
     md_lines = ["# Saddle quality on test\n",
@@ -164,7 +170,7 @@ def main():
         sad_only = g["is_saddle"].sum()
         false_min = g["false_conv_min"].sum()
         med_rmsd = g["rmsd_to_ts"].median()
-        line = (f"{m:<18} {n:>5} {n_total:>4}  "
+        line = (f"{m:<52} {n:>5} {n_total:>4}  "
                 f"{100*sad_loose/n_total:>13.1f}% {100*sad_strict/n_total:>14.1f}%  "
                 f"{100*sad_only/n_total:>9.1f}% {100*false_min/n_total:>9.1f}%  {med_rmsd:>9.4f}")
         print(line)
@@ -177,10 +183,13 @@ def main():
     # ============ RMSD distribution figure ============
     fig, axes = plt.subplots(2, 3, figsize=(13, 6.5), sharey=False)
     axes = axes.flatten()
-    colors = {"Sella default": "#d62728", "Sella libdef": "#ff7f0e",
-              "Sella internal": "#9467bd"}
+    colors = {
+        "Sella cart+Eckart, delta0=0.048 gamma=0 H/step": palette_color(3),
+        "Sella cart+Eckart, delta0=0.10 gamma=0.40 H/step": palette_color(1),
+        "Sella internal, delta0=0.048 gamma=0 H/step": palette_color(4),
+    }
     for ax, noise in zip(axes, NOISES):
-        for m in ["Sella default", "Sella libdef", "Sella internal"]:
+        for m in colors:
             g = df[(df["method"] == m) & (df["noise_pm"] == noise)]
             if not len(g): continue
             rmsds = g["rmsd_to_ts"].dropna().values

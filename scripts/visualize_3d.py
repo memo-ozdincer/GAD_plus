@@ -27,20 +27,23 @@ from ase import Atoms
 from ase.io import write as ase_write
 from ase.neighborlist import natural_cutoffs, neighbor_list
 
+from plotting_style import apply_plot_style, palette_hex
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+apply_plot_style()
 
 
 ELEMENT_COLORS = {
-    1: "#E0E0E0",  # H
-    6: "#333333",  # C
-    7: "#3050F8",  # N
-    8: "#FF0D0D",  # O
-    9: "#90E050",  # F
-    15: "#FF8000",  # P
-    16: "#FFFF30",  # S
-    17: "#1FF01F",  # Cl
-    35: "#A62929",  # Br
-    53: "#940094",  # I
+    1: palette_hex(7),  # H
+    6: palette_hex(5),  # C
+    7: palette_hex(0),  # N
+    8: palette_hex(3),  # O
+    9: palette_hex(2),  # F
+    15: palette_hex(1),  # P
+    16: palette_hex(8),  # S
+    17: palette_hex(2),  # Cl
+    35: palette_hex(5),  # Br
+    53: palette_hex(4),  # I
 }
 
 
@@ -406,7 +409,7 @@ def main() -> None:
     else:
         edges = []
 
-    atom_colors = [ELEMENT_COLORS.get(int(zi), "#9E9E9E") for zi in z]
+    atom_colors = [ELEMENT_COLORS.get(int(zi), palette_hex(7)) for zi in z]
     atom_sizes = [14 if int(zi) == 1 else 18 for zi in z]
 
     def frame_data(coords: np.ndarray, idx: int):

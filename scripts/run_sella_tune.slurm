@@ -16,7 +16,7 @@
 #
 # Configs:
 #   carteck_default : delta0=0.048, gamma=0.0  (current "tuned" setting)
-#   carteck_libdef  : delta0=0.1,   gamma=0.4  (closer to Sella library defaults)
+#   carteck_libdef  : delta0=0.1,   gamma=0.4
 #   carteck_lson    : delta0=0.048, gamma=0.4  (line search ON, current trust)
 
 set -euo pipefail

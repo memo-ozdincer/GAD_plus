@@ -6,7 +6,7 @@ multiple criteria using the final-state columns:
   - fmax<{1e-2, 5e-3, 1e-3, 1e-4}  ∧ n_neg=1
   - force_norm<{1e-2, 5e-3, 1e-3, 1e-4} ∧ n_neg=1
 
-Sella canonical = fmax<0.01 (Sella repo default). Other thresholds for
+Canonical convergence uses fmax<0.01. Other thresholds are for
 sensitivity analysis.
 
 Output:
@@ -26,8 +26,8 @@ OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT.mkdir(exist_ok=True, parents=True)
 
 NOISES = [10, 30, 50, 100, 150, 200]
-# Wider grid: 0.05 = Sella library default; 0.01 = our canonical;
-# tighter values for paper-grade strictness.
+# Wider grid around the canonical fmax<0.01 criterion; tighter values for
+# sensitivity analysis.
 THRESHOLDS = [0.05, 0.01, 0.005, 0.001, 1e-4]
 
 
@@ -68,11 +68,11 @@ def main():
         "GAD dt=0.007 (5k)":  BASE / "test_dtgrid/gad_dt007_fmax",
         "GAD dt=0.008 (5k)":  BASE / "test_dtgrid/gad_dt008_fmax",
         "GAD adaptive_dt":    BASE / "test_set/gad_adaptive_dt",
-        "Sella default":      BASE / "test_set/sella_carteck_default",
-        "Sella libdef":       BASE / "test_set/sella_carteck_libdef",
-        "Sella internal":     BASE / "test_set/sella_internal_default",
-        "Sella nohess cart":  BASE / "test_set/sella_carteck_nohess",
-        "Sella nohess int":   BASE / "test_set/sella_internal_nohess",
+        "Sella cart+Eckart (delta0=0.048, gamma=0, H/step)": BASE / "test_set/sella_carteck_default",
+        "Sella cart+Eckart (delta0=0.10, gamma=0.40, H/step)": BASE / "test_set/sella_carteck_libdef",
+        "Sella internal (delta0=0.048, gamma=0, H/step)": BASE / "test_set/sella_internal_default",
+        "Sella cart+Eckart (delta0=0.10, gamma=0.40, no HIP H)": BASE / "test_set/sella_carteck_nohess",
+        "Sella internal (delta0=0.048, gamma=0, no HIP H)": BASE / "test_set/sella_internal_nohess",
     }
 
     for label, mdir in method_specs.items():
@@ -90,7 +90,7 @@ def main():
                 # With saddle requirement
                 fmax_pass = ((df["n_neg"] == 1) & (df["fmax"] < thresh)).sum()
                 fnorm_pass = ((df["n_neg"] == 1) & (df["force_norm"] < thresh)).sum()
-                # WITHOUT saddle requirement (Sella's own default convergence: just fmax)
+                # WITHOUT saddle requirement: force-only convergence.
                 fmax_pass_no_sad = (df["fmax"] < thresh).sum()
                 fnorm_pass_no_sad = (df["force_norm"] < thresh).sum()
                 all_rows.append({
@@ -111,13 +111,13 @@ def main():
 
     # Summary tables — one per threshold, fmax then fnorm, with and without saddle req
     md_lines = ["# Convergence-criterion sensitivity sweep on test\n"]
-    gate_options = [
+    criterion_options = [
         ("conv_fmax_pct", "fmax", "n_neg=1 ∧ "),
         ("conv_fnorm_pct", "force_norm", "n_neg=1 ∧ "),
-        ("conv_fmax_nosad_pct", "fmax", ""),  # Sella library default style
+        ("conv_fmax_nosad_pct", "fmax", ""),
         ("conv_fnorm_nosad_pct", "force_norm", ""),
     ]
-    for gate, force_label, sad_prefix in gate_options:
+    for criterion_col, force_label, sad_prefix in criterion_options:
         for thresh in THRESHOLDS:
             md_lines.append(f"\n## {sad_prefix}{force_label} < {thresh}\n")
             md_lines.append("| method | 10 | 30 | 50 | 100 | 150 | 200 |")
@@ -127,7 +127,7 @@ def main():
                 for n in NOISES:
                     sub = out[(out["method"] == label) & (out["noise_pm"] == n) & (out["threshold"] == thresh)]
                     if len(sub):
-                        row.append(f"| {sub.iloc[0][gate]:.1f} ")
+                        row.append(f"| {sub.iloc[0][criterion_col]:.1f} ")
                     else:
                         row.append("| — ")
                 row.append("|")
@@ -153,15 +153,15 @@ def main():
 
     # Print headline tables to stdout
     for thresh in [0.01, 0.001]:
-        for gate in ["conv_fmax_pct", "conv_fnorm_pct"]:
-            label = "fmax" if "fmax" in gate else "force_norm"
+        for criterion_col in ["conv_fmax_pct", "conv_fnorm_pct"]:
+            label = "fmax" if "fmax" in criterion_col else "force_norm"
             print(f"\n=== n_neg=1 ∧ {label} < {thresh} ===")
             print(f"{'method':<26}  {'10':>5} {'30':>5} {'50':>5} {'100':>5} {'150':>5} {'200':>5}")
             for m in method_specs:
                 rates = []
                 for n in NOISES:
                     sub = out[(out["method"] == m) & (out["noise_pm"] == n) & (out["threshold"] == thresh)]
-                    rates.append(f"{sub.iloc[0][gate]:5.1f}" if len(sub) else "  --")
+                    rates.append(f"{sub.iloc[0][criterion_col]:5.1f}" if len(sub) else "  --")
                 print(f"{m:<26}  {' '.join(rates)}")
 
 

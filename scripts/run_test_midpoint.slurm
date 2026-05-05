@@ -12,7 +12,8 @@
 # Single-ended TS search from R+P linear midpoint, no TS noise (0pm).
 # Tests the paper's claim that GAD can climb from a non-TS starting point.
 #
-# 4 methods: GAD dt=0.003, GAD dt=0.007, Sella libdef, Sella internal default.
+# 4 methods: GAD dt=0.003, GAD dt=0.007, Sella cart+Eckart
+# delta0=0.10 gamma=0.40, Sella internal delta0=0.048 gamma=0.
 # All at noise=0pm starting from midpoint(reactant, product).
 
 set -euo pipefail

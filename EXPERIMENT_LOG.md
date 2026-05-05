@@ -60,7 +60,7 @@ This section is intentionally redundant. It is the "everything we've done that c
 3. Reworked [scripts/irc_validate.py](scripts/irc_validate.py) so TS candidates are selected from saved trajectories instead of blindly using final saved frames.
 4. Added TS-pick modes such as `best_nneg1`, `final`, and `best_force`.
 5. Added recomputation of `force_norm`, `fmax`, and projected `n_neg` on the chosen TS geometry before IRC.
-6. Added a TS quality gate so IRC can reject weak "converged" candidates before spending time on path following.
+6. Added a TS quality criterion so IRC can reject weak "converged" candidates before spending time on path following.
 7. Added an optional projected-GAD pre-IRC refinement stage so borderline TS candidates can be tightened before IRC.
 8. Recorded both pre-refinement and post-refinement metrics in the validation parquet.
 9. Stored coordinate payloads in the validation output:
@@ -77,12 +77,12 @@ This section is intentionally redundant. It is the "everything we've done that c
 1. An early new-style IRC run failed because older trajectory parquet files lacked `force_max`; the code still hard-selected that column.
 2. That bug was fixed by schema-detecting optional columns and falling back cleanly to `force_norm`.
 3. A later rerun confirmed that the pipeline was doing real IRC work rather than failing at Parquet read time.
-4. The stricter TS gate immediately exposed a key issue: many previously "converged" samples satisfy `n_neg==1 + force_norm<0.01` while failing `fmax<0.01`.
+4. The stricter TS criterion immediately exposed a key issue: many previously "converged" samples satisfy `n_neg==1 + force_norm<0.01` while failing `fmax<0.01`.
 5. The flagship CPU visualization batch completed successfully and produced 15 representative `gad_small_dt` bundles:
    - 5 noise levels: `10, 50, 100, 150, 200`
    - 3 picks each: `fast`, `slow`, `failure`
 6. The refined IRC run `59367455_[0-2]` completed and is the first run in the new stronger pipeline worth treating as scientifically meaningful.
-7. The headline from that refined IRC rerun is not "many intended reactions," but rather that the TS-quality gate is now doing serious filtering and that refinement rescues some borderline candidates while many still fail the tighter gate.
+7. The headline from that refined IRC rerun is not "many intended reactions," but rather that the TS-quality criterion is now doing serious filtering and that refinement rescues some borderline candidates while many still fail the tighter criterion.
 8. The first refined-run summaries currently in hand are:
 
 | Noise | Intended | Half | Topology Intended | Topology Half | Unintended | Error |
@@ -1073,7 +1073,7 @@ Primary metric: **TOPO-intended** (bond-graph isomorphism on both directions, el
 
 **Setup.** Five TS-finding methods benchmarked on identical inputs (Transition1x train samples 0-299, Gaussian noise seed 42, 2000-step budget, HIP analytic Hessian every step):
 
-| Method | Dynamics | Convergence gate | Output dir |
+| Method | Dynamics | Convergence criterion | Output dir |
 |---|---|---|---|
 | `gad_dt003` Eckart (historical) | projected GAD, dt=0.003 | n_neg==1 ∧ ‖F‖_mean<0.01 | `runs/round2/`, `runs/round3/` |
 | `gad_dt003_fmax` Eckart (NEW canonical) | projected GAD, dt=0.003 | n_neg==1 ∧ fmax<0.01 | `runs/gad_eckart_fmax/` |
@@ -1086,7 +1086,7 @@ Primary metric: **TOPO-intended** (bond-graph isomorphism on both directions, el
 
 | Method | 10pm | 30pm | 50pm | 100pm | 150pm | 200pm |
 |---|---|---|---|---|---|---|
-| GAD Eckart force_norm (old gate) | 94.7 | 94.3 | 92.0 | 87.3 | 71.3 | 52.3 |
+| GAD Eckart force_norm (old criterion) | 94.7 | 94.3 | 92.0 | 87.3 | 71.3 | 52.3 |
 | **GAD Eckart fmax (new canonical)** | **87.3** | **87.3** | **85.3** | **80.0** | **63.7** | **45.3** |
 | GAD no-Eckart fmax | 91.3 | 91.0 | 88.3 | 83.3 | 64.3 | 43.3 |
 | Sella cart+Eckart | 92.0 | 91.3 | 88.3 | 76.3 | 50.0 | 25.7 |
@@ -1108,7 +1108,7 @@ GAD Eckart fmax IRC pending at log-write time (job 59967280).
 
 **Key findings.**
 
-1. **Under matched fmax gate, Sella beats GAD at low noise** (~4 pp at 10-50pm) and **GAD beats Sella at high noise** (~4-20 pp at 100-200pm). Crossover ≈ 75-100pm. This is more nuanced than the original Round 1 "GAD always wins" narrative, which was inflated by GAD's looser force_norm gate.
+1. **Under matched fmax criterion, Sella beats GAD at low noise** (~4 pp at 10-50pm) and **GAD beats Sella at high noise** (~4-20 pp at 100-200pm). Crossover ≈ 75-100pm. This is more nuanced than the original Round 1 "GAD always wins" narrative, which was inflated by GAD's looser force_norm criterion.
 
 2. **Eckart projection makes GAD ~1.33× more step-efficient**, not fundamentally more reliable. On samples both Eckart and no-Eckart converge on, Eckart needs ~33% fewer steps. Under the 2000-step budget the convergence-rate gap is +0-3 pp. Under tight budgets (300 steps, Round 1 era) the same 1.33× was the difference between converging and timing out — explaining the original "Eckart is essential" claim.
 
@@ -1127,7 +1127,7 @@ GAD Eckart fmax IRC pending at log-write time (job 59967280).
 
 **Reports.**
 
-- `IRC_COMPREHENSIVE_2026-04-20.tex/pdf` — current canonical (5 methods, both gates, IRC, all comparison figures).
+- `IRC_COMPREHENSIVE_2026-04-20.tex/pdf` — current canonical (5 methods, both criteria, IRC, all comparison figures).
 - `STATUS_2026_04_20.md` — full inventory of completed cells, IRC datasets, code changes, open items, backburner.
 - Older reports marked `SUPERSEDED 2026-04-20` in the title page.
 
@@ -1153,7 +1153,7 @@ GAD Eckart fmax IRC pending at log-write time (job 59967280).
 ## Round 7: IRC backfill on gad_dt002 and gad_projected (2026-04-28)
 
 Backfill IRC validation (`sella_hip`, all endpoints, TOPO-intended) on two methods that the
-Round 6 head-to-head omitted: `gad_dt002` (3000-step, dt=0.002, force_norm gate — best raw
+Round 6 head-to-head omitted: `gad_dt002` (3000-step, dt=0.002, force_norm criterion — best raw
 TS-finder in the consolidated ranking) and `gad_projected` (300-step Round 1 baseline).
 
 Session: 29 array tasks dispatched (6 retry tasks ran ~16h on the queue overnight at
@@ -1169,11 +1169,11 @@ n=100 cells); 35 IRC cells produced in total.
 Output dirs: `runs/irc_gad_dt002/`, `runs/irc_gad_projected_round1/`.
 
 These are notably below the Round 5/6 IRC TOPO rates (~85–93% at 10–100pm), because both
-methods' historical TS pools were gated on `force_norm<0.01` (looser than fmax) — the
+methods' historical TS pools were selected by `force_norm<0.01` (looser than fmax) — the
 extra "barely-converged" TSs that pass force_norm but not fmax tend to drift on IRC. The
-Round 6 fmax-gated GAD Eckart pool gave 92.7%/89.7%/86.3% IRC TOPO at 10/50/100pm; the
+Round 6 fmax-criterion GAD Eckart pool gave 92.7%/89.7%/86.3% IRC TOPO at 10/50/100pm; the
 same 3000-step `gad_dt002` pool under force_norm only retains 69%/61%/58.7%. Confirms
-that fmax is the right gate for downstream IRC, not just for fair comparison with Sella.
+that fmax is the right criterion for downstream IRC, not just for fair comparison with Sella.
 
 ---
 

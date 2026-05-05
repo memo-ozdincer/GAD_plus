@@ -17,6 +17,8 @@ import matplotlib.ticker as ticker
 import numpy as np
 import duckdb
 
+from plotting_style import apply_plot_style, palette_color
+
 RUNS = '/lustre07/scratch/memoozd/gadplus/runs'
 OUT = '/lustre06/project/6033559/memoozd/GAD_plus/figures'
 os.makedirs(OUT, exist_ok=True)
@@ -31,7 +33,8 @@ plt.rcParams.update({
     'savefig.bbox': 'tight',
     'savefig.dpi': 200,
 })
-COLORS = ['#2196F3', '#4CAF50', '#FF9800', '#f44336', '#9C27B0', '#795548', '#607D8B']
+apply_plot_style()
+COLORS = [palette_color(0), palette_color(2), palette_color(1), palette_color(3), palette_color(4), palette_color(5), palette_color(7)]
 
 
 def fig1_conv_vs_noise():
@@ -55,8 +58,8 @@ def fig1_conv_vs_noise():
     ax.plot(level0_noise, level0_rate, 's--', color=COLORS[3], linewidth=2,
             markersize=7, label='Level 0: pure_gad (50 samples)', alpha=0.8, zorder=4)
 
-    ax.axhline(y=70, color='gray', linestyle=':', alpha=0.5)
-    ax.text(150, 72, '70% plateau', color='gray', fontsize=9)
+    ax.axhline(y=70, color=palette_color(7), linestyle=':', alpha=0.5)
+    ax.text(150, 72, '70% plateau', color=palette_color(7), fontsize=9)
 
     ax.set_xlabel('Gaussian Noise on TS Geometry (pm)')
     ax.set_ylabel('Convergence Rate (%)')
@@ -142,7 +145,7 @@ def fig3_basin_mapping():
     ax1.scatter(diff['noise_pm'], diff['rmsd_to_original_ts'],
                 c=COLORS[3], s=60, alpha=0.8, label='Different TS', marker='x',
                 linewidths=2, zorder=6)
-    ax1.axhline(0.1, color='k', linestyle='--', alpha=0.4, label='Threshold (0.1 Å)')
+    ax1.axhline(0.1, color=palette_color(7), linestyle='--', alpha=0.4, label='Threshold (0.1 Å)')
     ax1.set_xlabel('Noise (pm)')
     ax1.set_ylabel('RMSD to Original TS (Å)')
     ax1.set_title('Basin Stability: Same vs Different TS')
@@ -290,7 +293,7 @@ def fig5_trajectory_examples():
         ax.set_ylabel('Energy (eV)')
         ax.set_title(f'{label}' if row_idx == 0 else '')
         ax.text(0.02, 0.95, subtitle, transform=ax.transAxes, fontsize=9,
-                va='top', ha='left', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+                va='top', ha='left', bbox=dict(boxstyle='round', facecolor=palette_color(8), alpha=0.5))
         ax.grid(True, alpha=0.2)
 
         # Force norm
@@ -305,7 +308,7 @@ def fig5_trajectory_examples():
 
         # n_neg
         ax = axes[row_idx, 2]
-        ax.plot(steps, traj['n_neg'], color='black', linewidth=1.5,
+        ax.plot(steps, traj['n_neg'], color=palette_color(7), linewidth=1.5,
                 drawstyle='steps-post')
         ax.axhline(1, color=COLORS[1], linestyle='--', alpha=0.7, linewidth=1.5,
                    label='target (n_neg=1)')
@@ -319,7 +322,7 @@ def fig5_trajectory_examples():
         ax = axes[row_idx, 3]
         ax.plot(steps, traj['eig0'], color=COLORS[0], linewidth=1.5, label='λ₁ (lowest)')
         ax.plot(steps, traj['eig1'], color=COLORS[2], linewidth=1.5, label='λ₂')
-        ax.axhline(0, color='k', linestyle='-', alpha=0.3)
+        ax.axhline(0, color=palette_color(7), linestyle='-', alpha=0.3)
         ax.set_ylabel('Eigenvalue')
         if row_idx == 0:
             ax.legend(fontsize=9)
@@ -360,7 +363,7 @@ def fig6_steps_vs_noise():
     # Linear fit
     z = np.polyfit(df_clean['noise_pm'], df_clean['avg_steps'], 1)
     x_fit = np.linspace(0, 200, 100)
-    ax.plot(x_fit, np.polyval(z, x_fit), '--', color='gray', alpha=0.5,
+    ax.plot(x_fit, np.polyval(z, x_fit), '--', color=palette_color(7), alpha=0.5,
             label=f'Linear fit: {z[0]:.1f}·noise + {z[1]:.0f}')
 
     ax.set_xlabel('Noise (pm)')
@@ -401,8 +404,8 @@ def fig7_irc_rmsd():
     ax.scatter(unintended['rmsd_reactant'], unintended['rmsd_product'],
                c=COLORS[3], s=100, label='Unintended', zorder=5, edgecolors='black', linewidth=0.5)
 
-    ax.axhline(0.3, color='k', linestyle='--', alpha=0.3, label='Threshold (0.3 Å)')
-    ax.axvline(0.3, color='k', linestyle='--', alpha=0.3)
+    ax.axhline(0.3, color=palette_color(7), linestyle='--', alpha=0.3, label='Threshold (0.3 Å)')
+    ax.axvline(0.3, color=palette_color(7), linestyle='--', alpha=0.3)
 
     # Shade intended quadrant
     ax.fill_between([0, 0.3], 0, 0.3, alpha=0.05, color=COLORS[1])
@@ -445,7 +448,7 @@ def fig8_avg_force_trajectory():
                 ax.semilogy(df['step'], df['avg_force'], linewidth=2, color=color,
                            label=label)
 
-        ax.axhline(0.01, color='gray', linestyle='--', alpha=0.5, label='Threshold')
+        ax.axhline(0.01, color=palette_color(7), linestyle='--', alpha=0.5, label='Threshold')
         ax.set_xlabel('Step')
         ax.set_ylabel('Avg Force Norm (eV/Å)')
         ax.set_title(f'Average Force Trajectory ({title})')

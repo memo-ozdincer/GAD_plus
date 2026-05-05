@@ -12,6 +12,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 IRC_DIR = "/lustre07/scratch/memoozd/gadplus/runs/irc_sellahip_full"
 NOISE_TO_SURVEY = {10:"round2",30:"round2",50:"round2",100:"round3",150:"round3",200:"round3"}
 SURVEY_ROOT = "/lustre07/scratch/memoozd/gadplus/runs"
@@ -58,10 +62,10 @@ def fig_rates(m: pd.DataFrame) -> None:
 
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
     styles = {
-        "TOPO-int":  dict(color="#1f77b4", marker="o", lw=2.2, label="TOPO-intended (bond graph)"),
-        "TOPO-half": dict(color="#1f77b4", marker="o", lw=1.2, ls="--", label="TOPO-half only"),
-        "RMSD-int":  dict(color="#d62728", marker="s", lw=2.2, label="RMSD-intended ($<$0.3\\,\\AA)"),
-        "RMSD-half": dict(color="#d62728", marker="s", lw=1.2, ls="--", label="RMSD-half only"),
+        "TOPO-int":  dict(color=palette_color(0), marker="o", lw=2.2, label="TOPO-intended (bond graph)"),
+        "TOPO-half": dict(color=palette_color(0), marker="o", lw=1.2, ls="--", label="TOPO-half only"),
+        "RMSD-int":  dict(color=palette_color(3), marker="s", lw=2.2, label="RMSD-intended ($<$0.3\\,\\AA)"),
+        "RMSD-half": dict(color=palette_color(3), marker="s", lw=1.2, ls="--", label="RMSD-half only"),
     }
     for k, r in rates.items():
         ax.plot(NOISES, r, **styles[k])
@@ -77,7 +81,7 @@ def fig_rates(m: pd.DataFrame) -> None:
 def fig_endpoint_quality(m: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(7.5, 4.2))
     cats = ["both_min","only_fwd","only_rev","neither","missing"]
-    colors = ["#2ca02c","#7dbd6b","#f6c85f","#d62728","#888888"]
+    colors = [palette_color(2),palette_color(2),palette_color(8),palette_color(3),palette_color(7)]
     labels = ["both endpoints at minimum", "only forward", "only reverse",
               "neither at minimum", "missing data"]
 
@@ -128,11 +132,11 @@ def fig_rmsd_distributions(m: pd.DataFrame) -> None:
         ok_vals = ok[col].dropna()
         bad_vals = bad[col].dropna()
         bins = np.linspace(0, max(ok_vals.max(), bad_vals.max(), 1.5), 60)
-        ax.hist(ok_vals, bins=bins, color="#1f77b4", alpha=0.75,
+        ax.hist(ok_vals, bins=bins, color=palette_color(0), alpha=0.75,
                 label=f"TOPO-intended (n={len(ok_vals)})", edgecolor="white")
-        ax.hist(bad_vals, bins=bins, color="#d62728", alpha=0.75,
+        ax.hist(bad_vals, bins=bins, color=palette_color(3), alpha=0.75,
                 label=f"TOPO-failed (n={len(bad_vals)})", edgecolor="white")
-        ax.axvline(0.3, color="black", ls="--", lw=1, label="RMSD threshold 0.3\\,\\AA")
+        ax.axvline(0.3, color=palette_color(7), ls="--", lw=1, label="RMSD threshold 0.3\\,\\AA")
         ax.set_xlabel("RMSD (\\AA)")
         ax.set_title(title, fontsize=10)
         ax.grid(alpha=0.3)
@@ -149,9 +153,9 @@ def fig_ts_quality_vs_outcome(m: pd.DataFrame) -> None:
     bad = m[~m["topology_intended"]]
     # Log-scale converged_step because range is 50-2000
     ax.scatter(np.abs(ok["ts_final_eig0"]), ok["ts_converged_step"], s=8, alpha=0.35,
-               color="#1f77b4", label=f"TOPO-intended (n={len(ok)})")
+               color=palette_color(0), label=f"TOPO-intended (n={len(ok)})")
     ax.scatter(np.abs(bad["ts_final_eig0"]), bad["ts_converged_step"], s=15, alpha=0.75,
-               color="#d62728", label=f"TOPO-failed (n={len(bad)})", marker="x")
+               color=palette_color(3), label=f"TOPO-failed (n={len(bad)})", marker="x")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("$|\\lambda_0|$ at TS (eV/\\AA$^2$) — saddle sharpness")
@@ -190,7 +194,7 @@ def fig_systematic_failures(m: pd.DataFrame) -> None:
                 colors[i, j] = 0.0
 
     fig, ax = plt.subplots(figsize=(6, 0.3 * len(sids) + 1.5))
-    cmap = matplotlib.colors.ListedColormap(["#d62728", "#888888", "#2ca02c"])
+    cmap = matplotlib.colors.ListedColormap([palette_color(3), palette_color(7), palette_color(2)])
     bounds = [-0.5, 0.25, 0.75, 1.5]
     norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
     ax.imshow(colors, aspect="auto", cmap=cmap, norm=norm)
@@ -205,9 +209,9 @@ def fig_systematic_failures(m: pd.DataFrame) -> None:
 
     from matplotlib.patches import Patch
     ax.legend(handles=[
-        Patch(color="#2ca02c", label="TOPO-intended"),
-        Patch(color="#d62728", label="TOPO-failed"),
-        Patch(color="#888888", label="not in sample"),
+        Patch(color=palette_color(2), label="TOPO-intended"),
+        Patch(color=palette_color(3), label="TOPO-failed"),
+        Patch(color=palette_color(7), label="not in sample"),
     ], bbox_to_anchor=(1.01, 0.5), loc="center left", fontsize=8)
     save(fig, "fig_sella_systematic_failures")
 
@@ -218,7 +222,7 @@ def fig_wall_time(m: pd.DataFrame) -> None:
     bp = ax.boxplot(data, positions=range(len(NOISES)), widths=0.6,
                     patch_artist=True, showfliers=True)
     for patch in bp["boxes"]:
-        patch.set_facecolor("#1f77b4")
+        patch.set_facecolor(palette_color(0))
         patch.set_alpha(0.65)
     ax.set_xticks(range(len(NOISES)))
     ax.set_xticklabels([f"{n}pm" for n in NOISES])
@@ -234,6 +238,7 @@ def main() -> None:
         "axes.titlesize": 11,
         "text.usetex": False,
     })
+    apply_plot_style()
     m = load()
     print(f"loaded {len(m)} rows")
     fig_rates(m)

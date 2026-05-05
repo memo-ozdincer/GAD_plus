@@ -32,9 +32,9 @@ METHODS = {
     "GAD dt=0.003 (5k)":  "gad_dt003_fmax",
     "GAD dt=0.005 (5k)":  "gad_dt005_fmax",
     "GAD dt=0.007 (5k)":  "gad_dt007_fmax",
-    "Sella libdef":       "sella_carteck_libdef",
-    "Sella default":      "sella_carteck_default",
-    "Sella internal":     "sella_internal_default",
+    "Sella cart+Eckart, delta0=0.10 gamma=0.40 H/step": "sella_carteck_libdef",
+    "Sella cart+Eckart, delta0=0.048 gamma=0 H/step": "sella_carteck_default",
+    "Sella internal, delta0=0.048 gamma=0 H/step": "sella_internal_default",
 }
 
 # Import scoring infrastructure from gadplus

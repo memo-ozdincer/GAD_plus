@@ -90,7 +90,7 @@ def main():
     print(out.to_string(index=False))
 
     print()
-    print("=== Sella conv (Sella's own gate) over completed samples ===")
+    print("=== Sella conv (Sella's own criterion) over completed samples ===")
     print(f"{'method':<22} {'10':>6} {'30':>6} {'50':>6} {'100':>6} {'150':>6} {'200':>6}")
     for m in ["carteck_nohess", "internal_nohess"]:
         row = [f"{m:<22}"]
@@ -105,7 +105,7 @@ def main():
         print(" ".join(row))
 
     print()
-    print("=== n_neg=1 ∧ force<0.01 (our gate) over completed samples ===")
+    print("=== n_neg=1 ∧ force<0.01 (our criterion) over completed samples ===")
     print(f"{'method':<22} {'10':>6} {'30':>6} {'50':>6} {'100':>6} {'150':>6} {'200':>6}")
     for m in ["carteck_nohess", "internal_nohess"]:
         row = [f"{m:<22}"]

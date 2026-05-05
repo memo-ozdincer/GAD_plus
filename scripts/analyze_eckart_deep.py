@@ -15,11 +15,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from plotting_style import apply_plot_style, palette_color
+
+apply_plot_style()
+
 NOISES = [10, 30, 50, 100, 150, 200]
 OUT = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT.mkdir(exist_ok=True)
 
-# Use the canonical fmax-gated GAD Eckart data + matching no-Eckart data
+# Use the canonical fmax-criterion GAD Eckart data + matching no-Eckart data
 GAD_E = "/lustre07/scratch/memoozd/gadplus/runs/gad_eckart_fmax"          # GAD Eckart (fmax<0.01)
 GAD_N = "/lustre07/scratch/memoozd/gadplus/runs/gad_no_eckart"            # GAD no-Eckart (fmax<0.01)
 IRC_E = "/lustre07/scratch/memoozd/gadplus/runs/irc_gad_eckart_fmax"
@@ -183,8 +187,8 @@ for ax, noise in zip(axes.flat, NOISES):
     e_steps = e[e["converged"]]["converged_step"].dropna()
     n_steps = n[n["converged"]]["converged_step"].dropna()
     bins = np.logspace(0.5, np.log10(2000), 40)
-    ax.hist(e_steps, bins=bins, alpha=0.6, color="#1f77b4", label=f"Eckart (n={len(e_steps)})")
-    ax.hist(n_steps, bins=bins, alpha=0.6, color="#17becf", label=f"no-Eckart (n={len(n_steps)})")
+    ax.hist(e_steps, bins=bins, alpha=0.6, color=palette_color(0), label=f"Eckart (n={len(e_steps)})")
+    ax.hist(n_steps, bins=bins, alpha=0.6, color=palette_color(9), label=f"no-Eckart (n={len(n_steps)})")
     ax.set_xscale("log")
     ax.set_title(f"{noise} pm", fontsize=10)
     ax.set_xlabel("converged_step (log)")
@@ -213,9 +217,9 @@ for noise in NOISES:
     ratios_by_noise.append(shared["n_step"] / shared["e_step"])
 
 bp = ax.boxplot(ratios_by_noise, positions=range(len(NOISES)), widths=0.6, patch_artist=True, showfliers=False)
-for p in bp["boxes"]: p.set_facecolor("#17becf"); p.set_alpha(0.7)
-ax.axhline(1, color="black", lw=0.8, linestyle="--")
-ax.axhline(1.33, color="red", lw=1, linestyle=":", label="1.33× (median ratio)")
+for p in bp["boxes"]: p.set_facecolor(palette_color(9)); p.set_alpha(0.7)
+ax.axhline(1, color=palette_color(7), lw=0.8, linestyle="--")
+ax.axhline(1.33, color=palette_color(3), lw=1, linestyle=":", label="1.33× (median ratio)")
 ax.set_xticks(range(len(NOISES)))
 ax.set_xticklabels([f"{n} pm" for n in NOISES])
 ax.set_xlabel("TS noise")
@@ -232,10 +236,10 @@ both = [d[1] for d in agree_data]
 e_only = [d[2] for d in agree_data]
 n_only = [d[3] for d in agree_data]
 neither = [d[4] for d in agree_data]
-ax.bar(x, both, label="both converge", color="#2ca02c")
-ax.bar(x, e_only, bottom=both, label="Eckart only", color="#1f77b4")
-ax.bar(x, n_only, bottom=np.array(both)+np.array(e_only), label="no-Eckart only", color="#17becf")
-ax.bar(x, neither, bottom=np.array(both)+np.array(e_only)+np.array(n_only), label="neither", color="#d62728")
+ax.bar(x, both, label="both converge", color=palette_color(2))
+ax.bar(x, e_only, bottom=both, label="Eckart only", color=palette_color(0))
+ax.bar(x, n_only, bottom=np.array(both)+np.array(e_only), label="no-Eckart only", color=palette_color(9))
+ax.bar(x, neither, bottom=np.array(both)+np.array(e_only)+np.array(n_only), label="neither", color=palette_color(3))
 # skip per-bar annotations — counts shown in table
 ax.set_xticks(x)
 ax.set_xticklabels([f"{d[0]} pm" for d in agree_data])
@@ -250,7 +254,7 @@ log("wrote fig_eckart_per_sample_agreement")
 
 log()
 log("="*78)
-log("G. fmax vs force_norm gate — brief analysis")
+log("G. fmax vs force_norm criterion — brief analysis")
 log("="*78)
 log()
 
@@ -283,11 +287,11 @@ for i, noise in enumerate(NOISES):
     fmax_v = duckdb.execute(f"SELECT SUM(CASE WHEN converged THEN 1 ELSE 0 END), COUNT(*) FROM '{fmax_path}'").fetchone()
     fn_rates.append(100*fn[0]/300)
     fmax_rates.append(100*fmax_v[0]/300)
-ax.plot(NOISES, fn_rates, "o-", color="#1f77b4", linewidth=2, markersize=8, markerfacecolor="white", markeredgewidth=2, label="force_norm gate (looser)")
-ax.plot(NOISES, fmax_rates, "s-", color="#d62728", linewidth=2, markersize=8, markerfacecolor="white", markeredgewidth=2, label="fmax gate (stricter, canonical)")
+ax.plot(NOISES, fn_rates, "o-", color=palette_color(0), linewidth=2, markersize=8, markerfacecolor="white", markeredgewidth=2, label="force_norm criterion (looser)")
+ax.plot(NOISES, fmax_rates, "s-", color=palette_color(3), linewidth=2, markersize=8, markerfacecolor="white", markeredgewidth=2, label="fmax criterion (stricter, canonical)")
 for x, y1, y2 in zip(NOISES, fn_rates, fmax_rates):
-    ax.annotate(f"{y1:.1f}", (x, y1), xytext=(8, 4), textcoords="offset points", fontsize=8, color="#1f77b4")
-    ax.annotate(f"{y2:.1f}", (x, y2), xytext=(8, -10), textcoords="offset points", fontsize=8, color="#d62728")
+    ax.annotate(f"{y1:.1f}", (x, y1), xytext=(8, 4), textcoords="offset points", fontsize=8, color=palette_color(0))
+    ax.annotate(f"{y2:.1f}", (x, y2), xytext=(8, -10), textcoords="offset points", fontsize=8, color=palette_color(3))
 ax.set_xlabel("TS noise (pm)"); ax.set_ylabel("convergence rate (%)")
 ax.set_xticks(NOISES); ax.set_ylim(0, 100); ax.grid(alpha=0.3)
 ax.legend(loc="lower left", fontsize=10)
