@@ -252,26 +252,104 @@ def plot_phase_breakdown(df: pd.DataFrame):
     plt.close(fig); print("wrote fig_hybrid_step_phases")
 
 
+# =================================================================
+# GAD baselines for context (read from existing test_dtgrid sweeps)
+# =================================================================
+GAD_BASELINE_GLOBS = {
+    "GAD dt=0.003 (5k)": "/lustre07/scratch/memoozd/gadplus/runs/test_dtgrid/gad_dt003_fmax/summary_*.parquet",
+    "GAD dt=0.005 (5k)": "/lustre07/scratch/memoozd/gadplus/runs/test_dtgrid/gad_dt005_fmax/summary_*.parquet",
+    "GAD dt=0.007 (5k)": "/lustre07/scratch/memoozd/gadplus/runs/test_dtgrid/gad_dt007_fmax/summary_*.parquet",
+}
+
+
+def gad_baseline_row(label: str, glob: str, noise: int) -> dict | None:
+    try:
+        d = duckdb.execute(rf"""
+        SELECT COUNT(*) AS n, SUM(CAST(converged AS INT)) AS n_conv,
+          MEDIAN(CASE WHEN converged THEN converged_step END) AS med_step_conv,
+          AVG(wall_time_s) AS avg_wall_s, MEDIAN(wall_time_s) AS med_wall_s,
+          SUM(wall_time_s) AS total_wall_s
+        FROM read_parquet('{glob}', filename=true)
+        WHERE regexp_extract(filename, '_(\d+)pm', 1)='{noise}'
+        """).df()
+    except Exception as e:
+        print(f"baseline err {label} {noise}: {e}"); return None
+    if d.empty or int(d["n"].iloc[0]) == 0: return None
+    r = d.iloc[0]
+    return dict(method=label, noise_pm=noise, trust_radius=None,
+                n=int(r["n"]), n_conv=int(r["n_conv"]),
+                conv_pct=100.0 * r["n_conv"] / r["n"],
+                med_step_conv=r["med_step_conv"],
+                avg_wall_s=r["avg_wall_s"], med_wall_s=r["med_wall_s"],
+                total_wall_s=r["total_wall_s"],
+                wall_per_conv_s=r["total_wall_s"] / max(int(r["n_conv"]), 1))
+
+
 def write_pivot_md(df: pd.DataFrame):
     lines = ["# Hybrid GAD-Newton sweep — pivot tables", ""]
-    lines.append("Conv % by (method × trust_radius), per noise level:\n")
+    # ───── Compact summary tables (one row per method, columns = trust radii)
     for noise in NOISES:
         sub = df[df["noise_pm"] == noise]
         if sub.empty: continue
-        lines.append(f"\n## {noise} pm noise\n")
+        lines.append(f"\n## {noise} pm noise — convergence %  (rows = method, columns = trust radius Å)\n")
         pv = sub.pivot(index="method", columns="trust_radius", values="conv_pct")
-        lines.append(pv.to_string(float_format=lambda x: f"{x:.1f}"))
-        lines.append("\n")
-        # Median steps
-        lines.append(f"\n### Median steps to converge — {noise}pm:\n")
-        pv = sub.pivot(index="method", columns="trust_radius", values="med_step_conv")
-        lines.append(pv.to_string(float_format=lambda x: f"{x:.0f}"))
-        lines.append("\n")
-        # Newton-fired fraction
-        lines.append(f"\n### Fraction of last-steps that used Newton — {noise}pm:\n")
-        pv = sub.pivot(index="method", columns="trust_radius", values="frac_used_newton")
-        lines.append(pv.to_string(float_format=lambda x: f"{x:.2f}"))
-        lines.append("\n")
+        # Reorder rows in a fixed order
+        order = [k for k in CELL_LABELS.keys() if k in pv.index]
+        pv = pv.reindex(order)
+        lines.append("```\n" + pv.to_string(float_format=lambda x: f"{x:5.1f}") + "\n```")
+        # GAD baselines
+        baseline_rows = []
+        for label, glob in GAD_BASELINE_GLOBS.items():
+            b = gad_baseline_row(label, glob, noise)
+            if b: baseline_rows.append(b)
+        if baseline_rows:
+            lines.append("\n*GAD baselines (5k step budget, no Newton phase) for context:*\n")
+            for b in baseline_rows:
+                lines.append(f"- **{b['method']}** at {noise}pm: conv = {b['conv_pct']:.1f}%, "
+                             f"median step at conv = {b['med_step_conv']:.0f}, "
+                             f"wall/conv = {b['wall_per_conv_s']:.1f} s")
+
+        lines.append(f"\n### Median steps to converge — {noise}pm  (lower is better)\n")
+        pv = sub.pivot(index="method", columns="trust_radius", values="med_step_conv").reindex(order)
+        lines.append("```\n" + pv.to_string(float_format=lambda x: f"{x:5.0f}") + "\n```")
+
+        lines.append(f"\n### Wall-time per converged TS — {noise}pm  (sec, lower is better)\n")
+        pv = sub.pivot(index="method", columns="trust_radius", values="wall_per_conv_s").reindex(order)
+        lines.append("```\n" + pv.to_string(float_format=lambda x: f"{x:6.1f}") + "\n```")
+
+        lines.append(f"\n### Fraction of trajectories whose terminating step was Newton — {noise}pm\n")
+        pv = sub.pivot(index="method", columns="trust_radius", values="frac_used_newton").reindex(order)
+        lines.append("```\n" + pv.to_string(float_format=lambda x: f"{x:5.2f}") + "\n```")
+
+    # ───── Optimization summary: best cell per noise + head-to-head vs GAD
+    lines.append("\n\n# Optimal hybrid GAD-Newton config per noise level\n")
+    lines.append("\nBest (method, trust_radius) per noise — head-to-head vs vanilla GAD dt=0.007 (5000-step budget):\n")
+    for noise in NOISES:
+        sub = df[df["noise_pm"] == noise]
+        if sub.empty: continue
+        # Two ways to score: highest conv, and best wall_per_conv
+        best_acc = sub.loc[sub["conv_pct"].idxmax()]
+        best_speed = sub[sub["wall_per_conv_s"].notna()]
+        best_speed = best_speed.loc[best_speed["wall_per_conv_s"].idxmin()] if not best_speed.empty else None
+        # GAD ref
+        ref = gad_baseline_row("GAD dt=0.007 (5k)", GAD_BASELINE_GLOBS["GAD dt=0.007 (5k)"], noise)
+        lines.append(f"\n## {noise} pm noise\n")
+        if ref:
+            lines.append(f"- **Vanilla GAD dt=0.007 baseline:** conv = {ref['conv_pct']:.1f}% ({ref['n_conv']}/{ref['n']}); "
+                         f"median step at conv = {ref['med_step_conv']:.0f}; wall/conv = {ref['wall_per_conv_s']:.1f} s")
+        lines.append(f"- **Best hybrid by conv %:**  `{best_acc['method']}` @ trust={best_acc['trust_radius']:g}: "
+                     f"conv = {best_acc['conv_pct']:.1f}% ({best_acc['n_conv']}/{best_acc['n']}); "
+                     f"median step at conv = {best_acc['med_step_conv']:.0f}; "
+                     f"wall/conv = {best_acc['wall_per_conv_s']:.1f} s")
+        if best_speed is not None and best_speed["method"] != best_acc["method"]:
+            lines.append(f"- **Best hybrid by wall-per-conv:**  `{best_speed['method']}` @ trust={best_speed['trust_radius']:g}: "
+                         f"conv = {best_speed['conv_pct']:.1f}%; wall/conv = {best_speed['wall_per_conv_s']:.1f} s")
+        if ref and best_acc["wall_per_conv_s"] > 0:
+            speedup = ref["wall_per_conv_s"] / best_acc["wall_per_conv_s"]
+            dcc = best_acc["conv_pct"] - ref["conv_pct"]
+            lines.append(f"- **Head-to-head:** hybrid is **{speedup:.1f}× faster per converged TS** "
+                         f"({best_acc['wall_per_conv_s']:.1f} s vs {ref['wall_per_conv_s']:.1f} s); "
+                         f"accuracy {dcc:+.1f} pp")
     (OUT_CSV / "hybrid_gad_newton_pivot.md").write_text("\n".join(lines))
     print("wrote hybrid_gad_newton_pivot.md")
 

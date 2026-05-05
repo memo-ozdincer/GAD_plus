@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2021 Gentoo Linux) (preloaded format=xelatex 2023.8.23)  5 MAY 2026 03:07
+This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2021 Gentoo Linux) (preloaded format=xelatex 2023.8.23)  5 MAY 2026 10:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -543,38 +543,69 @@ Overfull \hbox (56.1953pt too wide) in paragraph at lines 40--45
 oggle via \TU/lmtt/m/n/10.95 switch_based_on_hessian_eigval
  []
 
-File: figures/fig_hybrid_method_compare.pdf Graphic file (type pdf)
-<use figures/fig_hybrid_method_compare.pdf>
+
+Overfull \hbox (169.2126pt too wide) in paragraph at lines 80--81
+\TU/lmr/m/it/10.95 Source CSV: \TU/lmtt/m/it/10.95 analysis_2026_04_29/hybrid_g
+ad_newton_summary.csv\TU/lmr/m/it/10.95 . Re-runnable via \TU/lmtt/m/it/10.95 s
+cripts/analyze_hybrid_gad_newton.py\TU/lmr/m/it/10.95 .
+ []
+
 [1
 
-]
+] [2]
+Overfull \hbox (85.3885pt too wide) in paragraph at lines 176--193
+ [] 
+ []
+
+
+Overfull \hbox (40.75034pt too wide) in paragraph at lines 197--207
+[]\TU/lmr/bx/n/10.95 At 10pm noise: zero-accuracy-loss speedup is achieved. \TU
+/lmr/m/n/10.95 The no-Eckart hybrid (\TU/lmtt/m/n/10.95 hybrid_swfalse\TU/lmr/m
+/n/10.95 )
+ []
+
+
+Overfull \hbox (71.78871pt too wide) in paragraph at lines 207--211
+[]\TU/lmr/bx/n/10.95 At 10pm with eigenvalue-clear switch: 4.4$\OMS/cmsy/m/n/10
+.95 ^^B$ \TU/lmr/bx/n/10.95 faster at $\OMS/cmsy/m/n/10.95 ^^@\OT1/cmr/m/n/10.9
+5 3$\TU/lmr/bx/n/10.95 pp accuracy. \TU/lmtt/m/n/10.95 hybrid_damped_eckart_swt
+rue
+ []
+
+[3]
+File: figures/fig_hybrid_method_compare.pdf Graphic file (type pdf)
+<use figures/fig_hybrid_method_compare.pdf>
 File: figures/fig_hybrid_conv_vs_tr.pdf Graphic file (type pdf)
 <use figures/fig_hybrid_conv_vs_tr.pdf>
+ [4]
 File: figures/fig_hybrid_switch_compare.pdf Graphic file (type pdf)
 <use figures/fig_hybrid_switch_compare.pdf>
- [2]
 File: figures/fig_hybrid_step_phases.pdf Graphic file (type pdf)
 <use figures/fig_hybrid_step_phases.pdf>
+ [5]
 File: figures/fig_hybrid_steps_vs_tr.pdf Graphic file (type pdf)
 <use figures/fig_hybrid_steps_vs_tr.pdf>
- [3]
-Overfull \hbox (42.11902pt too wide) in paragraph at lines 156--158
+
+Overfull \hbox (42.11902pt too wide) in paragraph at lines 317--319
 []\TU/lmr/m/n/10.95 Per-cell summary parquets: \TU/lmtt/m/n/10.95 runs/hybrid_g
 ad_newton/<method_tag>_<noise>pm/summary_*.parquet 
  []
 
-[4] (./HYBRID_GAD_NEWTON_2026-05-04.aux)
+[6] [7] (./HYBRID_GAD_NEWTON_2026-05-04.aux)
+
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+
 Package rerunfilecheck Info: File `HYBRID_GAD_NEWTON_2026-05-04.out' has not ch
 anged.
-(rerunfilecheck)             Checksum: C409ADDCA874C0DB939757B70F384F25;751.
+(rerunfilecheck)             Checksum: 4B38E89FF1B88BFACC97494F78178EF7;1042.
  ) 
 Here is how much of TeX's memory you used:
- 11352 strings out of 478850
- 178012 string characters out of 5860120
- 484615 words of memory out of 5000000
- 31070 multiletter control sequences out of 15000+600000
- 412786 words of font info for 78 fonts, out of 8000000 for 9000
+ 11381 strings out of 478850
+ 178561 string characters out of 5860120
+ 497615 words of memory out of 5000000
+ 31083 multiletter control sequences out of 15000+600000
+ 414546 words of font info for 91 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
- 71i,7n,77p,601b,401s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 71i,7n,77p,601b,444s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on HYBRID_GAD_NEWTON_2026-05-04.pdf (4 pages).
+Output written on HYBRID_GAD_NEWTON_2026-05-04.pdf (7 pages).

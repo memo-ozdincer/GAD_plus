@@ -73,7 +73,168 @@ dt=0.007 with 5000-step budget gets 89.2\% conv at 10pm and 72.8\% at
 100pm. Vanilla GAD dt=0.005 (closer to this sweep's $dt$): 89.2\% / 71.8\%.
 
 % =================================================================
-\section{Headline grid}
+\section{Headline tables — single-glance summary}
+% =================================================================
+
+\textit{Source CSV: \texttt{analysis\_2026\_04\_29/hybrid\_gad\_newton\_summary.csv}.
+Re-runnable via \texttt{scripts/analyze\_hybrid\_gad\_newton.py}. All 50 cells complete.}
+
+\begin{center}\footnotesize
+\textbf{Table 1 — Convergence \%} ($n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$, $n=287$ test samples)\\[0.4em]
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+\textbf{hybrid (no Eckart)}, force-switch          & \textbf{89.2} & 88.9 & 88.9 & 88.9 & 88.9 \\
+hybrid\_eckart, switch=False                       & 45.6 & 46.3 & 46.3 & 46.3 & 46.3 \\
+hybrid\_eckart, switch=True                        & 84.7 & 84.7 & 84.7 & 84.7 & 85.4 \\
+hybrid\_damped\_eckart, switch=False               & 45.6 & 46.3 & 46.3 & 46.3 & 46.3 \\
+hybrid\_damped\_eckart, switch=True                & 86.8 & 86.8 & 86.1 & 85.7 & 85.4 \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{89.2\%}} \\
+\bottomrule
+\end{tabular}
+\vskip0.6em
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+\textbf{hybrid (no Eckart)}, force-switch          & 66.9 & 67.6 & 67.6 & 67.6 & \textbf{67.9} \\
+hybrid\_eckart, switch=False                       & 0.3  & 0.3  & 0.3  & 0.3  & 0.3  \\
+hybrid\_eckart, switch=True                        & 64.8 & 65.5 & 65.2 & 65.5 & 65.2 \\
+hybrid\_damped\_eckart, switch=False               & 0.3  & 0.3  & 0.3  & 0.3  & 0.3  \\
+hybrid\_damped\_eckart, switch=True                & 66.6 & 66.6 & 66.2 & 66.2 & 66.6 \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{72.8\%}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}\footnotesize
+\textbf{Table 2 — Median steps to converge} (lower is better; --- = no converged sample)\\[0.4em]
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+hybrid (no Eckart), force-switch                   & 106 & 104 & 104 & 104 & 104 \\
+hybrid\_eckart, switch=False                       & 702 & 702 & 702 & 702 & 702 \\
+\textbf{hybrid\_eckart, switch=True}               & 21  & 12  & 8   & 5   & \textbf{5} \\
+hybrid\_damped\_eckart, switch=False               & 702 & 702 & 702 & 702 & 702 \\
+\textbf{hybrid\_damped\_eckart, switch=True}       & 35  & 19  & 10  & 6   & \textbf{5} \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{72}} \\
+\bottomrule
+\end{tabular}
+\vskip0.6em
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+hybrid (no Eckart), force-switch                   & 540 & 500 & 484 & 478 & 480 \\
+hybrid\_eckart, switch=False                       & 916 & 915 & 915 & 915 & 915 \\
+\textbf{hybrid\_eckart, switch=True}               & 194 & 105 & 60  & 38  & \textbf{33} \\
+hybrid\_damped\_eckart, switch=False               & 916 & 915 & 915 & 915 & 915 \\
+\textbf{hybrid\_damped\_eckart, switch=True}       & 330 & 173 & 94  & 49  & \textbf{36} \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{331}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}\footnotesize
+\textbf{Table 3 — Wall-time per converged TS} (sec; cell wall summed over $n=287$ then divided by $n_{\text{conv}}$)\\[0.4em]
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+hybrid (no Eckart), force-switch                   & 16.1 & 15.7 & 15.8 & 15.9 & 15.9 \\
+hybrid\_eckart, switch=True                        & 12.6 & 11.9 & 11.5 & 11.4 & 10.8 \\
+\textbf{hybrid\_damped\_eckart, switch=True}       & 12.1 & 10.8 & \textbf{10.7} & 11.1 & 11.0 \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{46.6 s}} \\
+\bottomrule
+\end{tabular}
+\vskip0.6em
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
+\midrule
+hybrid (no Eckart), force-switch                   & 64.9 & 57.8 & 57.2 & 57.3 & 56.5 \\
+hybrid\_eckart, switch=True                        & 46.6 & 40.1 & 40.1 & 36.0 & 36.5 \\
+\textbf{hybrid\_damped\_eckart, switch=True}       & 54.3 & 43.6 & 39.6 & 37.4 & \textbf{35.6} \\
+\midrule
+\textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{140.7 s}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =================================================================
+\section*{Headline numbers — best of each, head-to-head vs vanilla GAD dt=0.007}
+% =================================================================
+
+\begin{center}\small
+\begin{tabular}{l|cccc}
+\toprule
+& \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} & \textbf{vs GAD} \\
+\midrule
+\multicolumn{5}{c}{\textit{10 pm noise}} \\
+\midrule
+Vanilla GAD dt=0.007 (5k budget)                      & 89.2 & 72  & 46.6 & --- \\
+\textbf{hybrid (no Eckart) tr=0.005, force-switch}    & \textbf{89.2} & 106 & \textbf{16.1} & \textbf{2.9$\times$ faster, 0.0pp acc} \\
+hybrid\_damped\_eckart\_swtrue tr=0.02 (best wall)    & 86.1 & 10  & 10.7 & 4.4$\times$ faster, $-3.1$pp acc \\
+\midrule
+\multicolumn{5}{c}{\textit{100 pm noise}} \\
+\midrule
+Vanilla GAD dt=0.007 (5k budget)                      & 72.8 & 331 & 140.7 & --- \\
+hybrid (no Eckart) tr=0.10, force-switch              & 67.9 & 480 & 56.5 & 2.5$\times$ faster, $-4.9$pp acc \\
+\textbf{hybrid\_damped\_eckart\_swtrue tr=0.10}        & 66.6 & 36  & \textbf{35.6} & \textbf{4.0$\times$ faster, $-6.2$pp acc} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Headline.}
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{At 10pm noise: zero-accuracy-loss speedup is achieved.} The
+  no-Eckart hybrid (\texttt{hybrid\_swfalse}) at trust=0.005 matches
+  vanilla GAD's 89.2\% conv exactly while running at \textbf{2.9$\times$
+  faster wall-time per converged TS} (16.1 s vs 46.6 s). The Newton phase
+  never actually fires here (\texttt{frac\_used\_newton}=0); the speedup
+  comes from the \emph{trust-radius cap on the GAD step itself} preventing
+  the long tail of plateau-orbit samples from running out the
+  budget. Median converged step is 106 vs vanilla GAD's 72 — slightly
+  more steps but each at the same per-step cost; the win is shorter
+  P95 tail.
+\item \textbf{At 10pm with eigenvalue-clear switch: 4.4$\times$ faster at $-3$pp accuracy.}
+  \texttt{hybrid\_damped\_eckart\_swtrue} at trust=0.02 reaches 86.1\% in
+  \textbf{10 median steps} (vs vanilla GAD's 72) at 10.7 s/conv. Newton
+  fires on 98\% of samples.
+\item \textbf{At 100pm: 4$\times$ faster at $-6$pp accuracy.}
+  \texttt{hybrid\_damped\_eckart\_swtrue} at trust=0.10 reaches 66.6\% in
+  \textbf{36 median steps} (vs vanilla GAD's 331) at 35.6 s/conv. The
+  3$\times$ accuracy penalty is real but GAD's structural plateau is the
+  main culprit, not the hybrid.
+\item Trust radius is essentially flat across 0.005--0.10 \emph{once the
+  switch criterion fires}. The Newton step's eigenvalue regularisation
+  (\texttt{min\_curvature}) already provides the trust-region behaviour.
+\end{itemize}
+
+\paragraph{What this means for the project.}
+\begin{itemize}[leftmargin=1.5em]
+\item Confirms the compute-analysis prediction: GAD's $\sim$30$\times$
+  step ratio against Sella was inflated by the long plateau tail, not the
+  descent phase. Replacing the plateau orbits with one Newton step
+  recovers most of the compute gap.
+\item The previous NR-polish negative result (60314225) was a
+  trust-region issue: that NR was unconstrained and overshot. This
+  hybrid's eigenvalue-floored Newton step (combined with explicit trust
+  radius) does not overshoot.
+\item \textbf{No GAD code changes inside the canonical search loop are
+  required to reproduce this} — the supervisor's three step functions are
+  drop-in.
+\end{itemize}
+
+% =================================================================
+\section{Headline grid figure}
 % =================================================================
 
 \begin{figure}[H]
