@@ -97,6 +97,7 @@ Re-runnable via \texttt{scripts/analyze\_hybrid\_gad\_newton.py}. All 40 cells c
 \toprule
 \textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & \textbf{89.2} & 88.9 & 88.9 & 88.9 & 88.9 \\
 hybrid\_eckart, switch=False                       & 45.6 & 46.3 & 46.3 & 46.3 & 46.3 \\
 hybrid\_eckart, switch=True                        & 84.7 & 84.7 & 84.7 & 84.7 & \textbf{85.4} \\
 hybrid\_damped\_eckart, switch=False               & 45.6 & 46.3 & 46.3 & 46.3 & 46.3 \\
@@ -110,6 +111,7 @@ hybrid\_damped\_eckart, switch=False               & 45.6 & 46.3 & 46.3 & 46.3 &
 \toprule
 \textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & 66.9 & 67.6 & 67.6 & 67.6 & \textbf{67.9} \\
 hybrid\_eckart, switch=False                       & 0.3  & 0.3  & 0.3  & 0.3  & 0.3  \\
 hybrid\_eckart, switch=True                        & 64.8 & 65.5 & 65.2 & 65.5 & 65.2 \\
 hybrid\_damped\_eckart, switch=False               & 0.3  & 0.3  & 0.3  & 0.3  & 0.3  \\
@@ -117,7 +119,8 @@ hybrid\_damped\_eckart, switch=False               & 0.3  & 0.3  & 0.3  & 0.3  &
 \midrule
 \textit{baseline: GAD dt=0.007 (5k budget)}        & \multicolumn{5}{c}{\textit{72.8\%}} \\
 \bottomrule
-\end{tabular}
+\end{tabular}\\[0.3em]
+\textit{Italic row \textbf{(O)} is from 2026-05-04 (no rerun needed; non-Eckart variant unaffected by the bug).}
 \end{center}
 
 \begin{center}\footnotesize
@@ -126,6 +129,7 @@ hybrid\_damped\_eckart, switch=False               & 0.3  & 0.3  & 0.3  & 0.3  &
 \toprule
 \textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & 106 & 104 & 104 & 104 & 104 \\
 hybrid\_eckart, switch=False                       & 702 & 702 & 702 & 702 & 702 \\
 \textbf{hybrid\_eckart, switch=True}               & 21  & 12  & 8   & 5   & \textbf{5} \\
 hybrid\_damped\_eckart, switch=False               & 702 & 702 & 702 & 702 & 702 \\
@@ -139,6 +143,7 @@ hybrid\_damped\_eckart, switch=False               & 702 & 702 & 702 & 702 & 702
 \toprule
 \textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & 540 & 500 & 484 & 478 & 480 \\
 hybrid\_eckart, switch=False                       & 916 & 915 & 915 & 915 & 915 \\
 \textbf{hybrid\_eckart, switch=True}               & 195 & 105 & 60  & 38  & \textbf{33} \\
 hybrid\_damped\_eckart, switch=False               & 916 & 915 & 915 & 915 & 915 \\
@@ -155,6 +160,7 @@ hybrid\_damped\_eckart, switch=False               & 916 & 915 & 915 & 915 & 915
 \toprule
 \textbf{10 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & 16.1 & 15.7 & 15.8 & 15.9 & 15.9 \\
 hybrid\_eckart, switch=False                       & 112.7 & 114.5 & 111.0 & 110.8 & 110.4 \\
 hybrid\_eckart, switch=True                        & 12.7  & 12.2  & 11.7  & 11.3  & 10.7 \\
 hybrid\_damped\_eckart, switch=False               & 117.8 & 112.8 & 112.7 & 112.3 & 111.8 \\
@@ -168,6 +174,7 @@ hybrid\_damped\_eckart, switch=False               & 117.8 & 112.8 & 112.7 & 112
 \toprule
 \textbf{100 pm noise} & tr=0.005 & 0.01 & 0.02 & 0.05 & 0.10 \\
 \midrule
+\textit{hybrid (no Eckart), force-switch \textbf{(O)}} & 64.9 & 57.8 & 57.2 & 57.3 & 56.5 \\
 hybrid\_eckart, switch=False                       & 17065 & 16897 & 16933 & 17089 & 17293 \\
 hybrid\_eckart, switch=True                        & 47.1  & 41.0  & 37.9  & 35.9  & 36.3 \\
 hybrid\_damped\_eckart, switch=False               & 16877 & 17094 & 17011 & 16664 & 17060 \\
@@ -204,74 +211,182 @@ its 2000-step budget (library defaults), hybrid at its 1000-step budget.
 "med steps" is computed over converged trajectories only. "wall/conv" =
 total cell wall-time / number of converged samples.}
 
+\textit{Provenance legend:}
+\textbf{(R)} = this rerun, 2026-05-09, SLURM \texttt{60460000};
+\textbf{(O)} = original 2026-05-04 sweep, SLURM \texttt{60398168}, unchanged
+(unaffected by the GAD-step bug, which was internal-coord-to-Cartesian-only);
+\textbf{(M)} = main IRC report, 2026-04-29.
+
 \vskip0.5em
 \begin{center}\footnotesize
 \textbf{10 pm noise --- best config of each family}\\[0.4em]
-\begin{tabular}{l l c c c}
+\begin{tabular}{l l c c c c}
 \toprule
-\textbf{family} & \textbf{config} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
+\textbf{family} & \textbf{config} & \textbf{prov.} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
 \midrule
-\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & \textbf{92.7} & 4   & 14.5 \\
-Sella                         & default (2k)                              & 92.0          & 4   & 14.4 \\
-Sella                         & internal (2k, library default)            & 79.1          & 4   & 54.2 \\
+\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & (M) & \textbf{92.7} & 4   & 14.5 \\
+Sella                         & default (cart no-Eckart, 2k)              & (M) & 92.0          & 4   & 14.4 \\
+Sella                         & internal (lib default, 2k)                & (M) & 79.1          & 4   & 54.2 \\
 \midrule
-\textbf{plain GAD}            & dt=0.007 (5k budget)                      & \textbf{89.2} & 72  & 46.6 \\
-plain GAD                     & dt=0.005 (5k budget)                      & 89.2          & 98  & 47.7 \\
-plain GAD                     & dt=0.003 (5k budget)                      & 89.2          & 164 & 54.2 \\
+\textbf{plain GAD}            & dt=0.007 (5k budget)                      & (M) & \textbf{89.2} & 72  & 46.6 \\
+plain GAD                     & dt=0.005 (5k budget)                      & (M) & 89.2          & 98  & 47.7 \\
+plain GAD                     & dt=0.003 (5k budget)                      & (M) & 89.2          & 164 & 54.2 \\
 \midrule
-\textbf{hybrid (this sweep)}  & \textbf{damped\_eckart\_swtrue tr=0.02}   & \textbf{86.1} & 7   & \textbf{10.3} \\
-hybrid                        & damped\_eckart\_swtrue tr=0.10            & 85.4          & 4   & 11.3 \\
-hybrid                        & eckart\_swtrue tr=0.10                    & 85.4          & 5   & 10.7 \\
+\textbf{hybrid no-Eckart}     & force-switch tr=0.005                     & (O) & \textbf{89.2} & 106 & 16.1 \\
+hybrid no-Eckart              & force-switch tr=0.01--0.10                & (O) & 88.9          & 104 & 15.7--15.9 \\
 \midrule
-\multicolumn{5}{l}{\emph{Hybrid vs best Sella:} $-6.6$pp acc, $\mathbf{1.4\times}$ faster wall/conv. \emph{vs best plain GAD:} $-3.1$pp acc, $\mathbf{4.5\times}$ faster.} \\
+\textbf{hybrid Eckart (R)}    & \textbf{damped\_eckart\_swtrue tr=0.02}   & (R) & \textbf{86.1} & 7   & \textbf{10.3} \\
+hybrid Eckart (R)             & damped\_eckart\_swtrue tr=0.10            & (R) & 85.4          & 4   & 11.3 \\
+hybrid Eckart (R)             & eckart\_swtrue tr=0.10                    & (R) & 85.4          & 5   & 10.7 \\
+hybrid Eckart (R)             & \{eckart, damped\_eckart\}\_swfalse all tr & (R) & 45.6--46.3   & 702 & 110.4--117.8 \\
 \bottomrule
+\multicolumn{6}{l}{\emph{Best-overall by conv \%}: tied at 89.2--92.7\% (Sella libdef, plain GAD, hybrid no-Eckart all converge $\ge 89\%$).} \\
+\multicolumn{6}{l}{\emph{Best-overall by wall/conv}: hybrid Eckart damped\_swtrue tr=0.02 at \textbf{10.3 s} ($1.4\times$ faster than Sella libdef, $4.5\times$ vs plain GAD).} \\
 \end{tabular}
 \end{center}
 
 \vskip0.5em
 \begin{center}\footnotesize
 \textbf{100 pm noise --- best config of each family}\\[0.4em]
-\begin{tabular}{l l c c c}
+\begin{tabular}{l l c c c c}
 \toprule
-\textbf{family} & \textbf{config} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
+\textbf{family} & \textbf{config} & \textbf{prov.} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
 \midrule
-\textbf{plain GAD}            & dt=0.007 (5k budget)                      & \textbf{72.8} & 331 & 140.7 \\
-plain GAD                     & dt=0.005 (5k budget)                      & 71.8          & 457 & 156.0 \\
-plain GAD                     & dt=0.003 (5k budget)                      & 71.1          & 756 & 183.8 \\
+\textbf{plain GAD}            & dt=0.007 (5k budget)                      & (M) & \textbf{72.8} & 331 & 140.7 \\
+plain GAD                     & dt=0.005 (5k budget)                      & (M) & 71.8          & 457 & 156.0 \\
+plain GAD                     & dt=0.003 (5k budget)                      & (M) & 71.1          & 756 & 183.8 \\
 \midrule
-\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & \textbf{70.7} & 9   & 65.2 \\
-Sella                         & default (2k)                              & 65.5          & 10.5& 79.3 \\
-Sella                         & internal (2k, library default)            & 50.9          & 17  & 181.8 \\
+\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & (M) & \textbf{70.7} & 9   & 65.2 \\
+Sella                         & default (cart no-Eckart, 2k)              & (M) & 65.5          & 10.5 & 79.3 \\
+Sella                         & internal (lib default, 2k)                & (M) & 50.9          & 17  & 181.8 \\
 \midrule
-\textbf{hybrid (this sweep)}  & \textbf{damped\_eckart\_swtrue tr=0.10}   & \textbf{66.6} & 31  & \textbf{34.2} \\
-hybrid                        & damped\_eckart\_swtrue tr=0.05            & 66.9          & 36  & 34.7 \\
-hybrid                        & eckart\_swtrue tr=0.05                    & 65.5          & 38  & 35.9 \\
+\textbf{hybrid no-Eckart}     & force-switch tr=0.10                      & (O) & \textbf{67.9} & 480 & 56.5 \\
+hybrid no-Eckart              & force-switch tr=0.01--0.05                & (O) & 67.6          & $\sim$478--500 & 57.2--57.8 \\
+hybrid no-Eckart              & force-switch tr=0.005                     & (O) & 66.9          & 540 & 64.9 \\
 \midrule
-\multicolumn{5}{l}{\emph{Hybrid vs best Sella:} $-4.1$pp acc, $\mathbf{1.9\times}$ faster wall/conv. \emph{vs best plain GAD:} $-6.2$pp acc, $\mathbf{4.1\times}$ faster.} \\
+\textbf{hybrid Eckart (R)}    & \textbf{damped\_eckart\_swtrue tr=0.10}   & (R) & 66.6          & 31  & \textbf{34.2} \\
+hybrid Eckart (R)             & damped\_eckart\_swtrue tr=0.05            & (R) & \textbf{66.9} & 36  & 34.7 \\
+hybrid Eckart (R)             & eckart\_swtrue tr=0.05                    & (R) & 65.5          & 38  & 35.9 \\
+hybrid Eckart (R)             & \{eckart, damped\_eckart\}\_swfalse all tr & (R) & 0.3          & 915 & $\sim$17 000 \\
+\bottomrule
+\multicolumn{6}{l}{\emph{Best-overall by conv \%}: plain GAD dt=0.007 at \textbf{72.8\%}.} \\
+\multicolumn{6}{l}{\emph{Best-overall by wall/conv}: hybrid Eckart damped\_swtrue tr=0.10 at \textbf{34.2 s} ($1.9\times$ faster than Sella libdef, $4.1\times$ vs plain GAD).} \\
+\end{tabular}
+\end{center}
+
+\paragraph{What's in this comparison.}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item Every method family the project has benchmarked at 10 / 100 pm noise on
+  the T1x test split with the canonical $n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$
+  convergence criterion.
+\item Three plain-GAD timestep variants (dt=0.003, 0.005, 0.007 at 5k budget).
+\item Three Sella variants (libdef, default, internal) at the canonical 2k budget.
+  Extended-budget Sella (5k) is within $\pm 2$pp of these (see HEADLINE.md).
+\item All five trust-radius cells of the no-Eckart hybrid (carried over from
+  2026-05-04, unchanged --- the bug was Eckart-only).
+\item All four Eckart hybrid method-cells (\{eckart, damped\_eckart\}
+  $\times$ \{swfalse, swtrue\}) at all five trust radii (rerun 2026-05-09).
+\end{itemize}
+
+\paragraph{Bottom line of the comparison.}
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{Wall-time winner at both noise levels: hybrid Eckart damped, switch=True.}
+  At 10pm it is $1.4\times$ faster than the strongest Sella (libdef) and
+  $4.5\times$ faster than the strongest plain GAD (dt=0.007). At 100pm
+  the gap widens to $1.9\times$ vs Sella and $4.1\times$ vs GAD.
+\item \textbf{Convergence-rate winner per noise:} Sella libdef leads at 10pm
+  (92.7\%); plain GAD dt=0.007 leads at 100pm (72.8\%). The hybrid Eckart
+  variant trails both by 4--6pp.
+\item \textbf{Special case at 10pm: the no-Eckart hybrid (O) ties plain GAD
+  at 89.2\% conv while running at 16.1 s/conv ($2.9\times$ faster than
+  GAD).} It is the only hybrid that matches plain-GAD accuracy at low
+  noise. At 100pm it is much weaker (67.9\% vs the Eckart variant's
+  66.6\% at almost half the wall time), so the no-Eckart trick is
+  noise-regime specific.
+\item \textbf{Median converged-step count: hybrid Eckart $\approx$ Sella.}
+  At 10pm: 4--7 hybrid Eckart steps vs Sella's 4 vs GAD's 72. At 100pm:
+  31--38 hybrid Eckart steps vs Sella's 9--17 vs GAD's 331--756. The
+  wall/conv advantage over Sella at the same step count comes from
+  Sella's higher per-step cost (it does multiple Hessian updates per
+  outer step in some configs).
+\item \textbf{Plain GAD is the slowest family at both noises}, primarily
+  due to median-step counts of 72--756 vs Sella/hybrid's 4--38. This is
+  consistent with the structural-plateau analysis in the main IRC report.
+\end{itemize}
+
+% =================================================================
+\section*{Noise-level sweep --- how performance scales with TS noise}
+% =================================================================
+
+The hybrid sweep covered only \{10, 100\} pm. Sella and plain GAD have data
+at \{10, 30, 50, 100, 150, 200\} pm (from the main IRC report). The figure
+and table below combine all four families on the same axis so you can see
+\emph{where each method starts to break down}, and locate the two hybrid
+data points within that landscape.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_noise_sweep_unified.pdf}
+\caption{Best config of each family vs TS-noise level (10, 30, 50, 100,
+150, 200 pm). \textbf{Left:} convergence \%. \textbf{Centre:} median
+converged-step count (log y). \textbf{Right:} wall-time per converged
+TS (log y). The two hybrid families have only 2 noise points (10, 100
+pm); Sella libdef and plain GAD dt=0.007 cover all 6. Source:
+\texttt{analysis\_2026\_04\_29/noise\_sweep\_unified.csv}.}
+\label{fig:noise-sweep}
+\end{figure}
+
+\begin{center}\footnotesize
+\textbf{Table 4 --- Convergence \%, median steps, and wall/conv at every noise level we have data for}
+($n=287$ test split; \textbf{(R)} this rerun, \textbf{(O)} 2026-05-04 carry-over,
+\textbf{(M)} main report)\\[0.4em]
+\begin{tabular}{l c | r r r | r r r | r r r}
+\toprule
+& & \multicolumn{3}{c|}{\textbf{conv \%}} & \multicolumn{3}{c|}{\textbf{med steps (conv)}} & \multicolumn{3}{c}{\textbf{wall/conv (s)}} \\
+\textbf{family} & \textbf{prov.} & 10 & 100 & 200 & 10 & 100 & 200 & 10 & 100 & 200 \\
+\midrule
+Sella libdef                              & (M) & \textbf{92.7} & 70.7 & 27.2 & 4   & 9    & 13   & \textbf{14.5} & 65.2  & 393.8 \\
+plain GAD dt=0.007 (5k)                   & (M) & 89.2          & \textbf{72.8} & \textbf{44.6} & 73  & 332  & 546  & 46.6          & 140.7 & 440.9 \\
+hybrid no-Eckart, force-switch tr=0.005   & (O) & 89.2          & ---           & ---  & 106 & ---  & ---  & 16.1          & ---   & ---   \\
+hybrid no-Eckart, force-switch tr=0.10    & (O) & 88.9          & 67.9          & ---  & 104 & 480  & ---  & 15.9          & 56.5  & ---   \\
+\textbf{hybrid Eckart damped swtrue}      & (R) & 86.1          & 66.6          & ---  & 7   & 31   & ---  & \textbf{10.3} & \textbf{34.2}  & ---   \\
+\midrule
+\multicolumn{2}{l|}{\emph{30 pm intermediate}} & \multicolumn{3}{l|}{Sella libdef 92.0 / GAD dt=0.007 88.9 (med 145, wall 51.1)} & \multicolumn{6}{l}{} \\
+\multicolumn{2}{l|}{\emph{50 pm intermediate}} & \multicolumn{3}{l|}{Sella libdef 88.2 / GAD dt=0.007 85.7 (med 200, wall 67.9)} & \multicolumn{6}{l}{} \\
+\multicolumn{2}{l|}{\emph{150 pm intermediate}}& \multicolumn{3}{l|}{Sella libdef 54.0 / GAD dt=0.007 58.2 (med 437, wall 260.9)} & \multicolumn{6}{l}{} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\paragraph{Bottom line of the comparison.}
-\begin{itemize}[leftmargin=1.5em]
-\item \textbf{The hybrid is the wall-time winner at both noise levels.}
-  At 10pm it is $1.4\times$ faster than the strongest Sella (libdef) and
-  $4.5\times$ faster than the strongest plain GAD (dt=0.007). At 100pm
-  the gap widens to $1.9\times$ vs Sella and $4.1\times$ vs GAD.
-\item \textbf{Sella libdef is the convergence-rate winner at 10pm}
-  (92.7\%, $+6.6$pp over the hybrid). At 100pm plain GAD edges Sella by
-  $+2.1$pp ($72.8\%$ vs $70.7\%$), and the hybrid trails both by 4--6pp.
-  The hybrid trades 3--6pp of accuracy for $1.4$--$4.5\times$ wall speedup.
-\item \textbf{Median converged-step count: hybrid is competitive with Sella.}
-  At 10pm: 4--7 hybrid steps vs Sella's 4 vs GAD's 72. At 100pm: 31--38
-  hybrid steps vs Sella's 9--17 vs GAD's 331--756. The wall/conv
-  advantage over Sella at the same step count comes from the fact that
-  Sella's per-step cost is higher (it does multiple Hessian updates per
-  outer step in some configs).
-\item \textbf{Plain GAD is the slowest of the three families at both
-  noises}, primarily due to median-step counts of 72--756 vs Sella/hybrid's
-  4--38. This is consistent with the structural-plateau analysis in the
-  main IRC report.
+\paragraph{What the noise sweep shows.}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{Crossover at $\sim$50--100 pm.} Sella libdef wins by conv
+  \% at 10, 30, 50 pm (92.7, 92.0, 88.2 vs GAD's 89.2, 88.9, 85.7).
+  Above 100 pm, plain GAD takes over: \textbf{+2.1 pp at 100 pm, +4.2 pp
+  at 150 pm, +17.4 pp at 200 pm}. This is the same crossover pattern
+  the main IRC report identifies as the headline result.
+\item \textbf{The hybrid Eckart wall-time advantage is widest at 100
+  pm}, where the GAD plateau bites hardest: it hits $34.2$ s/conv vs
+  Sella's $65.2$ s ($1.9\times$) and GAD's $140.7$ s ($4.1\times$). At
+  10 pm Sella is already fast and the gap is only $1.4\times$ vs Sella.
+\item \textbf{Hybrid coverage gap.} We don't yet have hybrid data at
+  30, 50, 150, or 200 pm. Whether the hybrid Eckart variant continues
+  to dominate wall-time at $\ge 150$ pm is open --- the swfalse failure
+  mode at 100 pm (only 0.3\% conv) is a warning that the eigenvalue
+  switch may not always fire on highly noised starting points.
+\item \textbf{Median-step scaling.} Sella libdef stays $\le 13$ steps
+  out to 200 pm. Plain GAD scales linearly with noise (73 $\to$ 546
+  steps). Hybrid Eckart's 7 $\to$ 31 progression is consistent with
+  Sella's pattern, suggesting the Newton phase is doing the saddle
+  approach in $\mathcal{O}(10)$ steps regardless of where GAD hands off.
+\item \textbf{Recommendation per regime.}
+  \begin{itemize}[leftmargin=1.5em, itemsep=0.02em]
+  \item $\le 50$ pm: Sella libdef (highest conv, fastest).
+  \item 100 pm: hybrid Eckart damped swtrue tr=0.10 if speed matters;
+    plain GAD dt=0.007 if conv \% matters ($+6.2$ pp over hybrid).
+  \item $\ge 150$ pm: plain GAD dt=0.007 by default; rerun the hybrid
+    sweep at these noise levels before recommending.
+  \end{itemize}
 \end{itemize}
 
 % =================================================================
