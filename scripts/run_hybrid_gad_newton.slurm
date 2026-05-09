@@ -52,7 +52,7 @@ TR=${TRUST_RADII[$TR_IDX]}
 
 NOISE_PM=$(python -c "print(int(round($NOISE*1000)))")
 TAG="${METHOD}_sw${SWITCH}_dt5e-3_tr${TR}"
-OUTDIR=/lustre07/scratch/memoozd/gadplus/runs/hybrid_gad_newton/${TAG}_${NOISE_PM}pm
+OUTDIR=/lustre07/scratch/memoozd/gadplus/runs/hybrid_gad_newton_rerun_fixed/${TAG}_${NOISE_PM}pm
 mkdir -p "$OUTDIR"
 
 echo "task=$T method=$METHOD switch=$SWITCH noise=${NOISE_PM}pm trust=$TR"

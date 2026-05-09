@@ -24,14 +24,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import seaborn as sns
 
-from plotting_style import apply_plot_style, palette
+from plotting_style import apply_plot_style, palette, palette_color
 
 apply_plot_style()
 
 OUT_CSV = Path("/lustre06/project/6033559/memoozd/GAD_plus/analysis_2026_04_29")
 OUT_FIG = Path("/lustre06/project/6033559/memoozd/GAD_plus/figures")
 OUT_CSV.mkdir(exist_ok=True, parents=True); OUT_FIG.mkdir(exist_ok=True, parents=True)
-RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs/hybrid_gad_newton")
+RUNS = Path("/lustre07/scratch/memoozd/gadplus/runs/hybrid_gad_newton_rerun_fixed")
 
 NOISES = [10, 100]
 TRS = [0.005, 0.01, 0.02, 0.05, 0.10]

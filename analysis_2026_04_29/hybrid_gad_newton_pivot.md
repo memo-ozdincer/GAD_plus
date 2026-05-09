@@ -6,11 +6,10 @@
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                 89.2   88.9   88.9   88.9   88.9
 hybrid_eckart_swfalse          45.6   46.3   46.3   46.3   46.3
 hybrid_eckart_swtrue           84.7   84.7   84.7   84.7   85.4
 hybrid_damped_eckart_swfalse   45.6   46.3   46.3   46.3   46.3
-hybrid_damped_eckart_swtrue    86.8   86.8   86.1   85.7   85.4
+hybrid_damped_eckart_swtrue    86.1   86.1   86.1   85.4   85.4
 ```
 
 *GAD baselines (5k step budget, no Newton phase) for context:*
@@ -24,11 +23,10 @@ hybrid_damped_eckart_swtrue    86.8   86.8   86.1   85.7   85.4
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                  106    104    104    104    104
 hybrid_eckart_swfalse           702    702    702    702    702
 hybrid_eckart_swtrue             21     12      8      5      5
 hybrid_damped_eckart_swfalse    702    702    702    702    702
-hybrid_damped_eckart_swtrue      35     19     10      6      5
+hybrid_damped_eckart_swtrue      19     11      7      5      4
 ```
 
 ### Wall-time per converged TS — 10pm  (sec, lower is better)
@@ -36,11 +34,10 @@ hybrid_damped_eckart_swtrue      35     19     10      6      5
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                 16.1   15.7   15.8   15.9   15.9
-hybrid_eckart_swfalse         112.8  110.8  111.6  110.6  110.1
-hybrid_eckart_swtrue           12.6   11.9   11.5   11.4   10.8
-hybrid_damped_eckart_swfalse  113.1  116.5  110.8  113.3  114.9
-hybrid_damped_eckart_swtrue    12.1   10.8   10.7   11.1   11.0
+hybrid_eckart_swfalse         112.7  114.5  111.0  110.8  110.4
+hybrid_eckart_swtrue           12.7   12.2   11.7   11.3   10.7
+hybrid_damped_eckart_swfalse  117.8  112.8  112.7  112.3  111.8
+hybrid_damped_eckart_swtrue    11.5   10.9   10.3   10.8   11.3
 ```
 
 ### Fraction of trajectories whose terminating step was Newton — 10pm
@@ -48,7 +45,6 @@ hybrid_damped_eckart_swtrue    12.1   10.8   10.7   11.1   11.0
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                 0.00   0.00   0.00   0.00   0.00
 hybrid_eckart_swfalse          0.00   0.00   0.00   0.00   0.00
 hybrid_eckart_swtrue           0.97   0.97   0.97   0.97   0.98
 hybrid_damped_eckart_swfalse   0.00   0.00   0.00   0.00   0.00
@@ -60,11 +56,10 @@ hybrid_damped_eckart_swtrue    0.98   0.98   0.98   0.98   0.98
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                 66.9   67.6   67.6   67.6   67.9
 hybrid_eckart_swfalse           0.3    0.3    0.3    0.3    0.3
 hybrid_eckart_swtrue           64.8   65.5   65.2   65.5   65.2
 hybrid_damped_eckart_swfalse    0.3    0.3    0.3    0.3    0.3
-hybrid_damped_eckart_swtrue    66.6   66.6   66.2   66.2   66.6
+hybrid_damped_eckart_swtrue    66.9   65.9   66.2   66.9   66.6
 ```
 
 *GAD baselines (5k step budget, no Newton phase) for context:*
@@ -78,11 +73,10 @@ hybrid_damped_eckart_swtrue    66.6   66.6   66.2   66.2   66.6
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                  540    500    484    478    480
 hybrid_eckart_swfalse           916    915    915    915    915
-hybrid_eckart_swtrue            194    105     60     38     33
+hybrid_eckart_swtrue            195    105     60     38     33
 hybrid_damped_eckart_swfalse    916    915    915    915    915
-hybrid_damped_eckart_swtrue     330    173     94     49     36
+hybrid_damped_eckart_swtrue     200    103     59     36     31
 ```
 
 ### Wall-time per converged TS — 100pm  (sec, lower is better)
@@ -90,11 +84,10 @@ hybrid_damped_eckart_swtrue     330    173     94     49     36
 ```
 trust_radius                   0.005   0.010   0.020   0.050   0.100
 method                                                              
-hybrid_swfalse                  64.9    57.8    57.2    57.3    56.5
-hybrid_eckart_swfalse        17298.7 17519.7 17362.1 17207.5 17357.5
-hybrid_eckart_swtrue            46.6    40.1    40.1    36.0    36.5
-hybrid_damped_eckart_swfalse 17561.9 16992.2 16854.3 16956.8 17108.3
-hybrid_damped_eckart_swtrue     54.3    43.6    39.6    37.4    35.6
+hybrid_eckart_swfalse        17065.6 16897.2 16933.4 17088.6 17293.2
+hybrid_eckart_swtrue            47.1    41.0    37.9    35.9    36.3
+hybrid_damped_eckart_swfalse 16876.5 17093.7 17011.0 16663.7 17060.5
+hybrid_damped_eckart_swtrue     45.1    40.1    36.8    34.7    34.2
 ```
 
 ### Fraction of trajectories whose terminating step was Newton — 100pm
@@ -102,11 +95,10 @@ hybrid_damped_eckart_swtrue     54.3    43.6    39.6    37.4    35.6
 ```
 trust_radius                  0.005  0.010  0.020  0.050  0.100
 method                                                         
-hybrid_swfalse                 0.00   0.00   0.00   0.00   0.00
 hybrid_eckart_swfalse          0.00   0.00   0.00   0.00   0.00
 hybrid_eckart_swtrue           0.86   0.86   0.86   0.86   0.88
 hybrid_damped_eckart_swfalse   0.00   0.00   0.00   0.00   0.00
-hybrid_damped_eckart_swtrue    0.89   0.87   0.86   0.86   0.87
+hybrid_damped_eckart_swtrue    0.87   0.86   0.86   0.87   0.86
 ```
 
 
@@ -119,13 +111,11 @@ Best (method, trust_radius) per noise — head-to-head vs vanilla GAD dt=0.007 (
 ## 10 pm noise
 
 - **Vanilla GAD dt=0.007 baseline:** conv = 89.2% (256/287); median step at conv = 72; wall/conv = 46.6 s
-- **Best hybrid by conv %:**  `hybrid_swfalse` @ trust=0.005: conv = 89.2% (256/287); median step at conv = 106; wall/conv = 16.1 s
-- **Best hybrid by wall-per-conv:**  `hybrid_damped_eckart_swtrue` @ trust=0.02: conv = 86.1%; wall/conv = 10.7 s
-- **Head-to-head:** hybrid is **2.9× faster per converged TS** (16.1 s vs 46.6 s); accuracy +0.0 pp
+- **Best hybrid by conv %:**  `hybrid_damped_eckart_swtrue` @ trust=0.005: conv = 86.1% (247/287); median step at conv = 19; wall/conv = 11.5 s
+- **Head-to-head:** hybrid is **4.0× faster per converged TS** (11.5 s vs 46.6 s); accuracy -3.1 pp
 
 ## 100 pm noise
 
 - **Vanilla GAD dt=0.007 baseline:** conv = 72.8% (209/287); median step at conv = 331; wall/conv = 140.7 s
-- **Best hybrid by conv %:**  `hybrid_swfalse` @ trust=0.1: conv = 67.9% (195/287); median step at conv = 480; wall/conv = 56.5 s
-- **Best hybrid by wall-per-conv:**  `hybrid_damped_eckart_swtrue` @ trust=0.1: conv = 66.6%; wall/conv = 35.6 s
-- **Head-to-head:** hybrid is **2.5× faster per converged TS** (56.5 s vs 140.7 s); accuracy -4.9 pp
+- **Best hybrid by conv %:**  `hybrid_damped_eckart_swtrue` @ trust=0.005: conv = 66.9% (192/287); median step at conv = 200; wall/conv = 45.1 s
+- **Head-to-head:** hybrid is **3.1× faster per converged TS** (45.1 s vs 140.7 s); accuracy -5.9 pp
