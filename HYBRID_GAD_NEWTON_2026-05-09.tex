@@ -194,7 +194,88 @@ hybrid\_damped\_eckart, sw=True   & 0.98 & 0.98 & 0.98 & 0.98 & 0.98 & 0.87 & 0.
 \end{center}
 
 % =================================================================
-\section*{Headline numbers --- best of each, head-to-head vs vanilla GAD dt=0.007}
+\section*{Where does the hybrid land? Side-by-side vs best plain GAD and best canonical Sella}
+% =================================================================
+
+\textit{Same canonical convergence ($n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$),
+same $n=287$ test split, same HIP analytic Hessian. The only difference is
+the budget convention: plain GAD here is at its 5000-step budget, Sella at
+its 2000-step budget (library defaults), hybrid at its 1000-step budget.
+"med steps" is computed over converged trajectories only. "wall/conv" =
+total cell wall-time / number of converged samples.}
+
+\vskip0.5em
+\begin{center}\footnotesize
+\textbf{10 pm noise --- best config of each family}\\[0.4em]
+\begin{tabular}{l l c c c}
+\toprule
+\textbf{family} & \textbf{config} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
+\midrule
+\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & \textbf{92.7} & 4   & 14.5 \\
+Sella                         & default (2k)                              & 92.0          & 4   & 14.4 \\
+Sella                         & internal (2k, library default)            & 79.1          & 4   & 54.2 \\
+\midrule
+\textbf{plain GAD}            & dt=0.007 (5k budget)                      & \textbf{89.2} & 72  & 46.6 \\
+plain GAD                     & dt=0.005 (5k budget)                      & 89.2          & 98  & 47.7 \\
+plain GAD                     & dt=0.003 (5k budget)                      & 89.2          & 164 & 54.2 \\
+\midrule
+\textbf{hybrid (this sweep)}  & \textbf{damped\_eckart\_swtrue tr=0.02}   & \textbf{86.1} & 7   & \textbf{10.3} \\
+hybrid                        & damped\_eckart\_swtrue tr=0.10            & 85.4          & 4   & 11.3 \\
+hybrid                        & eckart\_swtrue tr=0.10                    & 85.4          & 5   & 10.7 \\
+\midrule
+\multicolumn{5}{l}{\emph{Hybrid vs best Sella:} $-6.6$pp acc, $\mathbf{1.4\times}$ faster wall/conv. \emph{vs best plain GAD:} $-3.1$pp acc, $\mathbf{4.5\times}$ faster.} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vskip0.5em
+\begin{center}\footnotesize
+\textbf{100 pm noise --- best config of each family}\\[0.4em]
+\begin{tabular}{l l c c c}
+\toprule
+\textbf{family} & \textbf{config} & \textbf{conv \%} & \textbf{med steps} & \textbf{wall/conv (s)} \\
+\midrule
+\textbf{plain GAD}            & dt=0.007 (5k budget)                      & \textbf{72.8} & 331 & 140.7 \\
+plain GAD                     & dt=0.005 (5k budget)                      & 71.8          & 457 & 156.0 \\
+plain GAD                     & dt=0.003 (5k budget)                      & 71.1          & 756 & 183.8 \\
+\midrule
+\textbf{Sella}                & libdef (cart+Eckart, 2k)                  & \textbf{70.7} & 9   & 65.2 \\
+Sella                         & default (2k)                              & 65.5          & 10.5& 79.3 \\
+Sella                         & internal (2k, library default)            & 50.9          & 17  & 181.8 \\
+\midrule
+\textbf{hybrid (this sweep)}  & \textbf{damped\_eckart\_swtrue tr=0.10}   & \textbf{66.6} & 31  & \textbf{34.2} \\
+hybrid                        & damped\_eckart\_swtrue tr=0.05            & 66.9          & 36  & 34.7 \\
+hybrid                        & eckart\_swtrue tr=0.05                    & 65.5          & 38  & 35.9 \\
+\midrule
+\multicolumn{5}{l}{\emph{Hybrid vs best Sella:} $-4.1$pp acc, $\mathbf{1.9\times}$ faster wall/conv. \emph{vs best plain GAD:} $-6.2$pp acc, $\mathbf{4.1\times}$ faster.} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Bottom line of the comparison.}
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{The hybrid is the wall-time winner at both noise levels.}
+  At 10pm it is $1.4\times$ faster than the strongest Sella (libdef) and
+  $4.5\times$ faster than the strongest plain GAD (dt=0.007). At 100pm
+  the gap widens to $1.9\times$ vs Sella and $4.1\times$ vs GAD.
+\item \textbf{Sella libdef is the convergence-rate winner at 10pm}
+  (92.7\%, $+6.6$pp over the hybrid). At 100pm plain GAD edges Sella by
+  $+2.1$pp ($72.8\%$ vs $70.7\%$), and the hybrid trails both by 4--6pp.
+  The hybrid trades 3--6pp of accuracy for $1.4$--$4.5\times$ wall speedup.
+\item \textbf{Median converged-step count: hybrid is competitive with Sella.}
+  At 10pm: 4--7 hybrid steps vs Sella's 4 vs GAD's 72. At 100pm: 31--38
+  hybrid steps vs Sella's 9--17 vs GAD's 331--756. The wall/conv
+  advantage over Sella at the same step count comes from the fact that
+  Sella's per-step cost is higher (it does multiple Hessian updates per
+  outer step in some configs).
+\item \textbf{Plain GAD is the slowest of the three families at both
+  noises}, primarily due to median-step counts of 72--756 vs Sella/hybrid's
+  4--38. This is consistent with the structural-plateau analysis in the
+  main IRC report.
+\end{itemize}
+
+% =================================================================
+\section*{Headline numbers --- hybrid vs vanilla GAD only (kept for continuity with 2026-05-04)}
 % =================================================================
 
 \begin{center}\small
@@ -380,6 +461,17 @@ machine-readable pivots.
   (job 60460000, tasks 10--49).
 \item Step-function source files: see "What this sweep does" above.
 \item Bug fix: commit \texttt{a80a763}, "return cartesian coord steps in hybrid".
+\item \textbf{Sella baselines} (used in the side-by-side table):
+  \texttt{analysis\_2026\_04\_29/test\_summary\_full.csv}, filtered to
+  \texttt{noise\_pm}$\in$\{10, 100\} and aggregated with
+  conv = \texttt{is\_saddle} $\wedge$ \texttt{fmax\_loose}
+  ($\equiv n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$).
+  Source runs: \texttt{runs/sella\_2000/} (cart+Eckart \emph{libdef},
+  cart no-Eckart \emph{default}, internal-coord \emph{internal}).
+\item \textbf{Plain GAD baselines}: from the main report's
+  \texttt{gad\_dt00\{3,5,7\}\_fmax} runs at the 5000-step budget;
+  numbers reproduced in
+  \texttt{analysis\_2026\_04\_29/hybrid\_gad\_newton\_pivot.md}.
 \end{itemize}
 
 \end{document}
