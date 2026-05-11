@@ -294,9 +294,22 @@ for ax, noise in zip(axes.flat, noises):
     ax.set_title(f"{noise} pm noise", fontsize=15)
     ax.set_ylim(0, 100)
     ax.grid(alpha=0.3, which="both")
-fig.legend(legend_handles.values(), legend_handles.keys(),
+# Build custom legend handles with fixed small marker size, so the legend
+# doesn't inherit the bubble-size scaling from the scatter.
+from matplotlib.lines import Line2D
+legend_proxies = []
+legend_labels = []
+for cfg, h in legend_handles.items():
+    family = master[master["config"] == cfg]["family"].iloc[0]
+    legend_proxies.append(Line2D([0], [0], marker=CONFIG_MARKER[cfg],
+                                  color="w", markerfacecolor=per_config_color(cfg, family),
+                                  markeredgecolor="black", markeredgewidth=0.7,
+                                  markersize=12, label=cfg, linestyle=""))
+    legend_labels.append(cfg)
+fig.legend(legend_proxies, legend_labels,
            loc="lower center", ncol=3, fontsize=13,
-           bbox_to_anchor=(0.5, -0.04), frameon=False)
+           bbox_to_anchor=(0.5, -0.04), frameon=False,
+           handletextpad=0.8, columnspacing=1.6)
 fig.suptitle("Pareto plane per noise: IRC TOPO % vs wall/conv  (upper-left = great; lower-right = bad)\n"
              "Bubble size $\\propto$ TS conv %",
              y=1.01, fontsize=17)
@@ -312,45 +325,51 @@ print("Wrote fig_pareto_per_noise")
 # - One TALL figure: 6 rows × 1 col, each row is wide and tall enough for labels
 # - Annotations to the right with consistent x-offset (no log-multiplier)
 # ────────────────────────────────────────────────────────────────────────
-# Save each noise as its own subfigure with generous height per row.
-# Total figure: 18 wide × 4 per row × 6 rows = 24" tall, no clipping.
-fig, axes = plt.subplots(6, 1, figsize=(18, 30))
+# Split into 2 figures (3 panels each) so each fits on one PDF page.
 cmap = plt.cm.RdYlGn
-for ax, noise in zip(axes, noises):
-    sub = master[master["noise_pm"] == noise].copy()
-    sub = sub.dropna(subset=["wall_per_conv"]).sort_values("wall_per_conv").reset_index(drop=True)
-    for i, r in sub.iterrows():
-        topo = r["topo_pct"] if not np.isnan(r["topo_pct"]) else None
-        color = cmap(min(max((topo or 0) / 100, 0), 1)) if topo is not None else "lightgray"
-        ax.hlines(y=i, xmin=0, xmax=r["wall_per_conv"], color=color, lw=8, alpha=0.55)
-        ax.scatter(r["wall_per_conv"], i, s=500, color=color,
-                   edgecolor="black", linewidth=1.2, zorder=5)
-        topo_str = f"{topo:.0f}%" if topo is not None else "n/a"
-        # Compact single-line: "TOPO 89 / raw 92 / 14.5s"
-        anno = f"  TOPO {topo_str} / raw {r['conv_pct']:.0f}% / {r['wall_per_conv']:.1f}s"
-        ax.text(r["wall_per_conv"], i, anno, va="center", ha="left", fontsize=10)
-    ax.set_yticks(range(len(sub)))
-    ax.set_yticklabels([SHORT.get(c, c) for c in sub["config"]], fontsize=13)
-    ax.invert_yaxis()
-    ax.set_xscale("log")
-    xmin = sub["wall_per_conv"].min()
-    xmax = sub["wall_per_conv"].max()
-    ax.set_xlim(xmin / 2.5, xmax * 50)
-    ax.tick_params(axis='x', labelsize=12)
-    ax.set_xlabel("Wall-time per converged TS (s, log)" if noise == 200 else "", fontsize=14)
-    ax.set_title(f"{noise} pm noise (top row = fastest)", fontsize=16, loc="left", pad=10)
-    ax.grid(alpha=0.3, which="both", axis="x")
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=100))
-sm.set_array([])
-cbar = fig.colorbar(sm, ax=list(axes), fraction=0.015, pad=0.02, orientation="vertical")
-cbar.set_label("IRC TOPO % (gray = not measured)", fontsize=13)
-fig.suptitle("Method rankings by wall-time per converged TS  •  head color = IRC TOPO",
-             y=0.995, fontsize=18)
-fig.tight_layout(rect=[0, 0, 0.94, 0.985])
-fig.savefig(f"{OUT}/fig_ranking_lollipop.pdf", bbox_inches="tight")
-fig.savefig(f"{OUT}/fig_ranking_lollipop.png", bbox_inches="tight", dpi=140)
-plt.close(fig)
-print("Wrote fig_ranking_lollipop")
+
+def render_lollipop_set(noise_set, save_name, title_suffix):
+    fig, axes = plt.subplots(len(noise_set), 1, figsize=(18, 14))
+    if len(noise_set) == 1:
+        axes = [axes]
+    for ax, noise in zip(axes, noise_set):
+        sub = master[master["noise_pm"] == noise].copy()
+        sub = sub.dropna(subset=["wall_per_conv"]).sort_values("wall_per_conv").reset_index(drop=True)
+        for i, r in sub.iterrows():
+            topo = r["topo_pct"] if not np.isnan(r["topo_pct"]) else None
+            color = cmap(min(max((topo or 0) / 100, 0), 1)) if topo is not None else "lightgray"
+            ax.hlines(y=i, xmin=0, xmax=r["wall_per_conv"], color=color, lw=8, alpha=0.55)
+            ax.scatter(r["wall_per_conv"], i, s=500, color=color,
+                       edgecolor="black", linewidth=1.2, zorder=5)
+            topo_str = f"{topo:.0f}%" if topo is not None else "n/a"
+            anno = f"  TOPO {topo_str} / raw {r['conv_pct']:.0f}% / {r['wall_per_conv']:.1f}s"
+            ax.text(r["wall_per_conv"], i, anno, va="center", ha="left", fontsize=11)
+        ax.set_yticks(range(len(sub)))
+        ax.set_yticklabels([SHORT.get(c, c) for c in sub["config"]], fontsize=13)
+        ax.invert_yaxis()
+        ax.set_xscale("log")
+        xmin = sub["wall_per_conv"].min()
+        xmax = sub["wall_per_conv"].max()
+        ax.set_xlim(xmin / 2.5, xmax * 50)
+        ax.tick_params(axis='x', labelsize=12)
+        ax.set_xlabel("Wall-time per converged TS (s, log)" if noise == noise_set[-1] else "", fontsize=14)
+        ax.set_title(f"{noise} pm noise (top row = fastest)", fontsize=16, loc="left", pad=10)
+        ax.grid(alpha=0.3, which="both", axis="x")
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=100))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=list(axes), fraction=0.015, pad=0.02, orientation="vertical")
+    cbar.set_label("IRC TOPO % (gray = not measured)", fontsize=13)
+    fig.suptitle(f"Method rankings by wall-time per converged TS — {title_suffix}\n"
+                 "head color = IRC TOPO",
+                 y=0.995, fontsize=17)
+    fig.tight_layout(rect=[0, 0, 0.94, 0.97])
+    fig.savefig(f"{OUT}/{save_name}.pdf", bbox_inches="tight")
+    fig.savefig(f"{OUT}/{save_name}.png", bbox_inches="tight", dpi=140)
+    plt.close(fig)
+
+render_lollipop_set([10, 30, 50],  "fig_ranking_lollipop_low",  "low noise (10/30/50 pm)")
+render_lollipop_set([100, 150, 200], "fig_ranking_lollipop_high", "high noise (100/150/200 pm)")
+print("Wrote fig_ranking_lollipop_low / _high")
 
 
 # ────────────────────────────────────────────────────────────────────────
