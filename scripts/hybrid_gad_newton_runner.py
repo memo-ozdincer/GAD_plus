@@ -311,6 +311,8 @@ def main():
             "trust_radius": args.trust_radius,
             "gad_dt": args.gad_dt,
             "switch_by_eig": switch_by_eig,
+            "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
+            "atomic_nums": atomic_nums.detach().cpu().numpy().astype(int).tolist(),
         })
 
         status = "CONV" if converged else "FAIL"

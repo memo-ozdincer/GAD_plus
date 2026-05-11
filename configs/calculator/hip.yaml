@@ -1,4 +1,5 @@
 name: hip
+# HIP (Equiformer) neural network potential, GPU-backed.
 checkpoint: ${cluster.project_dir}/models/hip_v2.ckpt
 hessian_method: predict
 device: cuda

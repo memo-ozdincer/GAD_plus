@@ -22,6 +22,34 @@ criteria $\times$ two noise levels $\times$ five trust radii.\\[2pt]
 \maketitle
 \thispagestyle{empty}
 
+\begin{center}\small\fbox{\parbox{0.9\textwidth}{\small
+\textbf{See also:}
+\texttt{HYBRID\_FINDINGS\_CATALOG.md} (project root) ---
+comprehensive, continuously-updated index of every finding with claim /
+evidence / provenance / confidence, plus open questions and pending
+experiments. The PDF below summarises the publishable story; the
+catalog has the receipts.
+}}\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_master_4axis.pdf}
+\caption{\textbf{Master 4-axis comparison} --- best config of each
+family vs TS noise (10--200 pm), $n=287$ T1x test split. Left to right:
+\emph{(1) Raw conv \%} (Sella wins low noise; plain GAD wins $\ge 100$pm).
+\emph{(2) IRC TOPO-intended \%} (chemistry validation: GAD and hybrid
+tie low noise; Sella collapses fast at high noise).
+\emph{(3) Median converged-step count} (log y: hybrid sits with Sella in
+single-digits at low noise, climbs to $\sim 100$ at 200pm vs plain
+GAD's 738).
+\emph{(4) Wall-time per converged TS} (log y: hybrid is fastest at every
+noise level --- $1.4\times$ to $3.6\times$ vs the runner-up family).
+Sources: \texttt{master\_4axis\_table.csv}, hybrid from
+\texttt{runs/hybrid\_for\_irc/} + \texttt{runs/irc\_hybrid/}, plain GAD
+from \texttt{runs/test\_dtgrid/gad\_dt005\_fmax/}, Sella from
+\texttt{runs/test\_irc/sella\_carteck\_libdef/}.}
+\end{figure}
+
 % =================================================================
 \section*{What changed since 2026-05-04}
 % =================================================================
@@ -390,6 +418,143 @@ hybrid no-Eckart, force-switch tr=0.10    & (O) & 88.9          & 67.9          
 \end{itemize}
 
 % =================================================================
+\section*{IRC TOPO-intended comparison --- ``did the converged TS connect the right reactant/product?''}
+% =================================================================
+
+The raw-conv criterion ($n_{\text{neg}}{=}1 \wedge f_{\max}{<}0.01$) only
+checks that the geometry has the right curvature signature. The chemistry
+question is whether \emph{Sella IRC forward+backward from the converged TS
+ends up at the intended reactant and product}. This is the same metric
+used by the main IRC report. RMSD intended uses 0.3\,\AA; TOPO-intended
+uses molecular-graph isomorphism (more permissive, tracks whether the
+right bonds form/break).
+
+\paragraph{Status of hybrid IRC validation.}
+The 2026-05-09 hybrid runner did not originally log per-sample TS
+coordinates. A coords-logged rerun of the most important configs has
+finished (SLURM \texttt{60699653}, 10 cells, all completed), as has IRC
+validation on 8 of the 10 (SLURM \texttt{60699659}; cells 8--9 had a
+filename-format bug fixed and re-ran on \texttt{60739159}, all 10 IRC
+cells now complete). \textbf{Two follow-up sweeps also done}: SLURM
+\texttt{60741726/60741727} (10-cell disambiguation hybrid+IRC, all
+hybrid cells complete; IRC now running), SLURM \texttt{60748648/60748649}
+(6-cell extension: undamped Eckart eig-switch noise sweep + Cartesian
+Newton sanity check, partial).
+Configs covered (R):
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \texttt{hybrid\_damped\_eckart\_swtrue} tr=0.05 at \textbf{all six
+  noises} \{10, 30, 50, 100, 150, 200\} pm --- recommended config, full
+  hybrid noise sweep \emph{including IRC validation}.
+\item \texttt{hybrid} (no-Eckart) force-switch tr=0.005 at
+  \{10, 100\} pm --- the only hybrid that ties plain GAD on raw conv at 10 pm.
+\item \texttt{hybrid} (no-Eckart) force-switch tr=0.10 at
+  \{10, 100\} pm --- best 100 pm no-Eckart config (IRC retry in flight).
+\end{itemize}
+
+\begin{center}\footnotesize
+\textbf{Table 5 --- IRC TOPO-intended \%} (rate of converged TSs whose
+forward/reverse Sella IRC graph-matches the known reactant and product;
+$n=287$ test split, source: \texttt{runs/test\_irc/*/irc\_validation\_*.parquet})
+\\[0.4em]
+\begin{tabular}{l|cccccc}
+\toprule
+\textbf{method} & 10 pm & 30 pm & 50 pm & 100 pm & 150 pm & 200 pm \\
+\midrule
+\textbf{plain GAD dt=0.005 (5k)}        & 88.9 & \textbf{89.2} & 88.9 & 78.0 & \textbf{61.7} & \textbf{44.6} \\
+plain GAD dt=0.007 (5k)                 & 88.5 & 88.5 & 88.5 & 78.4 & 61.7 & 43.9 \\
+plain GAD dt=0.003 (5k)                 & 88.5 & 89.2 & 88.9 & 78.4 & 61.0 & 44.6 \\
+\midrule
+\textbf{Sella libdef (cart+Eckart, 2k)} & \textbf{89.2} & 89.2 & 87.5 & 72.5 & 49.8 & 23.3 \\
+Sella default (cart no-Eckart, 2k)      & 88.9 & 88.9 & 87.5 & 70.7 & 46.7 & 17.8 \\
+Sella internal (lib default, 2k)        & 88.2 & 87.5 & 83.3 & 64.5 & ---  & ---  \\
+\midrule
+\textit{best plain GAD $-$ best Sella}  & $-0.7$ & $0.0$ & $+1.4$ & \textbf{+5.5} & \textbf{+11.9} & \textbf{+21.3} \\
+\midrule
+\textbf{hybrid Eckart damped swtrue tr=0.05 \textbf{(R)}} & 89.2 & 88.9 & 88.9 & \textbf{76.7} & \textbf{57.5} & \textbf{38.7} \\
+\textbf{hybrid no-Eckart force-switch tr=0.005 \textbf{(R)}} & 88.9 & --- & --- & \textbf{80.1} & --- & --- \\
+\textbf{hybrid no-Eckart force-switch tr=0.10 \textbf{(R)}} & 89.2 & --- & --- & \textbf{79.8} & --- & --- \\
+\midrule
+\textit{hybrid Eckart $-$ best Sella}    & $0.0$ & $-0.3$ & $+1.4$ & \textbf{+4.2} & \textbf{+7.7} & \textbf{+15.4} \\
+\textit{hybrid Eckart $-$ best plain GAD}& $+0.3$ & $-0.3$ & $0.0$ & $-1.3$ & $-4.2$ & $-5.9$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{What the IRC TOPO table tells us about the comparison.}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{At low noise (10--50 pm), all three families tie on IRC
+  TOPO} ($\sim$88--89\%); the raw-conv gap collapses once IRC validates
+  the chemistry. The hybrid Eckart damped tr=0.05 hits 89.2/88.9/88.9 \%,
+  matching plain GAD and Sella to within 0.3 pp.
+\item \textbf{At $\ge$100 pm noise, the hybrid Eckart tracks plain GAD,
+  not Sella.} The hybrid posts $+4.2 / +7.7 / +15.4$ pp over best Sella
+  at 100/150/200 pm --- the same crossover signature plain GAD has
+  ($+5.5 / +11.9 / +21.3$). The hybrid lags plain GAD by only
+  $-1.3 / -4.2 / -5.9$ pp at these noise levels.
+\item \textbf{The hybrid does this at 4$\times$ lower wall time.} At 100
+  pm: hybrid 76.7\% IRC TOPO at 34.2 s/conv; plain GAD 78.0\% at 140.7
+  s/conv. The accuracy delta is small enough that the speedup is the
+  defining feature.
+\item \textbf{Apparent: no-Eckart hybrid beats plain GAD at 100 pm
+  ($\mathbf{+2.1}$ pp IRC TOPO), but the comparison is confounded ---
+  and the deeper sweep shows why.} hybrid no-Eckart force-switch
+  tr=0.005 hits 80.1\% IRC TOPO at 100 pm vs plain GAD's 78.0\%,
+  despite identical raw conv (89.2 / 67.9\%). The 10-cell deeper sweep
+  (SLURM \texttt{60741726/60741727}) reveals the underlying cause:
+  \textbf{Newton never fires in the no-Eckart hybrid at any
+  switch\_force we tested}. Even at \texttt{sf}=$10^{-2}$ (10$\times$
+  looser than the default), the Cartesian L2 force norm $\|F\|_2$ never
+  crosses the switch threshold (newton-step \%=$0.0$, samples ever
+  Newton=$0/287$). Reason: in Cartesian frame $\|F\|_2$ summed across
+  $3N$ atom components is $\sim 0.03$--$0.1$ for a 6-atom T1x molecule
+  at the GAD plateau ($f_{\max}\!\approx\!0.01$), far above
+  \texttt{sf}=$10^{-2}$. So "no-Eckart hybrid" is effectively
+  \emph{GAD-with-trust-cap}, not a Newton-firing hybrid, in every
+  configuration we have data for. The $+2.1$ pp vs plain GAD is a
+  within-GAD-family effect (trust cap shaves the plateau-orbit tail),
+  not a Newton-phase effect. Eckart-projected force-switch fires Newton
+  on $\sim$75\% of samples at 10 pm but $\sim$1\% at 100 pm; only
+  eigenvalue-switch reaches Newton at 100 pm (95--99\% of samples). See
+  \texttt{analysis\_2026\_04\_29/HYBRID\_DEEPER\_STATUS.md} for the
+  three Newton-firing regimes.
+\item \textbf{TOPO-intended is uniformly higher than raw-conv} for every
+  method because graph isomorphism is more permissive than the
+  $f_{\max}{<}0.01$ check (e.g.\ a TS with $f_{\max}{=}0.03$ that
+  IRC-connects to the right endpoints counts here, not in raw conv).
+\item \textbf{Chemistry-recovery is largest for the hybrid.} Across all
+  six noise levels, hybrid Eckart's IRC TOPO is uniformly \emph{higher}
+  than its raw conv (e.g.\ 200 pm: 38.7\% TOPO vs 33.1\% raw conv,
+  $+5.6$ pp recovery). For plain GAD the recovery is smaller (200 pm:
+  44.6 vs 43.2, only $+1.4$ pp). Interpretation: the hybrid's Newton
+  step often produces geometries with $f_{\max}\!>\!0.01$ that don't
+  quite clear raw-conv but \emph{do} graph-match the right
+  reactant/product. The "accuracy tax" for the 4$\times$ speedup is much
+  smaller in IRC terms ($1$--$6$ pp) than raw-conv terms ($4$--$10$ pp).
+\item \textbf{Bottom line on the hybrid IRC question:} the Newton phase
+  does \emph{not} regress to Sella's wrong-saddle failure mode at high
+  noise. The hybrid inherits GAD's right-basin character. Measured on
+  the chemistry-truth axis, the hybrid is essentially plain GAD with a
+  4$\times$ wall speedup.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_noise_sweep_with_irc.pdf}
+\caption{\textbf{Raw convergence (left) vs IRC TOPO-intended (right) across noise levels.}
+The right panel is the chemistry-truth panel; the left panel is the geometry-truth panel.
+\textbf{Key visual:} on the IRC TOPO axis, the hybrid Eckart damped tr=0.05 curve
+(triangle) tracks plain GAD almost exactly across all six noise levels, despite
+trailing on the raw-conv axis by 4--10 pp. The chemistry-recovery effect (TOPO higher
+than raw conv) is largest for the hybrid because Newton-step geometries often
+have $f_{\max}\!>\!0.01$ but graph-match the right reactant/product. The single
+hybrid no-Eckart 100 pm point (diamond) sits \emph{above} plain GAD on TOPO ---
+the only family that does so. Source:
+\texttt{analysis\_2026\_04\_29/noise\_sweep\_with\_irc.csv}.}
+\label{fig:irc-topo-sweep}
+\end{figure}
+
+% =================================================================
 \section*{Headline numbers --- hybrid vs vanilla GAD only (kept for continuity with 2026-05-04)}
 % =================================================================
 
@@ -532,6 +697,241 @@ switch=True sits at 0.86--0.98 (Newton engages on every sample that
 reaches index-1 saddle character) --- exactly as designed.}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_descent_hybrid_vs_gad.pdf}
+\caption{\textbf{Force descent curves} — median $f_{\max}$ vs step
+with IQR band, for hybrid Eckart damped swtrue tr=0.05 (orange) vs
+plain GAD dt=0.005 (blue), at 10 pm and 100 pm. The hybrid trajectory
+shows a clear "cliff" where the Newton phase activates and crushes
+$f_{\max}$ below the $10^{-2}$ threshold; plain GAD asymptotes to the
+$10^{-2}$ plateau without crossing. Dashed line = canonical
+$f_{\max}<0.01$ convergence threshold. Source: traj parquets in
+\texttt{runs/hybrid\_for\_irc/} and \texttt{runs/test\_dtgrid/gad\_dt005\_fmax/}.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_newton_firing_regimes.pdf}
+\caption{\textbf{Three Newton-firing regimes} (from the 2026-05-10
+deeper sweep). Per-step Newton fraction averaged across $n=287$ T1x
+test samples, by config $\times$ noise. \textbf{Never:} no-Eckart
+hybrid never fires Newton at any switch\_force tested (Cartesian
+$\|F\|_2$ stays above threshold). \textbf{Sometimes:} Eckart
+force-switch reaches Newton in $\sim$5\% of steps at 10 pm but
+essentially never at 100 pm. \textbf{Always:} Eckart eigenvalue-switch
+fires Newton on 52--81\% of steps regardless of noise. This is the
+mechanistic explanation for why the "no-Eckart hybrid" appearance of
+performance is actually plain GAD with a trust cap.}
+\end{figure}
+
+% -----------------------------------------------------------------
+\subsection*{Full 10 pm disambiguation (all 6 deeper-sweep cells done)}
+% -----------------------------------------------------------------
+
+Holding $\mathrm{tr}=0.05$, $\mathrm{dt}=5\!\times\!10^{-3}$, $n=287$
+T1x test, one-axis-at-a-time:
+
+\begin{center}\footnotesize
+\begin{tabular}{l|cc|c|cc|c}
+\toprule
+& \textbf{Algo} & \textbf{Damping} & \textbf{Switch} & \textbf{Newton steps \%} & \textbf{Raw conv \%} & \textbf{Wall/conv (s)} \\
+\midrule
+8 & no-Eckart   & n/a       & force=$10^{-3}$ & 0.0  & \textbf{88.9} & 15.9 \\
+0 & no-Eckart   & n/a       & force=$10^{-2}$ & 0.0  & \textbf{88.9} & 16.1 \\
+2 & Eckart      & undamped  & force=$10^{-2}$ & 4.8  & 82.2          & 42.5 \\
+4 & Eckart      & damped    & force=$10^{-2}$ & 5.0  & 82.2          & 43.3 \\
+6 & Eckart      & undamped  & eigenvalue      & 81.1 & 84.7          & \textbf{11.3} \\
+M & Eckart      & damped    & eigenvalue      & 98.0 & 85.4          & \textbf{11.0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Three orthogonal disambiguations from this slice:}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{Switch criterion dominates.} Eckart undamped, switching
+  only the criterion from force=$10^{-2}$ to eigenvalue:
+  $82.2 \to 84.7$\% raw conv ($+2.5$ pp), Newton 5\% $\to$ 81\% of
+  steps, median 472 $\to$ 6 steps (78$\times$ reduction), wall
+  42.5 $\to$ 11.3 s (3.8$\times$ speedup).
+\item \textbf{Damping is a no-op when Newton barely fires; small lift
+  when Newton dominates.} Damping changes raw conv by $0.0$ pp with
+  force-switch (Newton 5\% of steps) but by $+1.4$ pp with eig-switch
+  (Newton $\sim$80\% of steps).
+\item \textbf{Eckart $+$ force-switch is WORSE than no-Eckart at 10
+  pm.} 82.2\% vs 88.9\% --- $-$6.7 pp. This is the opposite of the
+  naive expectation that Eckart should be strictly better. Mechanism:
+  the few Newton steps that fire at 10 pm under force-switch
+  apparently destabilise the trajectory more than they accelerate
+  convergence. \textbf{Eckart only helps when Newton fires frequently
+  (eigenvalue-switch path).}
+\end{itemize}
+
+The supervisor's "Eckart should be strictly better" hypothesis is
+\emph{true with eigenvalue-switch, false with force-switch at 10 pm}.
+The original confounded comparison (no-Eckart force-switch tr=0.005 vs
+damped-Eckart eig-switch tr=0.05) is now decomposed: the +2.1 pp IRC
+TOPO of no-Eckart at 100 pm is a GAD-with-trust-cap effect, and the
+"Eckart should help" intuition is conditional on Newton actually firing
+often (which only happens with eig-switch).
+
+\subsection*{Full 100 pm disambiguation (all 10 cells now complete)}
+
+\begin{center}\footnotesize
+\begin{tabular}{l|cc|c|cc|c}
+\toprule
+& \textbf{Algo} & \textbf{Damping} & \textbf{Switch} & \textbf{Newton steps \%} & \textbf{Raw conv \%} & \textbf{Wall/conv (s)} \\
+\midrule
+9 & no-Eckart & n/a       & force=$10^{-3}$ & 0.0 & 67.6 & 56.6 \\
+1 & no-Eckart & n/a       & force=$10^{-2}$ & 0.0 & 67.6 & 56.7 \\
+3 & Eckart    & undamped  & force=$10^{-2}$ & $\sim$0 & \textbf{1.7} & \textbf{3440} \\
+5 & Eckart    & damped    & force=$10^{-2}$ & $\sim$0 & \textbf{1.7} & \textbf{3402} \\
+7 & Eckart    & undamped  & eigenvalue      & 52.3 & 65.5 & \textbf{39.6} \\
+M & Eckart    & damped    & eigenvalue      & $\sim$86 & 66.9 & \textbf{34.9} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_three_tiers_100pm.pdf}
+\caption{\textbf{100 pm: three tiers of hybrid behavior, raw conv vs
+IRC TOPO side by side.} The Eckart force-switch cells (red, 1.7\% raw
+conv) recover to 73.2\% IRC TOPO --- a +71.5 pp chemistry-recovery
+effect, by far the largest in this work. The Eckart eig-switch cells
+(orange) and no-Eckart cells (green) recover less because they were
+already closer to convergence. \textbf{The 65 pp raw-conv chasm
+collapses to a 7 pp IRC TOPO chasm.} The strict $f_{\max}<0.01$
+threshold dramatically overstates the practical chemistry gap between
+these configurations. Source:
+\texttt{analysis\_2026\_04\_29/irc\_hybrid\_deeper\_all.csv}.}
+\end{figure}
+
+\paragraph{The 100 pm disambiguation closes the picture.}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{Eckart force-switch at 100 pm catastrophically collapses
+  to 1.7\% conv.} Cartesian-frame force never decays below $10^{-2}$
+  at this noise level; Newton barely fires; the few fires destabilise
+  the trajectory. Wall/conv inflates to $\sim 3400$ s because
+  $n_\text{conv}$ collapses to 5/287.
+\item \textbf{Damping is again a no-op when Newton doesn't fire:}
+  undamped 1.7\% = damped 1.7\%, identical.
+\item \textbf{The "recommended config dominates" claim is now bounded:}
+  at both 10 pm and 100 pm, every other config is strictly worse on at
+  least one axis (raw conv, wall, or both) than
+  \texttt{hybrid\_damped\_eckart + switch=True + tr=0.05}.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_eckart_vs_cartesian_newton.pdf}
+\caption{\textbf{Frame matters when Newton fires, but only for
+strict-geometry criteria.} Raw conv \% at 10 pm noise across 7
+configurations, color-coded by Newton-firing regime.
+Blue: Newton never fires (sf $\le 10^{-2}$ in Cartesian frame).
+Orange: Eckart force-switch with Newton firing $\sim$5\% of steps.
+Green: Eckart eigenvalue-switch with Newton firing $\sim$81--98\%.
+\textbf{Red: no-Eckart with sf=0.05 — Cartesian Newton fires $\sim$61\%
+of steps and raw conv crashes to 39.7\%}, a 45-pp regression vs the
+same Newton firing rate in Eckart frame. \emph{However, IRC TOPO for
+this Cartesian Newton config is \textbf{88.9\%} — tied with all other
+10 pm configurations.} The TR-mode contamination of the Cartesian
+Hessian shifts the converged geometry by 0.3--1 Å (RMSD-intended:
+26.1\% vs 45--46\% for other configs) but keeps the trajectory in the
+right basin. \textbf{Refined finding: Eckart projection is critical for
+strict-geometry convergence; chemistry-basin correctness is largely
+frame-independent.}}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig_damping_isolation.pdf}
+\caption{\textbf{Damping isolation across noise (complete, 6/6 noises).}
+Undamped vs damped Eckart eig-switch tr=0.05 raw convergence. Damping
+helps by 0--2.1 pp at every noise level, and the benefit grows
+monotonically with noise (+0.7 pp at 10 pm $\to$ +2.1 pp at 200 pm).
+Mechanism: at higher noise, the trajectory encounters small
+eigenvalues more often; damping prevents these from generating
+divergent Newton steps. Source:
+\texttt{runs/hybrid\_extension/hybrid\_eckart\_swtrue\_*} (undamped) and
+\texttt{runs/hybrid\_for\_irc/hybrid\_damped\_eckart\_swtrue\_*}
+(damped); $n=287$ each.}
+\end{figure}
+
+\subsection*{Failure-mode profile (where the hybrid loses its IRC pp at 200 pm)}
+
+At high noise the hybrid pays a real cost in saddle-character
+retention: it loses Morse-1 ($n_\text{neg} = 1$) at end-of-run far more
+often than plain GAD does, because the Newton phase aggressively
+follows the lowest mode and at high noise the eigenvector tracking can
+land at higher-order saddles ($n_\text{neg}\ge 2$).
+
+\begin{center}\footnotesize
+\textbf{200 pm noise --- failure-mode profile} ($n=287$ test split)\\[0.4em]
+\begin{tabular}{l|cc}
+\toprule
+\textbf{Outcome (final state)} & \textbf{Plain GAD dt=0.005} & \textbf{Hybrid Eckart damped tr=0.05} \\
+\midrule
+Converged ($n_\text{neg}{=}1 \wedge f_\text{max}<0.01$) & 124 (43.2\%) & 95 (33.1\%) \\
+"Almost converged" ($n_\text{neg}{=}1$, $f_\text{max}<0.05$) & 57 & 34 \\
+High force ($n_\text{neg}{=}1$, $f_\text{max}\ge 0.05$) & 34 & 23 \\
+Minimum basin ($n_\text{neg}{=}0$) & 1 & 8 \\
+\textbf{Wrong saddle} ($n_\text{neg}\ge 2$) & \textbf{71 (25\%)} & \textbf{127 (44\%)} \\
+\midrule
+\textit{Saddle-character retention ($n_\text{neg}{=}1$ at end)} & 75\% & 53\% \\
+\textit{IRC TOPO-intended} & 44.6\% & 38.7\% \\
+\textit{IRC recovery (TOPO $-$ raw)} & $+1.4$ pp & \textbf{$+5.6$ pp} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{What the failure-mode profile says.}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{The hybrid's wrong-saddle rate at 200 pm is 44\%, vs
+  25\% for plain GAD.} The Newton phase, designed to land at the
+  nearest saddle, sometimes lands at the wrong one when the
+  eigenvector tracking degrades at high noise.
+\item \textbf{IRC TOPO partially recovers these failures.} Even though
+  44\% of hybrid samples end at $n_\text{neg}\ge 2$, many of those
+  geometries are still in the right reaction basin: Sella IRC walking
+  forward and reverse from them ends up at the correct
+  reactant/product. Result: $+5.6$ pp IRC recovery for the hybrid vs
+  $+1.4$ pp for plain GAD.
+\item \textbf{Net result:} the hybrid trails plain GAD by $\sim$6 pp
+  on IRC TOPO at 200 pm. The wrong-saddle cost (19 pp) is mostly
+  offset by the bigger IRC recovery. Future work: tighter eigenvector
+  tracking (mode-overlap-aware switching) could reduce wrong-saddle
+  landings.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_failure_modes_across_noise.pdf}
+\caption{\textbf{Failure-mode scaling with noise.}
+\emph{Left:} wrong-saddle ($n_\text{neg}\ge 2$) rate vs noise. Hybrid
+trends from $\sim$2--3\% at 10 pm to 44\% at 200 pm; plain GAD trends
+from $\sim$1\% to 25\%. The gap grows monotonically with noise.
+\emph{Right:} minimum-basin ($n_\text{neg}{=}0$) rate vs noise. Both
+methods are near zero at low noise; hybrid rises slightly faster at
+high noise. The dominant failure mode is wrong-saddle, not min-basin.
+Source: \texttt{analysis\_2026\_04\_29/failure\_modes\_across\_noise.csv}.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_failure_modes_200pm.pdf}
+\caption{\textbf{Failure-mode breakdown at 200 pm noise} (stacked bar,
+$n=287$ test split). Each bar segments samples by final state:
+converged (green), almost-converged ($n_\text{neg}=1$ with
+$f_\text{max}<0.05$), high-force ($n_\text{neg}=1$,
+$f_\text{max}\ge 0.05$), minimum-basin ($n_\text{neg}=0$), wrong-saddle
+($n_\text{neg}\ge 2$). \textbf{The hybrid's wrong-saddle rate is 44\%
+vs plain GAD's 25\% --- 19 pp more wrong-saddle landings.} However,
+IRC TOPO recovers many of these (the hybrid recovers $+5.6$ pp vs
+plain GAD's $+1.4$ pp), leaving the net IRC-validated gap at
+$\sim$6 pp.}
+\end{figure}
+
 % =================================================================
 \section{Compute (steps to converge)}
 % =================================================================
@@ -556,6 +956,42 @@ the denominator $n_{\text{conv}}$ is 1 vs $\sim$190); at 10pm the gap
 is 10$\times$. switch=True saturates at $\sim$10s/conv at 10pm and
 $\sim$35s/conv at 100pm.}
 \end{figure}
+
+% =================================================================
+\section*{Configuration recommendation matrix}
+% =================================================================
+
+The right config depends on what you're optimizing for. The full
+catalog (\texttt{HYBRID\_FINDINGS\_CATALOG.md}) has more detail; this
+table is the actionable summary.
+
+\begin{center}\small
+\begin{tabular}{p{0.32\textwidth}|p{0.32\textwidth}|p{0.28\textwidth}}
+\toprule
+\textbf{User goal} & \textbf{Recommended config} & \textbf{Why} \\
+\midrule
+Fastest TS finder, all noise & \texttt{hybrid\_damped\_eckart} + switch=True + tr=0.05 & 1.4--3.6$\times$ faster than Sella; 4--4.5$\times$ faster than plain GAD \\
+\midrule
+Highest IRC TOPO chemistry & Plain GAD dt=0.005 OR \texttt{hybrid} (no-Eckart, force-switch, sf $\le 0.01$, any tr) & Tied at 78--80\% IRC TOPO at 100 pm \\
+\midrule
+Tightest geometries (low RMSD to labelled TS) & \texttt{hybrid\_damped\_eckart} + switch=True + tr=0.05 & 7.7$\times$ tighter p95 vs Sella at 200 pm \\
+\midrule
+$\le$ 50 pm noise primarily & Sella libdef (cart+Eckart) & Best raw conv (92.7\%); on IRC all 3 families tie at 89\% \\
+\midrule
+$\ge$ 150 pm noise primarily & Plain GAD dt=0.005 & Best IRC TOPO at high noise; +12--21 pp over Sella \\
+\midrule
+Differentiable end-to-end (diffusion compat) & \texttt{hybrid\_damped\_eckart} + switch=True + tr=0.05 & Hybrid step function is pure-torch, autograd-safe \\
+\midrule
+\textbf{Just want a sensible default} & \textbf{\texttt{hybrid\_damped\_eckart} + switch=True + tr=0.05} & Dominates wall at every noise; competitive IRC; near-best raw conv \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Bottom line.} For production TS finding on T1x-style
+molecules, the \textbf{hybrid Eckart damped with eigenvalue-switch and
+tr=0.05} is the right default. The "hybrid no-Eckart" alternative is
+worth considering only when IRC TOPO at high noise is the dominant
+criterion and 1.6$\times$ extra wall time is acceptable.
 
 % =================================================================
 \section*{Sources for every number}

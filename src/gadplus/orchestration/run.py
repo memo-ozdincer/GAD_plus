@@ -23,7 +23,6 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from torch_geometric.loader import DataLoader
 
-from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
 from gadplus.data.transition1x import Transition1xDataset, UsePos
 from gadplus.geometry.noise import add_gaussian_noise
 from gadplus.geometry.starting import make_starting_coords
@@ -32,6 +31,49 @@ from gadplus.logging.autopsy import classify_failure
 from gadplus.projection import atomic_nums_to_symbols
 from gadplus.search.gad_search import GADSearchConfig, run_gad_search
 from gadplus.search.nr_gad_flipflop import NRGADConfig, run_nr_gad_flipflop
+
+
+def _build_predict_fn(cfg: DictConfig):
+    """Dispatch on cfg.calculator.name and return (predict_fn, device).
+
+    Each backend's loader sits behind a local import so installing one
+    calculator's dependencies doesn't pull in the others.
+    """
+    name = cfg.calculator.get("name", "hip")
+    device = cfg.calculator.device
+    if name == "hip":
+        from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+        print(f"Loading HIP checkpoint: {cfg.calculator.checkpoint}")
+        calc = load_hip_calculator(
+            checkpoint_path=cfg.calculator.checkpoint,
+            device=device,
+            hessian_method=cfg.calculator.hessian_method,
+        )
+        return make_hip_predict_fn(calc), device
+
+    if name == "scine":
+        from gadplus.calculator.scine import (
+            load_scine_calculator, make_scine_predict_fn,
+        )
+        print(f"Loading SCINE Sparrow: {cfg.calculator.functional}")
+        calc = load_scine_calculator(
+            functional=cfg.calculator.functional,
+            device=device,
+        )
+        return make_scine_predict_fn(calc), device
+
+    if name == "xtb":
+        from gadplus.calculator.xtb import load_xtb_calculator, make_xtb_predict_fn
+        print(f"Loading xTB: {cfg.calculator.method}")
+        calc = load_xtb_calculator(
+            method=cfg.calculator.method,
+            device=device,
+            accuracy=cfg.calculator.get("accuracy", 1.0),
+            electronic_temperature=cfg.calculator.get("electronic_temperature", 300.0),
+        )
+        return make_xtb_predict_fn(calc), device
+
+    raise ValueError(f"Unknown calculator backend: {name!r}")
 
 
 def _build_gad_config(cfg: DictConfig) -> GADSearchConfig:
@@ -97,14 +139,8 @@ def main(cfg: DictConfig):
             "seed": cfg.seed,
         })
 
-    # Load calculator
-    print(f"Loading HIP checkpoint: {cfg.calculator.checkpoint}")
-    calculator = load_hip_calculator(
-        checkpoint_path=cfg.calculator.checkpoint,
-        device=cfg.calculator.device,
-        hessian_method=cfg.calculator.hessian_method,
-    )
-    predict_fn = make_hip_predict_fn(calculator)
+    # Load calculator (HIP / SCINE / xTB)
+    predict_fn, calc_device = _build_predict_fn(cfg)
 
     # Load dataset
     print(f"Loading Transition1x: {cfg.calculator.h5_path}")
@@ -144,11 +180,11 @@ def main(cfg: DictConfig):
                     batch, cfg.starting.method,
                     noise_rms=noise_angstrom, seed=seed,
                 )
-                coords = coords.to(cfg.calculator.device)
-                atomic_nums = batch.z.to(cfg.calculator.device)
+                coords = coords.to(calc_device)
+                atomic_nums = batch.z.to(calc_device)
 
                 # Known TS for RMSD tracking
-                known_ts = batch.pos_transition.to(cfg.calculator.device) if hasattr(batch, "pos_transition") else None
+                known_ts = batch.pos_transition.to(calc_device) if hasattr(batch, "pos_transition") else None
 
                 # Create logger
                 logger = TrajectoryLogger(

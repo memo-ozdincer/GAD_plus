@@ -1,0 +1,9 @@
+cell,noise_pm,n_conv,n_total,rmsd_conv_mean,rmsd_conv_med,rmsd_conv_p95,rmsd_fail_med
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_10pm,10,245,287,0.016,0.007,0.047,0.039
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_30pm,30,244,287,0.016,0.007,0.047,0.04
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_50pm,50,234,287,0.016,0.007,0.049,0.055
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_100pm,100,192,287,0.018,0.008,0.055,0.12
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_150pm,150,146,287,0.022,0.007,0.062,0.276
+hybrid_damped_eckart_swtrue_dt5e-3_tr0.05_200pm,200,95,287,0.038,0.008,0.109,0.466
+hybrid_swfalse_dt5e-3_tr0.005_10pm,10,256,287,0.006,0.005,0.015,0.032
+hybrid_swfalse_dt5e-3_tr0.005_100pm,100,192,287,0.016,0.011,0.04,0.096

@@ -1,0 +1,11 @@
+rundir,noise_pm,n,n_topo,n_rmsd,n_unstable,topo_pct,rmsd_pct,unstable_pct
+hybrid_damped_eckart_swfalse_dt5e-3_tr0.05_sf1e-2_10pm,10,287,255.0,131.0,52.0,88.9,45.6,18.1
+hybrid_eckart_swfalse_dt5e-3_tr0.05_sf1e-2_10pm,10,287,256.0,132.0,53.0,89.2,46.0,18.5
+hybrid_eckart_swtrue_dt5e-3_tr0.05_sf1e-2_10pm,10,287,255.0,132.0,51.0,88.9,46.0,17.8
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-2_10pm,10,287,256.0,131.0,54.0,89.2,45.6,18.8
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-3_10pm,10,287,255.0,131.0,52.0,88.9,45.6,18.1
+hybrid_damped_eckart_swfalse_dt5e-3_tr0.05_sf1e-2_100pm,100,287,210.0,103.0,49.0,73.2,35.9,17.1
+hybrid_eckart_swfalse_dt5e-3_tr0.05_sf1e-2_100pm,100,287,210.0,103.0,49.0,73.2,35.9,17.1
+hybrid_eckart_swtrue_dt5e-3_tr0.05_sf1e-2_100pm,100,287,221.0,110.0,57.0,77.0,38.3,19.9
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-2_100pm,100,287,229.0,115.0,55.0,79.8,40.1,19.2
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-3_100pm,100,287,229.0,116.0,55.0,79.8,40.4,19.2

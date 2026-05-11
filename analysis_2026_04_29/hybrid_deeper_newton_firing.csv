@@ -1,0 +1,5 @@
+cell,noise,raw_conv_%,newton_step_%,samples_w_newton_%
+hybrid_eckart_swtrue_dt5e-3_tr0.05_sf1e-2_10pm,10,84.7,81.11,99.0
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-2_10pm,10,88.9,0.0,0.0
+hybrid_swfalse_dt5e-3_tr0.05_sf1e-3_10pm,10,88.9,0.0,0.0
+hybrid_eckart_swtrue_dt5e-3_tr0.05_sf1e-2_100pm,100,65.5,52.3,95.1

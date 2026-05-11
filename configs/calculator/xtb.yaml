@@ -1,0 +1,12 @@
+# xTB (Grimme-lab GFN) backend via dxtb — PyTorch-native, autograd-compatible.
+#
+# Default method: GFN2-xTB. Supports gfn1 and gfn2 (dxtb does not ship
+# GFN0 or GFN-FF; use SCINE xtb_wrapper for those).
+#
+# Requires the dxtb package (already a HIP dependency in this venv).
+name: xtb
+method: gfn2
+device: cpu
+accuracy: 1.0
+electronic_temperature: 300.0
+h5_path: ${cluster.project_dir}/data/transition1x.h5

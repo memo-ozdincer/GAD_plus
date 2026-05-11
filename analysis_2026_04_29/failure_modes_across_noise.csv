@@ -1,0 +1,13 @@
+family,noise_pm,n,converged,almost,high_force,min_basin,wrong_saddle
+hybrid_eckart_damped,10,287,245.0,34.0,1.0,0.0,7.0
+hybrid_eckart_damped,30,287,244.0,34.0,1.0,0.0,8.0
+hybrid_eckart_damped,50,287,234.0,33.0,9.0,0.0,11.0
+hybrid_eckart_damped,100,287,192.0,32.0,26.0,2.0,35.0
+hybrid_eckart_damped,150,287,146.0,25.0,27.0,7.0,82.0
+hybrid_eckart_damped,200,287,95.0,34.0,23.0,8.0,127.0
+plain_gad_dt005,10,287,256.0,26.0,1.0,0.0,4.0
+plain_gad_dt005,30,287,254.0,27.0,1.0,0.0,5.0
+plain_gad_dt005,50,287,246.0,26.0,7.0,0.0,8.0
+plain_gad_dt005,100,287,206.0,31.0,25.0,1.0,24.0
+plain_gad_dt005,150,287,164.0,40.0,35.0,2.0,46.0
+plain_gad_dt005,200,287,124.0,57.0,34.0,1.0,71.0

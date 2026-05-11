@@ -1,0 +1,14 @@
+# SCINE Sparrow semiempirical backend (CPU-only).
+#
+# Best default for organic transition states: DFTB0 (fast, well-behaved
+# Hessian on T1x-style molecules). Other supported methods: DFTB2, DFTB3,
+# PM6, AM1, RM1, MNDO.
+#
+# Requires scine_sparrow + scine_utilities to be importable. Compute nodes
+# have no internet, so install with pip before sbatch.
+name: scine
+functional: DFTB0
+device: cpu
+# h5_path is independent of the calculator; keeps the Hydra interpolation
+# the orchestration uses for HIP working identically here.
+h5_path: ${cluster.project_dir}/data/transition1x.h5

@@ -1,11 +1,47 @@
 # LIVE_STATUS — GAD+ comprehensive benchmark
-**Last updated:** 2026-05-04 (auto-updated by Claude across sessions)
+**Last updated:** 2026-05-10 (hybrid GAD-Newton sweep deep dive)
 **Owner:** memo.ozdincer@mail.utoronto.ca
 **Cluster:** Narval, account `rrg-aspuru`
 
 This file is the source of truth for ongoing experimental work. If you
 (future Claude) are restarting after a compaction, read this top to
 bottom before doing anything else.
+
+## 🆕 Active workstream (2026-05-10): hybrid GAD–Newton
+
+**Stand-alone benchmark of three GAD+Newton hybrid step functions**
+(no-Eckart, Eckart undamped, Eckart damped). Standalone PDF and
+comprehensive findings catalog live in:
+- `HYBRID_GAD_NEWTON_2026-05-09.pdf` — publishable report (14 pages)
+- `HYBRID_FINDINGS_CATALOG.md` — every finding with provenance (~580 lines, the receipts)
+- `analysis_2026_04_29/HYBRID_DEEPER_STATUS.md` — running log of the deep-dive sweep
+
+**Stable findings:**
+- Recommended config: `hybrid_damped_eckart` + `switch_based_on_hessian_eigval=True`
+  + `tr=0.05`. Wall/conv ratio: **1.4× vs Sella, 4.5× vs plain GAD at 10pm;
+  3.0× / 3.6× at 200pm**. IRC TOPO within 1–6pp of plain GAD across all 6 noise levels.
+- Hybrid retains GAD's "right-basin" character — IRC validates the hybrid
+  far more reliably than Sella at high noise (+15.4pp at 200pm).
+- "no-Eckart hybrid" never actually fires Newton (Cartesian $\|F\|_2 \gg$ threshold).
+  All "no-Eckart hybrid" numbers in the original 2026-05-04 report are
+  mechanistically *plain GAD with a trust cap*, not a Newton hybrid.
+- 3-regime Newton firing: never (no-Eckart), sometimes (Eckart force-switch),
+  always (Eckart eig-switch). Only eig-switch reaches Newton at 100+pm noise.
+
+**SLURM jobs in flight (as of 2026-05-10 evening):**
+- 60741726 — 10-cell disambiguation sweep **COMPLETE (10/10)**
+- 60741727 — IRC for above **NOW RUNNING (10 cells just launched, dep released)**
+- 60748648 — 6-cell extension (undamped Eckart eig-switch noise sweep + sf=0.05 sanity check) — 2/6 done
+- 60748649 — IRC for extension — still pending dependency
+
+**Headline finding from the just-completed deeper sweep:** at 100 pm,
+Eckart force-switch (sf=1e-2) collapses to **1.7% raw conv** (vs 65.5%
+for eig-switch). Forces never crush below sf=1e-2 at high noise, so
+Newton barely fires; the few times it does, it destabilises. The
+recommended config (eig-switch) is now bounded above on the
+configuration space — anywhere else is dominated.
+
+
 
 ## 🎯 Headline result (2026-05-01, IRC validation landed)
 

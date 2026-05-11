@@ -195,6 +195,54 @@ method we use downstream.
 
 ---
 
+## 2026-05-10: hybrid GAD-Newton open follow-ups
+
+These items surfaced during the 2026-05-09 / 2026-05-10 hybrid sweep
+work and are documented in `HYBRID_FINDINGS_CATALOG.md` §7.
+
+### Z1. Mode-overlap-aware switching to reduce wrong-saddle landings
+
+At 200 pm, hybrid Eckart damped tr=0.05 lands at $n_{neg} \ge 2$
+wrong-saddles on 44% of samples (vs 25% for plain GAD). Failure-mode
+analysis (`hybrid_failure_modes.csv`) suggests Newton follows the wrong
+eigenvector once mode tracking degrades. Future work: gate the Newton
+trigger on a mode-overlap criterion (eigenvector continuity, not just
+$n_{neg}=1$).
+
+Expected outcome: hybrid IRC TOPO at 200 pm closes from -5.9 pp vs
+plain GAD to -2 to 0 pp. Wall/conv stays competitive.
+
+Cost: implement mode-overlap tracking in the projected step function;
+1 SLURM array (10 cells, ~3 GPU-h each, ~30 GPU-h).
+
+### Z2. Hybrid noise sweep at 300 / 500 / 1000 pm
+
+Tested 10--200 pm; main IRC report goes further. Hybrid wall/conv
+advantage at 200 pm (3.0x Sella) suggests it might extend further at
+higher noise where Sella's n_conv collapses. Or it might degrade once
+noise dominates the Newton basin radius.
+
+Cost: 6 hybrid cells + 6 IRC cells (1 SLURM array).
+
+### Z3. Cartesian Newton switch_force sweep
+
+Tested sf=0.05 with partial data: 60% Newton firing at 10 pm but raw
+conv crashing to ~40%. A full sf sweep on no-Eckart would map the
+"Cartesian Newton works / doesn't" boundary.
+
+Cost: 6 cells x 2 noises = 12 jobs. Curiosity item; doesn't affect the
+recommendation.
+
+### Z4. Sella IRC dependence
+
+All hybrid IRC uses Sella IRC forward+backward. If the +5.6 pp
+chemistry-recovery at 200 pm is an artifact of the specific IRC
+algorithm, the conclusion weakens. Could rerun with `rigorous` IRC.
+
+Cost: ~10 cells, similar to a fresh IRC sweep.
+
+---
+
 ## Housekeeping
 
 - Dates are absolute (2026-04-NN), not relative.
