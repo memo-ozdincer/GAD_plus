@@ -958,6 +958,78 @@ $\sim$35s/conv at 100pm.}
 \end{figure}
 
 % =================================================================
+\section*{Geometric quality of the converged TS (Kabsch RMSD to labelled T1x TS)}
+% =================================================================
+
+The IRC TOPO axis asks "does the converged TS connect the right
+reactant/product?" --- a binary, basin-level check. The complementary
+question is "how close is the converged TS to the labelled
+transition-state geometry?" --- a continuous, pose-level check. The
+hybrid wins this axis decisively at high noise.
+
+\begin{center}\small
+\textbf{RMSD between converged TS and labelled T1x TS} (Kabsch + Hungarian, converged samples only, $n=287$ test split)\\[0.4em]
+\begin{tabular}{l|cc|cc|cc}
+\toprule
+& \multicolumn{2}{c|}{\textbf{Sella libdef}} & \multicolumn{2}{c|}{\textbf{Plain GAD dt=0.005}} & \multicolumn{2}{c}{\textbf{Hybrid Eckart damped tr=0.05}} \\
+\textbf{Noise} & med (Å) & p95 (Å) & med (Å) & p95 (Å) & med (Å) & p95 (Å) \\
+\midrule
+10  & 0.008 & 0.073 & 0.005 & 0.018 & 0.007 & 0.047 \\
+30  & 0.009 & 0.071 & 0.008 & 0.021 & 0.007 & 0.047 \\
+50  & 0.009 & 0.072 & 0.011 & 0.028 & 0.007 & 0.049 \\
+100 & 0.009 & 0.201 & 0.014 & 0.044 & \textbf{0.008} & \textbf{0.055} \\
+150 & 0.013 & 0.617 & 0.016 & 0.088 & \textbf{0.007} & \textbf{0.062} \\
+200 & 0.017 & \textbf{0.838} & 0.014 & \textbf{0.456} & \textbf{0.008} & \textbf{0.109} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{The hybrid is the geometry-quality winner at high noise.}
+At 200 pm: hybrid p95 is **7.7$\times$ tighter than Sella** (0.109
+vs 0.838 Å) and **4.2$\times$ tighter than plain GAD** (0.109 vs 0.456
+Å). Median is 2$\times$ tighter than both. This is the only axis where
+the hybrid beats plain GAD --- the Newton phase crushes the geometry
+even when the basin is otherwise the same. Source:
+\texttt{analysis\_2026\_04\_29/rmsd\_to\_known\_ts\_compare.csv}.
+
+\paragraph{Mechanistic implication.} Sella's wide tail at 200 pm
+(p95=0.838 Å) reflects its TS-BFGS sometimes "converging" at
+graph-isomorphic but geometrically displaced saddles. The hybrid's
+Newton phase --- when it fires correctly under eigenvalue-switch +
+Eckart projection --- pins the TS within $\sim$0.1 Å of the labelled
+geometry consistently.
+
+% =================================================================
+\section*{Strict-RMSD chemistry validation (IRC RMSD-intended sibling of TOPO)}
+% =================================================================
+
+IRC TOPO is permissive (graph isomorphism: bonds match). IRC
+RMSD-intended is strict (Kabsch + Hungarian RMSD $<0.3$ Å to known
+reactant/product). The crossover pattern (Sella collapses at high
+noise; plain GAD and hybrid track) is the same on both axes.
+
+\begin{center}\small
+\textbf{IRC RMSD-intended \% (strict 0.3 Å)}\\[0.4em]
+\begin{tabular}{l|cccccc}
+\toprule
+\textbf{method} & 10 pm & 30 pm & 50 pm & 100 pm & 150 pm & 200 pm \\
+\midrule
+Plain GAD dt=0.005     & 46.3 & 46.7 & 45.6 & 40.1 & 31.4 & 21.3 \\
+Sella libdef           & 45.6 & 46.3 & 44.6 & 36.6 & 24.7 & 10.1 \\
+Hybrid Eckart damped tr=0.05 & 46.0 & 46.0 & 44.9 & 37.6 & 28.2 & 18.1 \\
+\midrule
+\emph{Hybrid $-$ Sella} & $+0.4$ & $-0.3$ & $+0.3$ & $+1.0$ & $+3.5$ & \textbf{$+8.0$} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The hybrid trails plain GAD by 1--3 pp on RMSD-intended (same direction
+as TOPO) and beats Sella by widening margins (1 pp at 100 pm → 8 pp at
+200 pm). Same crossover signature as TOPO, validated by a stricter
+metric. Source:
+\texttt{analysis\_2026\_04\_29/hybrid\_irc\_full\_diagnostics.csv}.
+
+% =================================================================
 \section*{Configuration recommendation matrix}
 % =================================================================
 
@@ -992,6 +1064,51 @@ molecules, the \textbf{hybrid Eckart damped with eigenvalue-switch and
 tr=0.05} is the right default. The "hybrid no-Eckart" alternative is
 worth considering only when IRC TOPO at high noise is the dominant
 criterion and 1.6$\times$ extra wall time is acceptable.
+
+% =================================================================
+\section*{Appendix --- trajectory-level diagnostics (catalog references)}
+% =================================================================
+
+The following diagnostics are documented in full in
+\texttt{HYBRID\_FINDINGS\_CATALOG.md} (project root). One-line summary
+each; see the catalog for tables, sources, and mechanism discussion.
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.2em]
+\item \textbf{Step-size distributions} (§6.3). Newton steps are
+  3--18$\times$ larger than GAD steps (18$\times$ at 10 pm; 3.5$\times$
+  at 200 pm). p95 step hits the trust radius (0.05 Å) on a large
+  fraction of Newton steps. \texttt{hybrid\_step\_size\_stats.csv}.
+\item \textbf{Time-to-first-Newton} (§6.5a). Scales linearly with
+  noise: median step 0 (10 pm) $\to$ 91 (200 pm). The Newton-landing
+  phase itself is bounded ($\sim$4--18 steps regardless of noise);
+  all noise scaling lives in the GAD-walking phase.
+  \texttt{hybrid\_time\_to\_first\_newton.csv}.
+\item \textbf{Morse-1 retention} (§6.5c0). Hybrid spends 23--81\% of
+  trajectory steps in $n_\text{neg}=1$ across noise; plain GAD spends
+  70--98\%. The hybrid's Newton phase steers the trajectory through
+  $n_\text{neg}=2,3$ territory between landings.
+  \texttt{hybrid\_morse1\_retention.csv}.
+\item \textbf{TOPO vs RMSD-intended disagreement} (§6.5). TOPO is
+  consistently ~2$\times$ more permissive than RMSD-intended across
+  all three families; the disagreement fraction is identical across
+  methods (no method-specific bias).
+  \texttt{irc\_criteria\_disagreement.csv}.
+\item \textbf{IRC endpoint stability} (§3.4b). All three families have
+  similar IRC endpoint instability ($\sim$17--21\% any-unstable) ---
+  the hybrid is marginally better at 200 pm ($-$1.9 pp vs Sella) but
+  not "half as unstable" as an early version of the catalog claimed
+  (corrected 2026-05-10).
+  \texttt{hybrid\_irc\_full\_diagnostics.csv}.
+\item \textbf{Force descent ``Newton cliff''} (§6.5b figure
+  \texttt{fig\_descent\_hybrid\_vs\_gad.pdf}, included above).
+  The Newton phase produces a visible cliff in the median $f_{\max}$
+  curve where the trajectory crosses the convergence threshold in
+  1--3 steps; plain GAD asymptotes from above.
+\item \textbf{Wrong-saddle rate scaling} (§6.5c, figure
+  \texttt{fig\_failure\_modes\_across\_noise.pdf}, included above).
+  Hybrid wrong-saddle rate grows from 2.4\% (10 pm) to 44\% (200 pm)
+  vs plain GAD's 1.4\% to 25\%. Partly recovered by IRC.
+\end{itemize}
 
 % =================================================================
 \section*{Sources for every number}
