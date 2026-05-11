@@ -256,75 +256,95 @@ print("Wrote fig_main_4axis")
 
 # ────────────────────────────────────────────────────────────────────────
 # Pareto scatter: wall/conv vs IRC TOPO per noise (6 panels)
+# - No per-point text annotations (collide); use a shared legend instead.
+# - Methods get short codes; family color encodes group; marker = config.
 # ────────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(2, 3, figsize=(18, 10), sharey=True)
+SHORT = {
+    "GAD dt=0.003": "G003", "GAD dt=0.005": "G005", "GAD dt=0.007": "G007",
+    "Sella libdef (cart+Eckart)": "S-libdef", "Sella default (cart no-Eckart)": "S-default",
+    "Sella internal (lib default)": "S-internal", "Sella libdef Hess-freq d=3": "S-d3",
+    "Hybrid damped Eckart eig tr=0.05": "H-damp", "Hybrid undamped Eckart eig tr=0.05": "H-undamp",
+}
+
+fig, axes = plt.subplots(2, 3, figsize=(20, 11), sharey=True)
 noises = [10, 30, 50, 100, 150, 200]
+legend_handles = {}
 for ax, noise in zip(axes.flat, noises):
     sub = master[master["noise_pm"] == noise].copy()
     sub = sub.dropna(subset=["wall_per_conv", "topo_pct"])
     for (family, config), grp in sub.groupby(["family", "config"], sort=False):
         for _, r in grp.iterrows():
-            sz = max(80, 8 * float(r["conv_pct"]))   # raw conv → bubble size
-            ax.scatter(r["wall_per_conv"], r["topo_pct"], s=sz,
+            sz = max(120, 12 * float(r["conv_pct"]))
+            h = ax.scatter(r["wall_per_conv"], r["topo_pct"], s=sz,
                        marker=CONFIG_MARKER[config],
                        color=per_config_color(config, family),
-                       edgecolor="black", linewidth=0.6, alpha=0.85,
-                       label=config if noise == 10 else None)
-            ax.annotate(config.replace("Hybrid ", "H ")
-                        .replace("Sella ", "S ").replace("GAD ", "G "),
-                        xy=(r["wall_per_conv"], r["topo_pct"]),
-                        xytext=(5, 5), textcoords="offset points",
-                        fontsize=7, alpha=0.75)
+                       edgecolor="black", linewidth=0.6, alpha=0.85)
+            if config not in legend_handles:
+                legend_handles[config] = h
     ax.set_xscale("log")
     ax.set_xlabel("Wall-time per converged TS (s, log)")
     if ax in axes[:, 0]:
         ax.set_ylabel("IRC TOPO-intended %")
-    ax.set_title(f"{noise} pm noise")
-    ax.set_ylim(0, 100); ax.grid(alpha=0.3, which="both")
-fig.suptitle("Pareto plane per noise — IRC TOPO % vs wall/conv (lower-right = bad; upper-left = great)\n"
-             "Bubble size $\\propto$ raw conv %", y=1.02, fontsize=14)
-fig.tight_layout()
+    ax.set_title(f"{noise} pm noise", fontsize=13)
+    ax.set_ylim(0, 100)
+    ax.grid(alpha=0.3, which="both")
+# Single legend below
+fig.legend(legend_handles.values(), legend_handles.keys(),
+           loc="lower center", ncol=3, fontsize=10,
+           bbox_to_anchor=(0.5, -0.05), frameon=False)
+fig.suptitle("Pareto plane per noise: IRC TOPO % vs wall/conv  (upper-left = great; lower-right = bad)\n"
+             "Bubble size $\\propto$ raw conv %",
+             y=1.0, fontsize=14)
+fig.tight_layout(rect=[0, 0.03, 1, 0.97])
 fig.savefig(f"{OUT}/fig_pareto_per_noise.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_pareto_per_noise.png", bbox_inches="tight", dpi=140)
+plt.close(fig)
 print("Wrote fig_pareto_per_noise")
 
 
 # ────────────────────────────────────────────────────────────────────────
-# Lollipop ranking per noise (6 panels): wall/conv ascending, head color = IRC TOPO
+# Lollipop ranking per noise: 6 panels stacked vertically — much more width
+# - One TALL figure: 6 rows × 1 col, each row is wide and tall enough for labels
+# - Annotations to the right with consistent x-offset (no log-multiplier)
 # ────────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-for ax, noise in zip(axes.flat, noises):
+# Save each noise as its own subfigure with generous height per row.
+# Total figure: 18 wide × 4 per row × 6 rows = 24" tall, no clipping.
+fig, axes = plt.subplots(6, 1, figsize=(18, 30))
+cmap = plt.cm.RdYlGn
+for ax, noise in zip(axes, noises):
     sub = master[master["noise_pm"] == noise].copy()
-    sub = sub.dropna(subset=["wall_per_conv"]).sort_values("wall_per_conv")
-    sub = sub.reset_index(drop=True)
-    cmap = plt.cm.RdYlGn  # red=bad TOPO, green=good TOPO
+    sub = sub.dropna(subset=["wall_per_conv"]).sort_values("wall_per_conv").reset_index(drop=True)
     for i, r in sub.iterrows():
         topo = r["topo_pct"] if not np.isnan(r["topo_pct"]) else None
         color = cmap(min(max((topo or 0) / 100, 0), 1)) if topo is not None else "lightgray"
-        ax.hlines(y=i, xmin=0, xmax=r["wall_per_conv"], color=color, lw=4, alpha=0.6)
-        ax.scatter(r["wall_per_conv"], i, s=300, color=color,
-                   edgecolor="black", linewidth=1, zorder=5)
-        # Annotate with TOPO/raw conv
-        anno = f"TOPO {topo:.0f}%" if topo is not None else "TOPO --"
-        anno += f"  raw {r['conv_pct']:.0f}%"
-        ax.text(r["wall_per_conv"] * 1.08, i, anno, va="center", fontsize=8)
+        ax.hlines(y=i, xmin=0, xmax=r["wall_per_conv"], color=color, lw=8, alpha=0.55)
+        ax.scatter(r["wall_per_conv"], i, s=500, color=color,
+                   edgecolor="black", linewidth=1.2, zorder=5)
+        topo_str = f"{topo:.0f}%" if topo is not None else "n/a"
+        # Two-line annotation reads cleanly
+        anno = f"IRC TOPO {topo_str}\nraw {r['conv_pct']:.0f}%   wall {r['wall_per_conv']:.1f}s"
+        ax.text(r["wall_per_conv"] * 1.18, i, anno, va="center", ha="left", fontsize=11)
     ax.set_yticks(range(len(sub)))
-    ax.set_yticklabels([c.replace("Hybrid ", "H ").replace("Sella ", "S ").replace("GAD ", "G ")
-                         for c in sub["config"]], fontsize=8)
+    ax.set_yticklabels([SHORT.get(c, c) for c in sub["config"]], fontsize=12)
     ax.invert_yaxis()
     ax.set_xscale("log")
-    ax.set_xlabel("Wall-time per converged TS (s, log)")
-    ax.set_title(f"{noise} pm noise — methods ranked by wall (top = fastest)")
+    # Plenty of right-side room for the annotations
+    xmin = sub["wall_per_conv"].min()
+    xmax = sub["wall_per_conv"].max()
+    ax.set_xlim(xmin / 2.5, xmax * 50)
+    ax.set_xlabel("Wall-time per converged TS (s, log)" if noise == 200 else "", fontsize=12)
+    ax.set_title(f"{noise} pm noise (top row = fastest)", fontsize=14, loc="left", pad=8)
     ax.grid(alpha=0.3, which="both", axis="x")
-# Add a colorbar
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=100))
 sm.set_array([])
-cbar = fig.colorbar(sm, ax=list(axes.flat), fraction=0.02, pad=0.04, orientation="vertical")
-cbar.set_label("IRC TOPO %", fontsize=9)
-fig.suptitle("Ranking by wall-time per converged TS  •  head color = IRC TOPO\n"
-             "Fast + green = best; slow + red = worst", y=1.00, fontsize=14)
+cbar = fig.colorbar(sm, ax=list(axes), fraction=0.015, pad=0.02, orientation="vertical")
+cbar.set_label("IRC TOPO % (gray = not measured)", fontsize=11)
+fig.suptitle("Method rankings by wall-time per converged TS  •  head color = IRC TOPO",
+             y=0.995, fontsize=16)
+fig.tight_layout(rect=[0, 0, 0.94, 0.985])
 fig.savefig(f"{OUT}/fig_ranking_lollipop.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_ranking_lollipop.png", bbox_inches="tight", dpi=140)
+plt.close(fig)
 print("Wrote fig_ranking_lollipop")
 
 
@@ -347,7 +367,7 @@ reps = {
 }
 rec_plot = recovery[recovery["config"].isin(reps.values())].copy()
 
-fig, ax = plt.subplots(figsize=(11, 4.6))
+fig, ax = plt.subplots(figsize=(13, 5.5))
 families = list(reps)
 families_x = np.arange(6)   # 6 noise levels
 w = 0.27
@@ -355,21 +375,23 @@ for i, fam in enumerate(families):
     sub = rec_plot[rec_plot["family"] == fam].sort_values("noise_pm")
     xs = np.array([noises.index(n) for n in sub["noise_pm"]]) + (i - 1) * w
     ys = sub["recovery_pp"].values
-    colors = [palette()[1] if v > 0 else palette()[3] for v in ys]  # green if positive, red if negative
     ax.bar(xs, ys, width=w, label=reps[fam],
            color=FAMILY_CMAP[fam], edgecolor="black", linewidth=0.5)
     for x_, y_ in zip(xs, ys):
-        ax.text(x_, y_ + (1.5 if y_ > 0 else -1.5), f"{y_:+.1f}",
-                ha="center", va="bottom" if y_ > 0 else "top", fontsize=8)
+        ax.text(x_, y_ + (0.4 if y_ > 0 else -0.4), f"{y_:+.1f}",
+                ha="center", va="bottom" if y_ > 0 else "top", fontsize=9)
 ax.axhline(0, color="black", lw=0.8)
-ax.set_xticks(range(6)); ax.set_xticklabels([f"{n} pm" for n in noises])
-ax.set_ylabel("IRC TOPO − Raw conv (percentage points)")
-ax.set_title("Who gains from IRC chemistry validation?  Positive = IRC saves trajectories; negative = IRC catches wrong-saddle 'wins'")
+ax.set_xticks(range(6)); ax.set_xticklabels([f"{n} pm" for n in noises], fontsize=12)
+ax.set_ylabel("IRC TOPO $-$ Raw conv (percentage points)", fontsize=12)
+ax.set_title("Who gains from IRC chemistry validation?\n(Positive = IRC saves trajectories; negative = IRC catches wrong-saddle 'wins')",
+             fontsize=12)
 ax.grid(alpha=0.3, axis="y")
-ax.legend(loc="upper right", fontsize=9)
+ax.legend(loc="upper left", fontsize=10, framealpha=0.95)
+ax.set_ylim(-6, 12)
 fig.tight_layout()
 fig.savefig(f"{OUT}/fig_topo_recovery.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_topo_recovery.png", bbox_inches="tight", dpi=140)
+plt.close(fig)
 print("Wrote fig_topo_recovery")
 
 print("\nAll figures done")
