@@ -235,6 +235,9 @@ def _run_one_sample(args_tuple):
         "n_calculator_calls": int(getattr(calc, "n_calls", 0)),
         "wall_time_s": float(wall),
         "failure_type": err,
+        # Final geometry saved as a flat list so downstream IRC validation
+        # can pull TS coords directly from the summary parquet.
+        "final_coords_flat": atoms.positions.reshape(-1).astype(float).tolist(),
     }
 
 
@@ -245,6 +248,8 @@ def main():
     p.add_argument("--noise", type=float, default=1.0,
                    help="Gaussian RMS noise on TS in Angstrom. 1.0 A = 100 pm.")
     p.add_argument("--n-samples", type=int, default=5)
+    p.add_argument("--sample-indices", type=str, default=None,
+                   help="Comma-separated 0-indexed sample IDs. Overrides --n-samples.")
     p.add_argument("--max-steps", type=int, default=500)
     p.add_argument("--fmax", type=float, default=0.01)
     p.add_argument("--apply-eckart", action="store_true", default=True,
@@ -273,6 +278,10 @@ def main():
     print(f"Noise: {args.noise} A | Workers: {args.n_workers}")
     print(f"Output: {args.output_dir}")
 
+    if args.sample_indices:
+        indices = [int(x) for x in args.sample_indices.split(",") if x.strip()]
+    else:
+        indices = list(range(args.n_samples))
     task_args = [
         (
             i, args.h5, args.split, args.backend, args.method, args.noise,
@@ -281,7 +290,7 @@ def main():
             args.delta0, args.gamma, args.diag_every,
             args.output_dir, run_id,
         )
-        for i in range(args.n_samples)
+        for i in indices
     ]
 
     results = []

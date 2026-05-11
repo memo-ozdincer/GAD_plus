@@ -117,7 +117,7 @@ rmsd_df.to_csv(f"{CSV}/rmsd_distributions_2026_05_11.csv", index=False)
 
 
 # Plot CDFs — only converged samples
-fig, axes = plt.subplots(1, 3, figsize=(16, 4.6), sharey=True)
+fig, axes = plt.subplots(1, 3, figsize=(18, 5.5), sharey=True)
 PAL = {"plain GAD": palette()[1], "Sella": palette()[0], "hybrid": palette()[2]}
 for ax, noise in zip(axes, [10, 100, 200]):
     sub = rmsd_df[(rmsd_df["noise_pm"] == noise) & rmsd_df["converged"]]
@@ -130,19 +130,19 @@ for ax, noise in zip(axes, [10, 100, 200]):
     ax.set_xscale("log")
     ax.set_xlim(1e-3, 5)
     ax.axvline(0.3, ls="--", color="gray", alpha=0.6, lw=1)
-    ax.text(0.32, 0.05, "0.3 Å threshold", fontsize=8, color="gray")
-    ax.set_title(f"{noise} pm noise", fontsize=13)
-    ax.set_xlabel("RMSD to labelled T1x TS (Å, log)")
-    if noise == 10:
-        ax.set_ylabel("Cumulative fraction of converged samples")
+    ax.text(0.32, 0.05, "0.3 Å threshold", fontsize=9, color="gray")
+    ax.set_title(f"{noise} pm noise", fontsize=14)
+    ax.set_xlabel("RMSD to labelled T1x TS (Å, log)", fontsize=12)
+    ax.set_ylabel("Cumulative fraction" if noise == 10 else "", fontsize=12)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=9, loc="lower right")
+    ax.legend(fontsize=10, loc="lower right")
 fig.suptitle(
-    "RMSD distributions: distance from converged TS to labelled T1x TS\n"
-    "At high noise hybrid is dramatically tighter — Newton crushes the geometry where GAD plateaus and Sella sometimes jumps wrong",
-    y=1.04, fontsize=12,
+    "Distance from converged TS to labelled T1x TS  •  CDFs of converged samples\n"
+    "At high noise hybrid is dramatically tighter than both Sella (long right tail) and plain GAD",
+    y=1.02, fontsize=13,
 )
 fig.tight_layout()
 fig.savefig(f"{OUT}/fig_rmsd_to_ts.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_rmsd_to_ts.png", bbox_inches="tight", dpi=140)
+plt.close(fig)
 print(f"Wrote {OUT}/fig_rmsd_to_ts.pdf")

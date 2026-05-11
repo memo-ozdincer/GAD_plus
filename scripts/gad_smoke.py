@@ -83,7 +83,7 @@ def _run_one_sample(args_tuple):
     predict_fn = _build_predict_fn(backend, method)
 
     cfg = GADSearchConfig(
-        n_steps=n_steps, dt=dt, k_track=0, beta=1.0,
+        n_steps=n_steps, dt=dt, k_track=8, beta=1.0,
         use_projection=use_projection, use_adaptive_dt=False,
         force_threshold=force_threshold, force_criterion=force_criterion,
         purify_hessian=False,
@@ -132,6 +132,8 @@ def main():
     p.add_argument("--noise", type=float, default=1.0,
                    help="Gaussian RMS noise on TS, in Angstrom. 1.0 A = 100 pm.")
     p.add_argument("--n-samples", type=int, default=5)
+    p.add_argument("--sample-indices", type=str, default=None,
+                   help="Comma-separated 0-indexed sample IDs. Overrides --n-samples.")
     p.add_argument("--n-steps", type=int, default=500)
     p.add_argument("--dt", type=float, default=0.003)
     p.add_argument("--use-projection", action="store_true", default=True)
@@ -154,6 +156,10 @@ def main():
     print(f"Workers: {args.n_workers}")
     print(f"Output: {args.output_dir}")
 
+    if args.sample_indices:
+        indices = [int(x) for x in args.sample_indices.split(",") if x.strip()]
+    else:
+        indices = list(range(args.n_samples))
     task_args = [
         (
             i, args.h5, args.split, args.backend, args.method, args.noise,
@@ -161,7 +167,7 @@ def main():
             args.force_threshold, args.force_criterion,
             args.output_dir, run_id,
         )
-        for i in range(args.n_samples)
+        for i in indices
     ]
 
     results = []

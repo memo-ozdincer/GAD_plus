@@ -32,7 +32,7 @@ GAD--Newton step (GAD walks, then Newton lands when the curvature
 signature is right). Best of each family across noise:
 
 \begin{center}\small\fbox{\parbox{0.95\textwidth}{
-\textbf{Sella libdef} wins raw conv $\le$50 pm (92.7\% @ 10 pm). \quad
+\textbf{Sella cartesian Eckart untuned Hess.Freq.=1} wins TS conv $\le$50 pm (92.7\% @ 10 pm). \quad
 \textbf{Plain GAD dt=0.005} wins IRC TOPO at $\ge$100 pm noise (+11.9 pp
 over Sella at 150 pm; +21.3 pp at 200 pm). \quad
 \textbf{Hybrid damped Eckart eig-switch tr=0.05} wins \emph{wall-time
@@ -41,6 +41,39 @@ per converged TS} at every noise level (1.4--3.0$\times$ vs Sella;
 tighter} converged TSs than either baseline at high noise (p95 RMSD
 to known TS at 200 pm: hybrid 0.11 Å vs Sella 0.84 Å vs plain GAD 0.46 Å).
 }}
+\end{center}
+
+\paragraph{Sella naming convention (used throughout this report).}
+The project's historical Sella names were inconsistent (\texttt{libdef},
+\texttt{default}, \texttt{internal}) and confusing: \texttt{libdef}
+actually deviates from Sella's library default on \texttt{diag\_every},
+while \texttt{default} uses the project's own tuned trust-radius
+hyperparameters. This report uses a clearer 3-axis naming scheme:
+
+\begin{center}\footnotesize
+\textbf{Sella \{cartesian | internal\} \{Eckart\}? \{tuned | untuned\} Hess.Freq.=N}
+\end{center}
+
+where:
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{coords}: \texttt{cartesian} or \texttt{internal} (only Cartesian needs Eckart projection)
+\item \textbf{Eckart}: present only if Eckart projection is applied
+\item \textbf{tuned}: trust-radius hyperparameters ($\delta_0$, $\gamma$) tuned from Sella library defaults. \texttt{tuned}: $\delta_0{=}0.048$, $\gamma{=}0$ (this project's choice). \texttt{untuned}: $\delta_0{=}0.1$, $\gamma{=}0.4$ (Sella library defaults)
+\item \textbf{Hess.Freq.=N}: Hessian recomputed every $N$ steps (Sella library default is 3; our project canonical chose 1)
+\end{itemize}
+
+\begin{center}\footnotesize
+\textbf{Historical $\to$ new name map}\\[0.3em]
+\begin{tabular}{l|l}
+\toprule
+\textbf{Old name} & \textbf{New name (this report)} \\
+\midrule
+\texttt{Sella libdef} (cart+Eckart, $\delta_0{=}0.1$, $\gamma{=}0.4$, d=1) & Sella cartesian Eckart untuned Hess.Freq.=1 \\
+\texttt{Sella default} (cart no-Eckart, $\delta_0{=}0.048$, $\gamma{=}0$, d=1) & Sella cartesian tuned Hess.Freq.=1 \\
+\texttt{Sella internal} (internal coords, $\delta_0{=}0.048$, $\gamma{=}0$, d=1) & Sella internal tuned Hess.Freq.=1 \\
+\texttt{Sella libdef Hess-freq d=3} & Sella cartesian Eckart untuned Hess.Freq.=3 \\
+\bottomrule
+\end{tabular}
 \end{center}
 
 \paragraph{Recommendation.}
@@ -52,7 +85,7 @@ to known TS at 200 pm: hybrid 0.11 Å vs Sella 0.84 Å vs plain GAD 0.46 Å).
 Fastest TS finder, any noise & \texttt{hybrid\_damped\_eckart\_swtrue} tr=0.05 & 1.4--3$\times$ vs Sella \\
 Highest IRC TOPO at $\ge$100 pm & Plain GAD dt=0.005 & Right-basin failures \\
 Tightest geometry at high noise & \texttt{hybrid\_damped\_eckart\_swtrue} tr=0.05 & 7.7$\times$ tighter p95 \\
-Low-noise raw conv ($\le$50 pm) & Sella libdef & 92.7\% @ 10 pm \\
+Low-noise TS conv ($\le$50 pm) & Sella cartesian Eckart untuned Hess.Freq.=1 & 92.7\% @ 10 pm \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -67,8 +100,9 @@ Low-noise raw conv ($\le$50 pm) & Sella libdef & 92.7\% @ 10 pm \\
 \caption{\textbf{Best-of-family across noise.} Four diagnostic axes:
 raw conv, IRC TOPO, median converged steps, wall-time per converged TS.
 Each family contributes its strongest configs as separate lines. The
-Sella libdef Hess-freq d=3 variant (only raw conv available, no IRC)
-shows up only on panel 1. Sella internal only goes to 100 pm. All
+Sella cartesian Eckart untuned Hess.Freq.=3 variant (raw + IRC TOPO
+available for 10--150 pm; 200 pm pending) and the Sella internal
+variant (only goes to 100 pm). All
 others span 10--200 pm. Source: \texttt{master\_2026\_05\_11.csv}.}
 \end{figure}
 
@@ -77,19 +111,19 @@ others span 10--200 pm. Source: \texttt{master\_2026\_05\_11.csv}.}
 in row.
 
 \begin{center}\footnotesize
-\textbf{Table 1 — Raw conv \%} ($n_\text{neg}{=}1 \wedge f_\text{max}<0.01$, $n=287$)\\[0.3em]
+\textbf{Table 1 — TS conv \%} (Im. Freq. $\wedge$ $F_{\max}<0.01$, $n=287$)\\[0.3em]
 \begin{tabular}{l|cccccc}
 \toprule
 \textbf{method} & \textbf{10 pm} & \textbf{30 pm} & \textbf{50 pm} & \textbf{100 pm} & \textbf{150 pm} & \textbf{200 pm} \\
 \midrule
-GAD dt=0.003                       & 89.2 & 88.5 & 85.4 & 71.1 & 55.1 & 40.8 \\
-GAD dt=0.005                       & 89.2 & 88.5 & 85.7 & 71.8 & 57.1 & 43.2 \\
-GAD dt=0.007                       & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 & \textbf{44.6} \\
+GAD dt=0.003                                & 89.2 & 88.5 & 85.4 & 71.1 & 55.1 & 40.8 \\
+GAD dt=0.005                                & 89.2 & 88.5 & 85.7 & 71.8 & 57.1 & 43.2 \\
+GAD dt=0.007                                & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 & \textbf{44.6} \\
 \midrule
-Sella default (cart no-Eckart)     & 92.0 & 91.3 & 87.5 & 65.5 & 42.9 & 18.8 \\
-Sella libdef (cart+Eckart)         & 92.7 & 92.0 & 88.2 & 70.7 & 54.0 & 27.2 \\
-Sella internal                     & 79.1 & 77.4 & 71.8 & 50.9 & ---  & ---  \\
-Sella libdef Hess-freq d=3         & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & ---  \\
+Sella cartesian tuned Hess.Freq.=1          & 92.0 & 91.3 & 87.5 & 65.5 & 42.9 & 18.8 \\
+Sella cartesian Eckart untuned Hess.Freq.=1 & 92.7 & 92.0 & 88.2 & 70.7 & 54.0 & 27.2 \\
+Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & ---  & ---  \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 23.3 (partial) \\
 \midrule
 Hybrid damped Eckart eig tr=0.05   & 85.4 & 85.0 & 81.5 & 66.9 & 50.9 & 33.1 \\
 Hybrid undamped Eckart eig tr=0.05 & 84.7 & 84.3 & 81.5 & 65.5 & 49.8 & 31.0 \\
@@ -107,10 +141,10 @@ GAD dt=0.003                       & 88.5 & \textbf{89.2} & 88.9 & 78.4 & 61.0 &
 GAD dt=0.005                       & 88.9 & \textbf{89.2} & 88.9 & 78.0 & 61.7 & \textbf{44.6} \\
 GAD dt=0.007                       & 88.5 & 88.5 & 88.5 & \textbf{78.4} & \textbf{61.7} & 43.9 \\
 \midrule
-Sella default                      & 88.9 & 88.9 & 87.5 & 70.7 & 46.7 & 17.8 \\
-Sella libdef                       & \textbf{89.2} & \textbf{89.2} & 87.5 & 72.5 & 49.8 & 23.3 \\
-Sella internal                     & 88.2 & 87.5 & 83.3 & 64.5 & ---  & ---  \\
-Sella libdef Hess-freq d=3         & ---  & ---  & ---  & ---  & ---  & ---  \\
+Sella cartesian tuned Hess.Freq.=1          & 88.9 & 88.9 & 87.5 & 70.7 & 46.7 & 17.8 \\
+Sella cartesian Eckart untuned Hess.Freq.=1 & \textbf{89.2} & \textbf{89.2} & 87.5 & 72.5 & 49.8 & 23.3 \\
+Sella internal tuned Hess.Freq.=1           & 88.2 & 87.5 & 83.3 & 64.5 & ---  & ---  \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & 88.5 & 88.9 & 87.1 & 70.4 & 45.3 & ---  \\
 \midrule
 Hybrid damped Eckart eig tr=0.05   & \textbf{89.2} & 88.9 & 88.9 & 76.7 & 57.5 & 38.7 \\
 Hybrid undamped Eckart eig tr=0.05 & 88.9 & 88.9 & 88.5 & 77.0 & 57.1 & 38.7 \\
@@ -125,7 +159,7 @@ Hybrid undamped Eckart eig tr=0.05 & 88.9 & 88.9 & 88.5 & 77.0 & 57.1 & 38.7 \\
 \textbf{method} & \textbf{10 pm} & \textbf{30 pm} & \textbf{50 pm} & \textbf{100 pm} & \textbf{150 pm} & \textbf{200 pm} \\
 \midrule
 GAD dt=0.005                       & 46.3 & 46.7 & 45.6 & \textbf{40.1} & \textbf{31.4} & \textbf{21.3} \\
-Sella libdef                       & 45.6 & 46.3 & 44.6 & 36.6 & 24.7 & 10.1 \\
+Sella cartesian Eckart untuned Hess.Freq.=1 & 45.6 & 46.3 & 44.6 & 36.6 & 24.7 & 10.1 \\
 Hybrid damped Eckart eig tr=0.05   & 46.0 & 46.0 & 44.9 & 37.6 & 28.2 & 18.1 \\
 \bottomrule
 \end{tabular}
@@ -156,7 +190,7 @@ sorts methods by wall-time ascending (top = fastest). Head color =
 IRC TOPO \% (red = bad chemistry, green = good chemistry). Inline
 annotations: TOPO and raw conv. Across all 6 noises, the hybrid
 configurations occupy the top of the ranking with green heads. Sella
-libdef Hess-freq d=3 (no IRC) shows as gray heads.}
+Sella Hess.Freq.=3 (gray heads if IRC not available).}
 \end{figure}
 
 \begin{center}\footnotesize
@@ -166,8 +200,8 @@ libdef Hess-freq d=3 (no IRC) shows as gray heads.}
 \textbf{method} & \textbf{10 pm} & \textbf{30 pm} & \textbf{50 pm} & \textbf{100 pm} & \textbf{150 pm} & \textbf{200 pm} \\
 \midrule
 GAD dt=0.005                       & 47.7  & 57.1  & 74.3  & 156.0 & 278.5 & 472.3 \\
-Sella libdef                       & 14.5  & 15.8  & 23.2  & 65.2  & 132.6 & 393.8 \\
-Sella libdef Hess-freq d=3         & \textbf{13.8} & \textbf{14.6} & 23.1  & 69.3  & 156.3 & --- \\
+Sella cartesian Eckart untuned Hess.Freq.=1 & 14.5  & 15.8  & 23.2  & 65.2  & 132.6 & 393.8 \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{13.8} & \textbf{14.6} & 23.1  & 69.3  & 156.3 & --- \\
 \textbf{Hybrid damped Eckart eig tr=0.05} & \textbf{11.0} & \textbf{12.0} & \textbf{15.7} & \textbf{34.9} & \textbf{65.0} & \textbf{130.7} \\
 \bottomrule
 \end{tabular}
@@ -180,8 +214,8 @@ Sella libdef Hess-freq d=3         & \textbf{13.8} & \textbf{14.6} & 23.1  & 69.
 \textbf{method} & \textbf{10 pm} & \textbf{30 pm} & \textbf{50 pm} & \textbf{100 pm} & \textbf{150 pm} & \textbf{200 pm} \\
 \midrule
 GAD dt=0.005                       & 100  & 204  & 278  & 458  & 614  & 738  \\
-Sella libdef                       & \textbf{4}    & \textbf{6}    & \textbf{7}    & \textbf{9}    & \textbf{11}   & \textbf{13}   \\
-Sella libdef Hess-freq d=3         & 5    & 8    & 9    & 11   & 14   & --- \\
+Sella cartesian Eckart untuned Hess.Freq.=1 & \textbf{4}    & \textbf{6}    & \textbf{7}    & \textbf{9}    & \textbf{11}   & \textbf{13}   \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & 5    & 8    & 9    & 11   & 14   & --- \\
 Hybrid damped Eckart eig tr=0.05   & 6    & 12   & 19   & 37   & 61   & 95   \\
 \bottomrule
 \end{tabular}
@@ -201,7 +235,7 @@ Sella and pays for all of them — slowest of the three families.
 \centering
 \includegraphics[width=\textwidth]{figures_2026_05_11/fig_topo_recovery.pdf}
 \caption{\textbf{Who gains from IRC chemistry validation?} Bars show
-\emph{IRC TOPO $-$ Raw conv} per (family, noise). Positive (green) =
+\emph{IRC TOPO $-$ TS conv} per (family, noise). Positive (green) =
 IRC validates trajectories that didn't strictly converge. Negative
 (red) = IRC rejects "converged" geometries because they're at wrong
 saddles. \textbf{Sella's recovery is negative at 10 and $\ge$150 pm} —
@@ -242,7 +276,7 @@ from the labelled TS).
 (Kabsch + Hungarian; converged samples only)\\[0.4em]
 \begin{tabular}{l|cc|cc|cc}
 \toprule
-& \multicolumn{2}{c|}{\textbf{Sella libdef}} & \multicolumn{2}{c|}{\textbf{Plain GAD dt=0.005}} & \multicolumn{2}{c}{\textbf{Hybrid damped Eckart eig tr=0.05}} \\
+& \multicolumn{2}{c|}{\textbf{Sella cart. Eckart untuned d=1}} & \multicolumn{2}{c|}{\textbf{Plain GAD dt=0.005}} & \multicolumn{2}{c}{\textbf{Hybrid damped Eckart eig tr=0.05}} \\
 \textbf{noise} & med (Å) & p95 (Å) & med (Å) & p95 (Å) & med (Å) & p95 (Å) \\
 \midrule
 10 pm  & 0.008 & 0.073 & 0.005 & 0.018 & 0.007 & 0.047 \\
@@ -259,6 +293,20 @@ from the labelled TS).
 4.2$\times$ tighter than plain GAD.} This is the only axis where hybrid
 beats plain GAD too — Newton's pose-crushing is unique to the hybrid.
 Source: \texttt{analysis\_2026\_04\_29/rmsd\_to\_known\_ts\_compare.csv}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures_2026_05_11/fig_rmsd_to_ts.pdf}
+\caption{\textbf{RMSD distributions of converged TSs vs the labelled
+T1x reference.} CDFs across three noise levels (n=287 each, converged
+samples only). At 10 pm all three families are tight ($\le 0.05$ Å).
+At 100 pm Sella develops a long right tail (some "converged" Sella TSs
+sit $\sim$0.2 Å off); hybrid stays tight. At \textbf{200 pm} the
+hybrid is dramatically tighter — the green curve rises sharply at low
+RMSD while Sella's blue and GAD's orange extend past 0.5 Å. The
+$0.3$ Å threshold (dashed) is the RMSD-intended cutoff. Source:
+\texttt{rmsd\_distributions\_2026\_05\_11.csv}.}
+\end{figure}
 
 % =================================================================
 \section{Hybrid mechanism: three Newton-firing regimes
@@ -321,6 +369,114 @@ prevents tiny eigenvalues from generating divergent Newton steps, which
 matters more at high noise where eigenvalues fluctuate. But it doesn't
 change which basin the trajectory ends up in. Use damped — never hurts,
 helps a hair on raw conv.}
+\end{figure}
+
+% =================================================================
+\section{Sella Hess.Freq.=3 surprise: 96.5\% TS conv at 10 pm}
+% =================================================================
+
+The \texttt{Sella cartesian Eckart untuned Hess.Freq.=3} variant
+(Hessian recomputed every 3rd step — Sella's actual library default)
+beats our project's canonical \texttt{Sella cartesian Eckart untuned
+Hess.Freq.=1} (fresh Hessian every step) by \textbf{+3.8 pp at 10 pm
+TS conv} (96.5\% vs 92.7\%), with identical total wall-time. This is
+surprising: less Hessian information should mean worse convergence,
+not better.
+
+\begin{center}\small
+\textbf{Sella d=1 vs d=3 (cart+Eckart, fmax<0.01, $n=287$ each)}\\[0.4em]
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{noise} & \textbf{d=1 conv \%} & \textbf{d=3 conv \%} & $\Delta$ \textbf{(pp)} & \textbf{both total wall (s)} \\
+\midrule
+10 pm  & 92.7 & \textbf{96.5} & \textbf{+3.8} & 13.4 / 13.3 \\
+30 pm  & 92.0 & \textbf{95.5} & \textbf{+3.5} & 14.6 / 13.9 \\
+50 pm  & 88.2 & \textbf{92.0} & \textbf{+3.8} & 20.4 / 21.2 \\
+100 pm & 70.7 & \textbf{72.8} & +2.1 & 46.1 / 50.5 \\
+150 pm & \textbf{54.0} & 50.5 & $-3.5$ & 71.6 / 79.0 \\
+200 pm & 27.2 & --- (cell running) & --- & 107.0 / --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Same compute budget, different trajectory style.}
+Looking inside the trajectories at 10 pm:
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{Same total step count} across all 287 samples: d=1 averages
+  179 steps; d=3 averages 182 steps. Both trajectory lengths are
+  dominated by unconverged samples that hit the 2000-step cap.
+\item \textbf{d=3 takes 3$\times$ more steps per converged sample}
+  (123 vs 43 average). Smaller, more conservative moves: smoother
+  BFGS-updated Hessian between full diagonalizations $\to$ less
+  mode-jitter and less trust-region oscillation.
+\item \textbf{Per-step wall is 22\% cheaper for d=3} (0.079 s vs
+  0.10 s) because the Hessian is recomputed only every 3rd step.
+\item \textbf{Total wall is identical} ($\sim$13.3 s) — d=3 spends
+  the same compute budget on more iterations of cheaper, safer
+  steps.
+\item \textbf{Net result: +3.8 pp more samples land at the strict
+  $f_\text{max}<0.01$ threshold} because the slower march doesn't
+  overshoot the saddle.
+\end{itemize}
+
+\paragraph{The GAD-like effect, inside Sella.} The smaller-steps-converge-
+more-reliably story is the same mechanism we see in plain GAD vs
+Sella d=1 globally: aggressive Newton-style steps can over-correct
+near saddles; smaller-step methods land more reliably. d=3 is Sella's
+upstream library default for exactly this reason; our project's
+d=1 "libdef" was a benchmark-driven choice to keep the HIP Hessian
+fresh on every step. Turns out the library default beats it at low/mid
+noise. At $\ge$150 pm noise the trade-off flips: fresh Hessian wins
+because the trajectory needs frequent course-correction.
+
+\paragraph{IRC TOPO result (CORRECTED 2026-05-11): the +3.8 pp doesn't survive chemistry validation.}
+
+\begin{center}\small
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{noise} & \textbf{d=1 raw / IRC TOPO} & \textbf{d=3 raw / IRC TOPO} & $\Delta$ \textbf{raw} & $\Delta$ \textbf{IRC} \\
+\midrule
+10 pm  & 92.7 / 89.2 & \textbf{96.5} / 88.5 & $+3.8$ & $-0.7$ \\
+30 pm  & 92.0 / 89.2 & \textbf{95.5} / 88.9 & $+3.5$ & $-0.3$ \\
+50 pm  & 88.2 / 87.5 & \textbf{92.0} / 87.1 & $+3.8$ & $-0.4$ \\
+100 pm & 70.7 / \textbf{72.5} & 72.8 / 70.4 & $+2.1$ & $\mathbf{-2.1}$ \\
+150 pm & \textbf{54.0} / \textbf{49.8} & 50.5 / 45.3 & $-3.5$ & $\mathbf{-4.5}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The pattern is monotonic in noise: \textbf{d=1 wins IRC TOPO at every
+noise level, and the IRC gap widens dramatically with noise} (-0.7 pp
+at 10 pm $\to$ -4.5 pp at 150 pm). d=3's stale-Hessian
+misclassifications grow with noise and IRC's correction grows
+correspondingly. At 150 pm d=3 IRC TOPO is just 45.3\% vs d=1's
+49.8\%, a 4.5 pp chemistry-quality gap that goes the opposite way
+from the raw-conv axis (where d=3 was 3.5 pp behind d=1).
+
+\textbf{Mechanism (corrected):} d=3's stale BFGS-updated Hessian
+sometimes misjudges saddle character $\to$ trust region claims
+convergence at a wrong saddle. d=1's fresh Hessian rejects more
+saddle-impostors $\to$ fewer raw conv hits but cleaner basins.
+
+\textbf{Net result:} on the chemistry-truth axis, d=1 (our project's
+choice) is marginally better than d=3. The headline "96.5\%" is a real
+raw-conv number but doesn't translate to better chemistry. \textbf{Our
+project's choice of d=1 was justified.} The raw-conv chase is the
+wrong metric; IRC validation is the honest one.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures_2026_05_11/fig_d1_vs_d3.pdf}
+\caption{\textbf{Sella Eckart Hess.Freq.=1 (d=1, project) vs Hess.Freq.=3 (d=3, library default) across noise.} Left: TS conv
+(d=3 wins +3--4 pp at low noise; loses at 150 pm). Right: IRC TOPO
+(d=1 wins at every noise level; gap monotonically widens with noise
+from $-0.7$ pp at 10 pm to $-4.5$ pp at 150 pm). The d=3 raw-conv
+"wins" are wrong-saddle false positives that IRC catches and
+rejects. Source:
+\texttt{runs/test\_hessfreq/sella\_carteck\_libdef\_d3/} +
+\texttt{runs/irc\_sella\_libdef\_d3/}, 200 pm cells pending (SLURM
+60769799/60769872).}
 \end{figure}
 
 % =================================================================

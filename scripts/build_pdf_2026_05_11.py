@@ -111,17 +111,17 @@ for dt_tag, label in [("dt003", "GAD dt=0.003"), ("dt005", "GAD dt=0.005"), ("dt
 # 2) Sella variants — canonical libdef/default/internal from test_summary_full + IRC dirs
 # ────────────────────────────────────────────────────────────────────────
 sella_raw = [
-    sella_from_csv("Sella libdef",   "Sella libdef (cart+Eckart)"),
-    sella_from_csv("Sella default",  "Sella default (cart no-Eckart)"),
-    sella_from_csv("Sella internal", "Sella internal (lib default)"),
+    sella_from_csv("Sella libdef",   "Sella cartesian Eckart untuned Hess.Freq.=1"),
+    sella_from_csv("Sella default",  "Sella cartesian tuned Hess.Freq.=1"),
+    sella_from_csv("Sella internal", "Sella internal tuned Hess.Freq.=1"),
 ]
 sella_irc = [
     grab_irc(f"{RUNS}/test_irc/sella_carteck_libdef/irc_validation_*.parquet",
-             "Sella", "Sella libdef (cart+Eckart)"),
+             "Sella", "Sella cartesian Eckart untuned Hess.Freq.=1"),
     grab_irc(f"{RUNS}/test_irc/sella_carteck_default/irc_validation_*.parquet",
-             "Sella", "Sella default (cart no-Eckart)"),
+             "Sella", "Sella cartesian tuned Hess.Freq.=1"),
     grab_irc(f"{RUNS}/test_irc/sella_internal_default/irc_validation_*.parquet",
-             "Sella", "Sella internal (lib default)"),
+             "Sella", "Sella internal tuned Hess.Freq.=1"),
 ]
 
 # Sella libdef with d=3 (Hessian every 3 steps) — raw conv only, no IRC
@@ -140,7 +140,7 @@ sella_d3 = duckdb.execute(f"""
 sella_d3["conv_pct"]      = 100 * sella_d3["nc"] / sella_d3["n"]
 sella_d3["wall_per_conv"] = sella_d3["sw"] / sella_d3["nc"].replace(0, np.nan)
 sella_d3["family"]        = "Sella"
-sella_d3["config"]        = "Sella libdef Hess-freq d=3"
+sella_d3["config"]        = "Sella cartesian Eckart untuned Hess.Freq.=3"
 sella_raw.append(sella_d3[["family", "config", "noise_pm", "conv_pct", "med_step", "wall_per_conv"]])
 
 
@@ -194,15 +194,15 @@ print(master.round(2).to_string(index=False))
 # ────────────────────────────────────────────────────────────────────────
 FAMILY_CMAP = {"plain GAD": palette()[1], "Sella": palette()[0], "hybrid": palette()[2]}
 CONFIG_MARKER = {
-    "GAD dt=0.003":                       "o",
-    "GAD dt=0.005":                       "s",
-    "GAD dt=0.007":                       "D",
-    "Sella libdef (cart+Eckart)":         "o",
-    "Sella default (cart no-Eckart)":     "s",
-    "Sella internal (lib default)":       "v",
-    "Sella libdef Hess-freq d=3":         "X",
-    "Hybrid damped Eckart eig tr=0.05":   "^",
-    "Hybrid undamped Eckart eig tr=0.05": "<",
+    "GAD dt=0.003":                                  "o",
+    "GAD dt=0.005":                                  "s",
+    "GAD dt=0.007":                                  "D",
+    "Sella cartesian Eckart untuned Hess.Freq.=1":   "o",
+    "Sella cartesian tuned Hess.Freq.=1":            "s",
+    "Sella internal tuned Hess.Freq.=1":             "v",
+    "Sella cartesian Eckart untuned Hess.Freq.=3":   "X",
+    "Hybrid damped Eckart eig tr=0.05":              "^",
+    "Hybrid undamped Eckart eig tr=0.05":            "<",
 }
 
 
@@ -218,36 +218,38 @@ def per_config_color(config, family):
 
 
 # ────────────────────────────────────────────────────────────────────────
-# 4-panel figure: raw conv / IRC TOPO / med steps / wall vs noise
+# 4-panel figure: TS conv / IRC TOPO / med steps / wall vs noise
+# Larger fonts so figure is readable at PDF screen size on a laptop.
 # ────────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 4, figsize=(22, 5), sharex=True)
+fig, axes = plt.subplots(1, 4, figsize=(24, 6), sharex=True)
 panels = [
-    ("conv_pct",      r"Raw conv % ($n_{neg}=1$ and $f_{max}<0.01$)", False),
-    ("topo_pct",      "IRC TOPO-intended %",                                                 False),
-    ("med_step",      "Median converged-step count",                                          True),
-    ("wall_per_conv", "Wall-time per converged TS (s)",                                       True),
+    ("conv_pct",      r"TS conv % (Im. Freq. and $F_\mathrm{max}<0.01$)", False),
+    ("topo_pct",      "IRC TOPO-intended %",                              False),
+    ("med_step",      "Median converged-step count",                       True),
+    ("wall_per_conv", "Wall-time per converged TS (s)",                    True),
 ]
 for ax, (col, ylab, logy) in zip(axes, panels):
     for (family, config), grp in master.groupby(["family", "config"], sort=False):
         grp = grp.sort_values("noise_pm")
         if col == "topo_pct" and grp[col].isna().all():
             continue
-        # plain line for full sweep, dashed for partial
         n_pts = grp[col].notna().sum()
         ls = "-" if n_pts >= 6 else "--"
         ax.plot(grp.loc[grp[col].notna(), "noise_pm"],
                 grp.loc[grp[col].notna(), col],
-                marker=CONFIG_MARKER[config], linestyle=ls, lw=1.8, ms=8,
+                marker=CONFIG_MARKER[config], linestyle=ls, lw=2.2, ms=10,
                 color=per_config_color(config, family), label=config)
-    ax.set_xlabel("TS noise (pm)"); ax.set_ylabel(ylab)
+    ax.set_xlabel("TS noise (pm)", fontsize=16)
+    ax.set_ylabel(ylab, fontsize=15)
+    ax.tick_params(axis='both', labelsize=13)
     if logy: ax.set_yscale("log")
     else: ax.set_ylim(0, 100)
     ax.grid(alpha=0.3)
-# Legend below
 handles, labels = axes[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc="lower center", ncol=3, fontsize=9,
-           bbox_to_anchor=(0.5, -0.18), frameon=False)
-fig.suptitle("Best-of-family comparison across TS noise (n=287 T1x test split)", y=1.02, fontsize=14)
+fig.legend(handles, labels, loc="lower center", ncol=3, fontsize=14,
+           bbox_to_anchor=(0.5, -0.20), frameon=False)
+fig.suptitle("Best-of-family comparison across TS noise ($n=287$ T1x test split)",
+             y=1.03, fontsize=18)
 fig.tight_layout()
 fig.savefig(f"{OUT}/fig_main_4axis.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_main_4axis.png", bbox_inches="tight", dpi=140)
@@ -261,12 +263,15 @@ print("Wrote fig_main_4axis")
 # ────────────────────────────────────────────────────────────────────────
 SHORT = {
     "GAD dt=0.003": "G003", "GAD dt=0.005": "G005", "GAD dt=0.007": "G007",
-    "Sella libdef (cart+Eckart)": "S-libdef", "Sella default (cart no-Eckart)": "S-default",
-    "Sella internal (lib default)": "S-internal", "Sella libdef Hess-freq d=3": "S-d3",
-    "Hybrid damped Eckart eig tr=0.05": "H-damp", "Hybrid undamped Eckart eig tr=0.05": "H-undamp",
+    "Sella cartesian Eckart untuned Hess.Freq.=1":  "S-cart+eck-utuned-d1",
+    "Sella cartesian tuned Hess.Freq.=1":           "S-cart-tuned-d1",
+    "Sella internal tuned Hess.Freq.=1":            "S-int-tuned-d1",
+    "Sella cartesian Eckart untuned Hess.Freq.=3":  "S-cart+eck-utuned-d3",
+    "Hybrid damped Eckart eig tr=0.05":             "H-damp-Eck-tr0.05",
+    "Hybrid undamped Eckart eig tr=0.05":           "H-undamp-Eck-tr0.05",
 }
 
-fig, axes = plt.subplots(2, 3, figsize=(20, 11), sharey=True)
+fig, axes = plt.subplots(2, 3, figsize=(22, 12), sharey=True)
 noises = [10, 30, 50, 100, 150, 200]
 legend_handles = {}
 for ax, noise in zip(axes.flat, noises):
@@ -274,27 +279,27 @@ for ax, noise in zip(axes.flat, noises):
     sub = sub.dropna(subset=["wall_per_conv", "topo_pct"])
     for (family, config), grp in sub.groupby(["family", "config"], sort=False):
         for _, r in grp.iterrows():
-            sz = max(120, 12 * float(r["conv_pct"]))
+            sz = max(150, 15 * float(r["conv_pct"]))
             h = ax.scatter(r["wall_per_conv"], r["topo_pct"], s=sz,
                        marker=CONFIG_MARKER[config],
                        color=per_config_color(config, family),
-                       edgecolor="black", linewidth=0.6, alpha=0.85)
+                       edgecolor="black", linewidth=0.7, alpha=0.85)
             if config not in legend_handles:
                 legend_handles[config] = h
     ax.set_xscale("log")
-    ax.set_xlabel("Wall-time per converged TS (s, log)")
+    ax.set_xlabel("Wall-time per converged TS (s, log)", fontsize=14)
     if ax in axes[:, 0]:
-        ax.set_ylabel("IRC TOPO-intended %")
-    ax.set_title(f"{noise} pm noise", fontsize=13)
+        ax.set_ylabel("IRC TOPO-intended %", fontsize=14)
+    ax.tick_params(axis='both', labelsize=12)
+    ax.set_title(f"{noise} pm noise", fontsize=15)
     ax.set_ylim(0, 100)
     ax.grid(alpha=0.3, which="both")
-# Single legend below
 fig.legend(legend_handles.values(), legend_handles.keys(),
-           loc="lower center", ncol=3, fontsize=10,
-           bbox_to_anchor=(0.5, -0.05), frameon=False)
+           loc="lower center", ncol=3, fontsize=13,
+           bbox_to_anchor=(0.5, -0.04), frameon=False)
 fig.suptitle("Pareto plane per noise: IRC TOPO % vs wall/conv  (upper-left = great; lower-right = bad)\n"
-             "Bubble size $\\propto$ raw conv %",
-             y=1.0, fontsize=14)
+             "Bubble size $\\propto$ TS conv %",
+             y=1.01, fontsize=17)
 fig.tight_layout(rect=[0, 0.03, 1, 0.97])
 fig.savefig(f"{OUT}/fig_pareto_per_noise.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_pareto_per_noise.png", bbox_inches="tight", dpi=140)
@@ -321,26 +326,26 @@ for ax, noise in zip(axes, noises):
         ax.scatter(r["wall_per_conv"], i, s=500, color=color,
                    edgecolor="black", linewidth=1.2, zorder=5)
         topo_str = f"{topo:.0f}%" if topo is not None else "n/a"
-        # Two-line annotation reads cleanly
-        anno = f"IRC TOPO {topo_str}\nraw {r['conv_pct']:.0f}%   wall {r['wall_per_conv']:.1f}s"
-        ax.text(r["wall_per_conv"] * 1.18, i, anno, va="center", ha="left", fontsize=11)
+        # Compact single-line: "TOPO 89 / raw 92 / 14.5s"
+        anno = f"  TOPO {topo_str} / raw {r['conv_pct']:.0f}% / {r['wall_per_conv']:.1f}s"
+        ax.text(r["wall_per_conv"], i, anno, va="center", ha="left", fontsize=10)
     ax.set_yticks(range(len(sub)))
-    ax.set_yticklabels([SHORT.get(c, c) for c in sub["config"]], fontsize=12)
+    ax.set_yticklabels([SHORT.get(c, c) for c in sub["config"]], fontsize=13)
     ax.invert_yaxis()
     ax.set_xscale("log")
-    # Plenty of right-side room for the annotations
     xmin = sub["wall_per_conv"].min()
     xmax = sub["wall_per_conv"].max()
     ax.set_xlim(xmin / 2.5, xmax * 50)
-    ax.set_xlabel("Wall-time per converged TS (s, log)" if noise == 200 else "", fontsize=12)
-    ax.set_title(f"{noise} pm noise (top row = fastest)", fontsize=14, loc="left", pad=8)
+    ax.tick_params(axis='x', labelsize=12)
+    ax.set_xlabel("Wall-time per converged TS (s, log)" if noise == 200 else "", fontsize=14)
+    ax.set_title(f"{noise} pm noise (top row = fastest)", fontsize=16, loc="left", pad=10)
     ax.grid(alpha=0.3, which="both", axis="x")
 sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=100))
 sm.set_array([])
 cbar = fig.colorbar(sm, ax=list(axes), fraction=0.015, pad=0.02, orientation="vertical")
-cbar.set_label("IRC TOPO % (gray = not measured)", fontsize=11)
+cbar.set_label("IRC TOPO % (gray = not measured)", fontsize=13)
 fig.suptitle("Method rankings by wall-time per converged TS  •  head color = IRC TOPO",
-             y=0.995, fontsize=16)
+             y=0.995, fontsize=18)
 fig.tight_layout(rect=[0, 0, 0.94, 0.985])
 fig.savefig(f"{OUT}/fig_ranking_lollipop.pdf", bbox_inches="tight")
 fig.savefig(f"{OUT}/fig_ranking_lollipop.png", bbox_inches="tight", dpi=140)
@@ -362,14 +367,14 @@ recovery = recovery.dropna()
 # Pick one representative config per family for the recovery chart
 reps = {
     "plain GAD": "GAD dt=0.005",
-    "Sella":     "Sella libdef (cart+Eckart)",
+    "Sella":     "Sella cartesian Eckart untuned Hess.Freq.=1",
     "hybrid":    "Hybrid damped Eckart eig tr=0.05",
 }
 rec_plot = recovery[recovery["config"].isin(reps.values())].copy()
 
-fig, ax = plt.subplots(figsize=(13, 5.5))
+fig, ax = plt.subplots(figsize=(15, 6.2))
 families = list(reps)
-families_x = np.arange(6)   # 6 noise levels
+families_x = np.arange(6)
 w = 0.27
 for i, fam in enumerate(families):
     sub = rec_plot[rec_plot["family"] == fam].sort_values("noise_pm")
@@ -379,14 +384,15 @@ for i, fam in enumerate(families):
            color=FAMILY_CMAP[fam], edgecolor="black", linewidth=0.5)
     for x_, y_ in zip(xs, ys):
         ax.text(x_, y_ + (0.4 if y_ > 0 else -0.4), f"{y_:+.1f}",
-                ha="center", va="bottom" if y_ > 0 else "top", fontsize=9)
+                ha="center", va="bottom" if y_ > 0 else "top", fontsize=11)
 ax.axhline(0, color="black", lw=0.8)
-ax.set_xticks(range(6)); ax.set_xticklabels([f"{n} pm" for n in noises], fontsize=12)
-ax.set_ylabel("IRC TOPO $-$ Raw conv (percentage points)", fontsize=12)
+ax.set_xticks(range(6)); ax.set_xticklabels([f"{n} pm" for n in noises], fontsize=14)
+ax.set_ylabel("IRC TOPO $-$ TS conv (percentage points)", fontsize=14)
 ax.set_title("Who gains from IRC chemistry validation?\n(Positive = IRC saves trajectories; negative = IRC catches wrong-saddle 'wins')",
-             fontsize=12)
+             fontsize=15)
 ax.grid(alpha=0.3, axis="y")
-ax.legend(loc="upper left", fontsize=10, framealpha=0.95)
+ax.legend(loc="upper left", fontsize=13, framealpha=0.95)
+ax.tick_params(axis='y', labelsize=12)
 ax.set_ylim(-6, 12)
 fig.tight_layout()
 fig.savefig(f"{OUT}/fig_topo_recovery.pdf", bbox_inches="tight")

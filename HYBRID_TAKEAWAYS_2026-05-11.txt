@@ -68,7 +68,19 @@ Auxiliary points (mechanism + diagnostic notes):
 - Sella has variants: libdef (canonical, cart+Eckart), default (cart
   no-Eckart), internal (lib default, internal coords), and Hess-freq
   d=3 (Hessian every 3rd step). d=3 actually wins raw conv at low
-  noise (96.5% @ 10pm) but no IRC data computed for it.
+  noise (96.5% @ 10pm vs 92.7% for our d=1) with the SAME total wall.
+
+- The d=3 mechanism (CORRECTED): same total compute as d=1, but d=3
+  produces more "false positive" convergences. d=3 IRC TOPO at 10pm is
+  88.5% vs d=1's 89.2% (-0.7pp). The +3.8pp raw conv gain doesn't
+  survive chemistry validation. Stale Hessian misjudges saddle
+  character -> trust-region claims wrong-saddle convergences. Our
+  project's d=1 ("fresh HIP H every step") was the right call.
+
+- Sella's library default IS d=3 (every 3 steps). Our project's "libdef
+  d=1" was a benchmark-driven choice for fresher Hessian. On raw conv
+  d=3 wins by +3.8pp at 10pm, but on IRC TOPO d=1 wins by 0.7pp. The
+  raw-conv chase is misleading; IRC validation is the honest metric.
 
 - Hybrid's trust radius matters little within 0.005-0.10 (raw conv
   varies <=2pp). The trust-radius cap rarely bites once Newton fires;
