@@ -111,7 +111,8 @@ others span 10--200 pm. Source: \texttt{master\_2026\_05\_11.csv}.}
 in row.
 
 \begin{center}\footnotesize
-\textbf{Table 1 — TS conv \%} (Im. Freq. $\wedge$ $F_{\max}<0.01$, $n=287$)\\[0.3em]
+\textbf{Table 1 — TS conv \%} (Im. Freq. $\wedge$ $F_{\max}<0.01$, $n=287$).
+$^p$ = partial: extracted from log after SLURM timeout; biased toward earlier sample\_ids (smaller molecules).\\[0.3em]
 \begin{tabular}{l|cccccc}
 \toprule
 \textbf{method} & \textbf{10 pm} & \textbf{30 pm} & \textbf{50 pm} & \textbf{100 pm} & \textbf{150 pm} & \textbf{200 pm} \\
@@ -122,8 +123,8 @@ GAD dt=0.007                                & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 &
 \midrule
 Sella cartesian tuned Hess.Freq.=1          & 92.0 & 91.3 & 87.5 & 65.5 & 42.9 & 18.8 \\
 Sella cartesian Eckart untuned Hess.Freq.=1 & 92.7 & 92.0 & 88.2 & 70.7 & 54.0 & 27.2 \\
-Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & ---  & ---  \\
-Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 23.3 (partial) \\
+Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & 29.3$^{p}$ & 19.9$^{p}$ \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 23.3$^{p}$ \\
 \midrule
 Hybrid damped Eckart eig tr=0.05   & 85.4 & 85.0 & 81.5 & 66.9 & 50.9 & 33.1 \\
 Hybrid undamped Eckart eig tr=0.05 & 84.7 & 84.3 & 81.5 & 65.5 & 49.8 & 31.0 \\

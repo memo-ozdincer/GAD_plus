@@ -92,45 +92,30 @@ def main():
     ax_hip.grid(alpha=0.3)
 
     # ---- SCINE / xTB panel (right) ----
-    gad_strict = lookup(scine, "plain GAD dt=0.005", "conv_pct")
-    # Note: the no-Eckart row also matches "plain GAD dt=0.005" substring,
-    # so filter explicitly.
-    gad_strict = {pm: gad_strict[pm] for pm in NOISES if pm in gad_strict}
-    gad_neck = {}
+    # Use the matched 15k-budget rows. Legacy 2k rows are kept in the CSV for
+    # comparison but not plotted here.
+    gad_strict = {}
     sella_strict = {}
-    gad_topo = {}
-    sella_topo = {}
+    gad_irc = {}
+    sella_irc = {}
     for r in scine:
         fam = r["family"]
-        pm = int(r["noise_pm"])
-        if "no-Eckart" in fam:
-            gad_neck[pm] = float(r["conv_pct"])
+        if "15k" not in fam:
+            continue
+        try:
+            pm = int(r["noise_pm"])
+        except (ValueError, TypeError):
+            continue
+        irc_v = r.get("irc_topo_pct_over_all", "")
+        irc_f = float(irc_v) if irc_v not in ("", "nan", "None") else None
+        if "plain GAD" in fam:
+            gad_strict[pm] = float(r["conv_pct"])
+            if irc_f is not None:
+                gad_irc[pm] = irc_f
         elif "Sella libdef" in fam:
             sella_strict[pm] = float(r["conv_pct"])
-            sella_topo[pm] = float(r["n_neg1_pct"])
-        elif "plain GAD dt=0.005" in fam and "no-Eckart" not in fam:
-            gad_topo[pm] = float(r["n_neg1_pct"])
-
-    # Correct gad_strict (must overwrite the substring-match leak from above)
-    gad_strict = {}
-    for r in scine:
-        fam = r["family"]
-        if "no-Eckart" in fam or "Sella" in fam or "xTB" in fam:
-            continue
-        if "plain GAD dt=0.005" in fam:
-            gad_strict[int(r["noise_pm"])] = float(r["conv_pct"])
-
-    # Strict and IRC TOPO (over all N=287) for both methods
-    gad_irc = {int(r["noise_pm"]): float(r["irc_topo_pct_over_all"])
-               for r in scine
-               if "plain GAD" in r["family"] and "no-Eckart" not in r["family"]
-               and r["irc_topo_pct_over_all"] not in ("", "nan", "None")
-               and r["irc_topo_pct_over_all"]}
-    sella_irc = {int(r["noise_pm"]): float(r["irc_topo_pct_over_all"])
-                 for r in scine
-                 if "Sella libdef" in r["family"]
-                 and r["irc_topo_pct_over_all"] not in ("", "nan", "None")
-                 and r["irc_topo_pct_over_all"]}
+            if irc_f is not None:
+                sella_irc[pm] = irc_f
 
     ns_strict = [n for n in NOISES if n in gad_strict]
     ax_scine.plot(ns_strict, [gad_strict[n] for n in ns_strict],
@@ -160,8 +145,9 @@ def main():
     )
 
     ax_scine.set_title(
-        "SCINE/DFTB0: GAD's IRC TOPO ≥ Sella's at every noise level (+9.4pp at 10pm)",
-        fontsize=11,
+        "SCINE/DFTB0 (dt=0.007, 15k steps): GAD matches HIP strict-conv (89.9% @10pm); "
+        "GAD IRC TOPO > Sella's (+12.9pp @10pm)",
+        fontsize=10,
     )
     ax_scine.set_xlabel("Noise (pm)")
     ax_scine.set_xticks(NOISES)
@@ -169,7 +155,7 @@ def main():
     ax_scine.grid(alpha=0.3)
 
     fig.suptitle(
-        "Noise sweep, T1x test (n=287): HIP reference vs SCINE/DFTB0 + xTB/GFN1",
+        "Noise sweep, T1x test (n=287): HIP reference (left) vs SCINE/DFTB0 + xTB/GFN1 (right)",
         fontsize=12, y=1.02,
     )
 

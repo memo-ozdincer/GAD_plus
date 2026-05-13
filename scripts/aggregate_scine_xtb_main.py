@@ -20,12 +20,19 @@ import pyarrow.parquet as pq
 
 
 # Full-grid runs (6 noise levels each).
+# Updated 2026-05-12: 15k-step budget at dt=0.007 matched to HIP-level
+# performance. The 2k-step rows are kept in a second dict below for
+# the "step budget matters" table.
 RUNS_FULL = {
-    "SCINE/DFTB0 + plain GAD dt=0.005":
+    "SCINE/DFTB0 + plain GAD dt=0.007 15k":
+        "/lustre07/scratch/memoozd/gadplus/runs/main_scine_gad15k_60865063",
+    "SCINE/DFTB0 + Sella libdef 15k":
+        "/lustre07/scratch/memoozd/gadplus/runs/main_scine_sella15k_60868140",
+    "SCINE/DFTB0 + plain GAD dt=0.005 2k (legacy)":
         "/lustre07/scratch/memoozd/gadplus/runs/main_scine_gad_60772085",
-    "SCINE/DFTB0 + plain GAD dt=0.005 no-Eckart":
+    "SCINE/DFTB0 + plain GAD dt=0.005 no-Eckart 2k (legacy)":
         "/lustre07/scratch/memoozd/gadplus/runs/main_scine_gad_neck_60774250",
-    "SCINE/DFTB0 + Sella libdef":
+    "SCINE/DFTB0 + Sella libdef 2k (legacy)":
         "/lustre07/scratch/memoozd/gadplus/runs/main_scine_sella_60772086",
 }
 
@@ -39,9 +46,13 @@ RUNS_XTB_PANEL = {
 
 # IRC validation directories: per-noise irc_validation_<noise>pm_<tag>.parquet
 IRC_RUNS = {
-    "SCINE/DFTB0 + plain GAD dt=0.005":
+    "SCINE/DFTB0 + plain GAD dt=0.007 15k":
+        ("/lustre07/scratch/memoozd/gadplus/runs/scine_irc15k_60865129/gad", "gad"),
+    "SCINE/DFTB0 + Sella libdef 15k":
+        ("/lustre07/scratch/memoozd/gadplus/runs/scine_sella_irc15k_60869134/sella", "sella"),
+    "SCINE/DFTB0 + plain GAD dt=0.005 2k (legacy)":
         ("/lustre07/scratch/memoozd/gadplus/runs/scine_irc_60776605/gad", "gad"),
-    "SCINE/DFTB0 + Sella libdef":
+    "SCINE/DFTB0 + Sella libdef 2k (legacy)":
         ("/lustre07/scratch/memoozd/gadplus/runs/scine_sella_irc_60777076/sella", "sella"),
 }
 

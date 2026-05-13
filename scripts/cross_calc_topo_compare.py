@@ -24,8 +24,8 @@ NOISES = [10, 30, 50, 100, 150, 200]
 
 HIP_GAD_DIR = "/lustre07/scratch/memoozd/gadplus/runs/test_irc/gad_dt005_fmax"
 HIP_SELLA_DIR = "/lustre07/scratch/memoozd/gadplus/runs/test_irc/sella_carteck_libdef"
-SCINE_GAD_DIR = "/lustre07/scratch/memoozd/gadplus/runs/scine_irc_60776605/gad"
-SCINE_SELLA_DIR = "/lustre07/scratch/memoozd/gadplus/runs/scine_sella_irc_60777076/sella"
+SCINE_GAD_DIR = "/lustre07/scratch/memoozd/gadplus/runs/scine_irc15k_60865129/gad"
+SCINE_SELLA_DIR = "/lustre07/scratch/memoozd/gadplus/runs/scine_sella_irc15k_60869134/sella"
 
 
 def load_topo(path: str, topo_col: str) -> set[int]:

@@ -49,6 +49,8 @@ def _run_one_sample(args_tuple):
     (
         sample_idx, h5_path, split, backend, method, noise_ang, seed,
         n_steps, dt, use_projection, force_threshold, force_criterion,
+        use_adaptive_dt, dt_min, dt_max, max_atom_disp,
+        use_preconditioning, eig_floor,
         output_dir, run_id,
     ) = args_tuple
 
@@ -84,7 +86,10 @@ def _run_one_sample(args_tuple):
 
     cfg = GADSearchConfig(
         n_steps=n_steps, dt=dt, k_track=8, beta=1.0,
-        use_projection=use_projection, use_adaptive_dt=False,
+        use_projection=use_projection,
+        use_adaptive_dt=use_adaptive_dt, dt_min=dt_min, dt_max=dt_max,
+        max_atom_disp=max_atom_disp,
+        use_preconditioning=use_preconditioning, eig_floor=eig_floor,
         force_threshold=force_threshold, force_criterion=force_criterion,
         purify_hessian=False,
     )
@@ -140,6 +145,12 @@ def main():
     p.add_argument("--no-projection", dest="use_projection", action="store_false")
     p.add_argument("--force-threshold", type=float, default=0.01)
     p.add_argument("--force-criterion", default="fmax", choices=["fmax", "force_norm"])
+    p.add_argument("--use-adaptive-dt", action="store_true", default=False)
+    p.add_argument("--dt-min", type=float, default=1e-5)
+    p.add_argument("--dt-max", type=float, default=0.1)
+    p.add_argument("--max-atom-disp", type=float, default=0.35)
+    p.add_argument("--use-preconditioning", action="store_true", default=False)
+    p.add_argument("--eig-floor", type=float, default=0.01)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--split", default="test")
     p.add_argument("--h5", default="/lustre06/project/6033559/memoozd/data/transition1x.h5")
@@ -165,6 +176,8 @@ def main():
             i, args.h5, args.split, args.backend, args.method, args.noise,
             args.seed + 1000 * i, args.n_steps, args.dt, args.use_projection,
             args.force_threshold, args.force_criterion,
+            args.use_adaptive_dt, args.dt_min, args.dt_max, args.max_atom_disp,
+            args.use_preconditioning, args.eig_floor,
             args.output_dir, run_id,
         )
         for i in indices
