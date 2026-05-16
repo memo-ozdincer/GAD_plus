@@ -215,17 +215,35 @@ def reactant_data():
         "is_partial": False,
     })
 
-    # Hybrid from reactant — auto-pick up if the SLURM cells have landed
-    for sub, tag in [
-        ("damped_dt5e-3_tr0.05",   "Hybrid damped Eckart eig tr=0.05"),
-        ("undamped_dt5e-3_tr0.05", "Hybrid undamped Eckart eig tr=0.05"),
-    ]:
+    # Hybrid from reactant — pick up summary parquet if present, else log fallback
+    import re as _re
+    HYBRID_LINE = _re.compile(
+        r"\[\s*(?P<sid>\d+)\]\s+\S+\s*\|\s*(?:CONV|FAIL)\s*\|\s*"
+        r"n_neg=(?P<nneg>-?\d+)\s+fmax=(?P<fmax>[\d.eE+-]+)"
+    )
+    LOGS = "/lustre07/scratch/memoozd/gadplus/logs"
+    hybrid_cells = [
+        ("damped_dt5e-3_tr0.05",   "Hybrid damped Eckart eig tr=0.05",   f"{LOGS}/compr_61087603_0.out"),
+        ("undamped_dt5e-3_tr0.05", "Hybrid undamped Eckart eig tr=0.05", f"{LOGS}/compr_61087603_1.out"),
+    ]
+    for sub, tag, log_path in hybrid_cells:
         path = f"{RUNS}/start_reactant_hybrid/{sub}/summary_*.parquet"
-        if not glob.glob(path):
+        df = None
+        if glob.glob(path):
+            df = con.execute(f"SELECT * FROM read_parquet('{path}')").df()
+        elif os.path.exists(log_path):
+            log_rows = []
+            with open(log_path) as f:
+                for line in f:
+                    m = HYBRID_LINE.search(line)
+                    if m:
+                        log_rows.append({"final_n_neg": int(m["nneg"]),
+                                          "final_force_max": float(m["fmax"])})
+            if log_rows:
+                df = pd.DataFrame(log_rows)
+        if df is None or len(df) == 0:
             continue
-        df = con.execute(f"SELECT * FROM read_parquet('{path}')").df()
         nn = len(df)
-        if nn == 0: continue
         rows.append({
             "config": tag,
             "family": "hybrid",
@@ -261,11 +279,12 @@ for cfg, n, partial in zip(rdf["config"], rdf["n"], rdf["is_partial"]):
         labels.append(f"{short}\n($n={n}/287$, partial)")
     else:
         labels.append(f"{short}\n($n={n}$)")
-ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=12)
+ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=10, rotation=15, ha="right")
 ax.set_ylabel("TS convergence % (Im. Freq. and $F_\\mathrm{max}<\\cdot$)", fontsize=14)
 ax.set_title("Starting from REACTANT @ 0 pm noise (T1x test split)\n"
-             "Newton methods dominate; GAD's slow walk struggles without a saddle direction in hand",
-             fontsize=15)
+             "Sella's Newton step finds the nearby saddle directly; hybrid's eig-switch never fires "
+             "(GAD walk never reaches $n_\\mathrm{neg}=1$ in 2000 steps from reactant)",
+             fontsize=14)
 ax.legend(loc="upper right", fontsize=12, framealpha=0.95)
 ax.set_ylim(0, 100); ax.grid(alpha=0.3, axis="y")
 ax.tick_params(axis='y', labelsize=12)

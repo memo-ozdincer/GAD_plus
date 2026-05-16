@@ -129,8 +129,8 @@ GAD dt=0.007                                & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 &
 \midrule
 Sella cartesian tuned Hess.Freq.=1          & 92.0 & 91.3 & 87.5 & 65.5 & 42.9 & 18.8 \\
 Sella cartesian Eckart untuned Hess.Freq.=1 & 92.7 & 92.0 & 88.2 & 70.7 & 54.0 & 27.2 \\
-Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & 40.4$^{p_{52}}$ & 16.3$^{p_{98}}$ \\
-Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 23.8$^{p_{126}}$ \\
+Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & 41.4$^{p_{58}}$ & 16.1$^{p_{112}}$ \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 25.0$^{p_{144}}$ \\
 \midrule
 Hybrid damped Eckart eig tr=0.05            & 85.4 & 85.0 & 81.5 & 66.9 & 50.9 & 33.1 \\
 Hybrid undamped Eckart eig tr=0.05          & 84.7 & 84.3 & 81.5 & 65.5 & 49.8 & 31.0 \\
@@ -183,9 +183,9 @@ needs $>$1000 steps to walk reactant$\to$saddle and partial-run statistics
 ($n=152/287, 179/287$) show 40--54\% conv at the project threshold. The 300-step
 GAD-projected cell (force-norm criterion, no fmax in the trajectory schema)
 illustrates the step-budget collapse: only 6\% converge with a 300-step cap.
-\textbf{Hybrid runs from the reactant are not yet in the benchmark} — the
-existing hybrid runner only takes a noised-TS starting condition; a follow-up
-is queued. Source: \texttt{reactant\_0pm\_2026\_05\_16.csv}.}
+\textbf{Hybrid damped/undamped from reactant: 0\% conv at all thresholds
+($n=51$ each)} — a clear mechanistic finding (see following paragraph).
+Source: \texttt{reactant\_0pm\_2026\_05\_16.csv}.}
 \end{figure}
 
 \paragraph{Why this matters.} The reactant-start probe shows the headline
@@ -194,6 +194,19 @@ For reactant-start, the Sella family is overwhelmingly the right tool; GAD
 becomes useful only when started near a saddle (small to moderate noise).
 This is consistent with GAD's mechanism: it follows the lowest curvature
 direction, which is only well-defined near the saddle manifold.
+
+\paragraph{Hybrid from reactant: 0\% (new finding, $n=51$).} The hybrid
+trails plain GAD (40--54\% from reactant) by 40+ pp on this axis. Mechanism:
+the hybrid's Newton step only fires when the Hessian's vibrational spectrum
+has $n_\mathrm{neg}=1$ (eig-switch). Starting from the reactant, the
+trajectory begins at $n_\mathrm{neg}=0$ (a local minimum) and the GAD
+walking phase has to drag the geometry onto the saddle manifold before
+Newton can activate. Within the 2000-step budget, the GAD walk doesn't
+reach $n_\mathrm{neg}=1$ for any of the 51 samples observed. \emph{The
+hybrid is a Newton accelerator for the saddle-finding mechanism, not an
+alternative basin-finder.} See \texttt{FINDING\_HYBRID\_REACTANT\_2026\_05\_16.md}
+for the full analysis + predicted fixes (5000+ step budget; force-switch
+trigger instead of eig-switch; composite criterion).
 
 \paragraph{Companion: midpoint starting condition (NEW 2026-05-16).}
 Same Sella cart+Eckart untuned d=1, $n=52$ in flight, started from the
@@ -205,7 +218,7 @@ Same Sella cart+Eckart untuned d=1, $n=52$ in flight, started from the
 \textbf{Starting condition} & \textbf{$F_\mathrm{max}<0.01$} & \textbf{$F_\mathrm{max}<0.05$} \\
 \midrule
 True TS + 10 pm noise (canonical sweep) & 92.7\%   & 98.6\% \\
-\textbf{Linear midpoint (R+P)/2}        & \textbf{47.3\%$^{p_{74}}$} & ---    \\
+\textbf{Linear midpoint (R+P)/2}        & \textbf{52.2\%$^{p_{90}}$} & ---    \\
 Reactant                                & 80.8\%   & 89.9\% \\
 \bottomrule
 \end{tabular}
@@ -591,7 +604,7 @@ total wall-time. Less Hessian information, better conv: surprising.
 50 pm  & 88.2 & \textbf{92.0} & \textbf{+3.8} & 20.4 / 21.2 \\
 100 pm & 70.7 & \textbf{72.8} & +2.1          & 46.1 / 50.5 \\
 150 pm & \textbf{54.0} & 50.5 & $-3.5$        & 71.6 / 79.0 \\
-200 pm & \textbf{27.2} & 23.8$^{p_{126}}$ & $-3.4$ & 107.0 / pending \\
+200 pm & \textbf{27.2} & 25.0$^{p_{144}}$ & $-2.2$ & 107.0 / pending \\
 \bottomrule
 \end{tabular}
 \end{center}
