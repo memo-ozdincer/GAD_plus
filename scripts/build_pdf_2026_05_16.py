@@ -282,9 +282,9 @@ for cfg, n, partial in zip(rdf["config"], rdf["n"], rdf["is_partial"]):
 ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=10, rotation=15, ha="right")
 ax.set_ylabel("TS convergence % (Im. Freq. and $F_\\mathrm{max}<\\cdot$)", fontsize=14)
 ax.set_title("Starting from REACTANT @ 0 pm noise (T1x test split)\n"
-             "Sella's Newton step finds the nearby saddle directly; hybrid's eig-switch never fires "
-             "(GAD walk never reaches $n_\\mathrm{neg}=1$ in 2000 steps from reactant)",
-             fontsize=14)
+             "Sella's Newton step finds the nearby saddle directly (81\\%); hybrid is case-dependent "
+             "($\\sim$5\\%) — GAD walk reaches $n_\\mathrm{neg}=1$ only for some molecular species in 2000 steps",
+             fontsize=13)
 ax.legend(loc="upper right", fontsize=12, framealpha=0.95)
 ax.set_ylim(0, 100); ax.grid(alpha=0.3, axis="y")
 ax.tick_params(axis='y', labelsize=12)

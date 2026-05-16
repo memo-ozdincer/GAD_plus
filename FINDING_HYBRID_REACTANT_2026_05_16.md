@@ -1,6 +1,32 @@
 # In-flight finding: hybrid struggles starting from reactant (2026-05-16)
 
-## Snapshot (n=11/287, log-parsed mid-run)
+## REVISION 2026-05-16 (cron iteration 9)
+
+The "0% conv" claim was correct **only for the early sample range (0-74)**.
+At $n \approx 78$, samples 75-78 (all C3H5NO2) start converging in ~250 steps.
+The GAD walking phase reaches the saddle manifold faster for some molecular
+species than others; the early test-set samples (C2H3N3O2) happen to be in
+the slow-convergence regime.
+
+| Cell | Updated conv % |
+|---|---|
+| Hybrid damped reactant | **1.3% (n=78)** — was 0% at n<75 |
+| Hybrid undamped reactant | **5.1% (n=79)** — was 0% at n<75 |
+
+**Corrected mechanism:** the hybrid is **case-dependent** from reactant, not
+categorically broken. The 4 converged C3H5NO2 samples confirm the
+eig-switch DOES fire when the GAD walk reaches $n_\mathrm{neg}=1$. The 0%
+finding for sample range 0-74 reflects that C2H3N3O2 reactants are
+geometrically far from their saddles and the 2000-step GAD walk isn't
+sufficient to bridge that distance.
+
+**Implication:** the predicted "5000+ step budget" fix is on track. SLURM
+61091399 (10000-step budget) should rescue many of the currently-failing
+samples. ETA $\sim$5 h.
+
+---
+
+## Original snapshot (n=11/287, log-parsed mid-run)
 
 | Method | Starting condition | Conv % (fmax<0.01) |
 |---|---|---|
