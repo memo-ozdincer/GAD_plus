@@ -156,6 +156,11 @@ def main():
                              "use a large number (e.g. 99999) to disable forced recomputes and let "
                              "Sella decide via nsteps_per_diag.")
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--sample-start", type=int, default=None,
+                        help="Process samples [sample-start, sample-end). Used to partition "
+                             "the 287-sample test set across multiple SLURM tasks.")
+    parser.add_argument("--sample-end", type=int, default=None,
+                        help="Process samples [sample-start, sample-end). Exclusive.")
     args = parser.parse_args()
 
     use_internal = not args.cartesian
@@ -225,7 +230,9 @@ def main():
     results = []
     t_total = time.time()
 
-    for i in range(len(dataset)):
+    s_start = args.sample_start if args.sample_start is not None else 0
+    s_end = args.sample_end if args.sample_end is not None else len(dataset)
+    for i in range(s_start, min(s_end, len(dataset))):
         sample = dataset[i]
         coords_ts = sample.pos.to(device)
         z = sample.z.to(device)
@@ -380,7 +387,10 @@ def main():
 
     # ---- Save ----
     df = pd.DataFrame(results)
-    out_path = os.path.join(output_dir, f"summary_{config_name}_{noise_pm}pm.parquet")
+    suffix = ""
+    if args.sample_start is not None or args.sample_end is not None:
+        suffix = f"_s{s_start}-{s_end}"
+    out_path = os.path.join(output_dir, f"summary_{config_name}_{noise_pm}pm{suffix}.parquet")
     df.to_parquet(out_path)
 
     # Report — ALL criteria combinations

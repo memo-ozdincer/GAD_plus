@@ -109,6 +109,10 @@ def parse_args():
     p.add_argument("--device", default="cuda")
     p.add_argument("--force-threshold", type=float, default=0.01,
                    help="fmax convergence criterion (with n_neg=1)")
+    p.add_argument("--start-from", default="ts_noised",
+                   choices=["ts_noised", "reactant", "product", "midpoint"],
+                   help="Initial geometry: noised TS (default), reactant, product, or linear midpoint. "
+                        "Noise is added only for ts_noised; reactant/product/midpoint use raw coords.")
     return p.parse_args()
 
 
@@ -146,6 +150,8 @@ def main():
     if args.method != "hybrid":
         method_tag = f"{args.method}_swEIG" if switch_by_eig else f"{args.method}_swFORCE"
     method_tag = f"{method_tag}_dt{args.gad_dt:g}_tr{args.trust_radius:g}"
+    if args.start_from != "ts_noised":
+        method_tag = f"{method_tag}_start-{args.start_from}"
     run_id = f"{method_tag}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     summary_path = out_dir / f"summary_{method_tag}_{noise_pm}pm.parquet"
 
@@ -159,12 +165,33 @@ def main():
     # ── Per-sample loop ──────────────────────────────────────────────
     rows = []
     t_total = time.time()
+    n_skipped = 0
     for i in range(len(dataset)):
         sample = dataset[i]
         coords_ts = sample.pos.to(device)
         z = sample.z.to(device)
         formula = getattr(sample, "formula", f"sample_{i}")
-        coords = (coords_ts + noise_vecs[i].to(device)).double()
+
+        if args.start_from == "ts_noised":
+            coords = (coords_ts + noise_vecs[i].to(device)).double()
+        elif args.start_from == "reactant":
+            if not hasattr(sample, "pos_reactant"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_reactant"); n_skipped += 1; continue
+            coords = sample.pos_reactant.to(device).double()
+        elif args.start_from == "product":
+            if not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: no pos_product"); n_skipped += 1; continue
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product all zeros"); n_skipped += 1; continue
+            coords = pos_p.double()
+        elif args.start_from == "midpoint":
+            if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: midpoint needs R+P"); n_skipped += 1; continue
+            pos_r = sample.pos_reactant.to(device); pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product missing"); n_skipped += 1; continue
+            coords = (0.5 * (pos_r + pos_p)).double()
         atomic_nums = z
 
         # Get masses for eckart variants

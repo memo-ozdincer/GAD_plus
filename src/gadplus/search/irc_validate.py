@@ -299,9 +299,12 @@ def run_irc_validation(
 ) -> IRCResult:
     """Baseline: vanilla Sella IRC with BFGS-updated Hessian, Cartesian coords.
 
-    Identical wiring to what the codebase has always used. Kept as the
-    control condition for comparison against `irc_sella_hip.run_irc_sella_hip`
-    and `irc_rigorous.run_irc_rigorous`.
+    Uses a single Sella IRC instance for forward + reverse so the saddle's
+    lowest eigenvector is computed once and the +/- sign is consistent
+    between the two directions. Creating separate IRC instances (the prior
+    behavior) caused forward and reverse to occasionally pick the same
+    sign for v0ts on near-degenerate spectra, sending both directions
+    to the same minimum.
     """
     try:
         from sella import IRC
@@ -327,16 +330,18 @@ def run_irc_validation(
 
     optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4}
 
-    endpoints = {}
-    for direction in ["forward", "reverse"]:
-        try:
-            atoms_copy = atoms.copy()
-            atoms_copy.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
-            irc = IRC(atoms=atoms_copy, **optimizer_kwargs)
-            irc.run(fmax=0.01, steps=max_steps, direction=direction)
-            endpoints[direction] = atoms_copy.positions.copy()
-        except Exception:
-            endpoints[direction] = None
+    endpoints = {"forward": None, "reverse": None}
+    try:
+        irc = IRC(atoms=atoms, **optimizer_kwargs)
+        # Forward first — computes v0ts and saves it on the instance.
+        irc.run(fmax=0.01, steps=max_steps, direction="forward")
+        endpoints["forward"] = atoms.positions.copy()
+        # Reverse uses the cached v0ts (Sella restores PES state internally),
+        # guaranteeing direction = -v0ts of the forward run.
+        irc.run(fmax=0.01, steps=max_steps, direction="reverse")
+        endpoints["reverse"] = atoms.positions.copy()
+    except Exception:
+        pass
 
     return score_endpoints(
         forward_coords=endpoints.get("forward"),
