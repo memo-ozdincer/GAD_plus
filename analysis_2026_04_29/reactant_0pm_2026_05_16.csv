@@ -3,5 +3,5 @@ Sella cartesian Eckart untuned Hess.Freq.=1,Sella,287,89.89547038327527,81.53310
 GAD dt=0.003,plain GAD,152,59.86842105263158,47.36842105263158,40.13157894736842,True
 GAD dt=0.005,plain GAD,179,68.15642458100558,62.01117318435754,54.18994413407821,True
 "GAD projected (300 steps, force_norm)",plain GAD,300,10.666666666666666,9.333333333333334,6.333333333333333,False
-Hybrid damped Eckart eig tr=0.05,hybrid,52,0.0,0.0,0.0,True
-Hybrid undamped Eckart eig tr=0.05,hybrid,52,0.0,0.0,0.0,True
+Hybrid damped Eckart eig tr=0.05,hybrid,56,0.0,0.0,0.0,True
+Hybrid undamped Eckart eig tr=0.05,hybrid,56,0.0,0.0,0.0,True
