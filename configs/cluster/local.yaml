@@ -1,0 +1,21 @@
+# Local/current cluster checkout.
+#
+# Data and checkpoints live inside the repository by default:
+#   ${project_dir}/data/transition1x.h5
+#   ${project_dir}/models/hip_v3.ckpt
+# Override with GADPLUS_PROJECT_DIR, GADPLUS_SCRATCH_DIR, GADPLUS_T1X_H5, or
+# GADPLUS_HIP_CHECKPOINT when using shared cluster storage.
+
+account: null
+gpus: 1
+cpus_per_task: 4
+mem_gb: 32
+time_min: 360
+
+omp_num_threads: 1
+torch_num_threads: 2
+
+modules: []
+
+project_dir: /lustre/fsw/portfolios/nvr/users/anburger/GAD_plus
+scratch_dir: /lustre/fsw/portfolios/nvr/users/anburger/GAD_plus

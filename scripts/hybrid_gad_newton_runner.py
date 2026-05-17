@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
 from gadplus.data.transition1x import Transition1xDataset, UsePos
+from gadplus.paths import hip_checkpoint_path, transition1x_h5_path
 from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
 # ── hybrid_gad_newton step functions ──────────────────────────────────────────
@@ -107,9 +108,61 @@ def parse_args():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output-dir", required=True)
     p.add_argument("--device", default="cuda")
+    p.add_argument(
+        "--start-from",
+        default="ts_noised",
+        choices=["ts_noised", "reactant", "product", "midpoint", "geodesic_mid"],
+        help=(
+            "Initial geometry: noised TS (default), reactant, product, "
+            "linear midpoint, or reactant-product geodesic midpoint."
+        ),
+    )
     p.add_argument("--force-threshold", type=float, default=0.01,
                    help="fmax convergence criterion (with n_neg=1)")
     return p.parse_args()
+
+
+def starting_coords(sample, start_from: str, device: str, noise: torch.Tensor) -> tuple[torch.Tensor, str] | None:
+    coords_ts = sample.pos.to(device)
+    if start_from == "ts_noised":
+        return coords_ts + noise.to(device), "ts_noised"
+
+    if start_from == "reactant":
+        if not hasattr(sample, "pos_reactant"):
+            return None
+        return sample.pos_reactant.to(device), "reactant"
+
+    if start_from == "product":
+        if not hasattr(sample, "pos_product"):
+            return None
+        pos_p = sample.pos_product.to(device)
+        if pos_p.abs().sum() < 1e-6:
+            return None
+        return pos_p, "product"
+
+    if start_from in {"midpoint", "geodesic_mid"}:
+        if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+            return None
+        pos_r = sample.pos_reactant.to(device)
+        pos_p = sample.pos_product.to(device)
+        if pos_p.abs().sum() < 1e-6:
+            return None
+        if start_from == "midpoint":
+            return 0.5 * (pos_r + pos_p), "midpoint"
+
+        from gadplus.geometry.interpolation import geodesic_interpolation
+
+        return (
+            geodesic_interpolation(
+                pos_r,
+                pos_p,
+                n_images=3,
+                atoms=atomic_nums_to_symbols(sample.z),
+            )[1],
+            "geodesic_mid",
+        )
+
+    raise ValueError(f"Unknown start_from: {start_from}")
 
 
 def main():
@@ -121,15 +174,11 @@ def main():
     device = args.device if torch.cuda.is_available() else "cpu"
 
     # Locate HIP + dataset
-    for ckpt in ["/lustre06/project/6033559/memoozd/models/hip_v2.ckpt",
-                 "/project/rrg-aspuru/memoozd/models/hip_v2.ckpt"]:
-        if os.path.exists(ckpt): break
-    else: sys.exit("hip_v2.ckpt not found")
-
-    for h5 in ["/lustre06/project/6033559/memoozd/data/transition1x.h5",
-               "/project/rrg-aspuru/memoozd/data/transition1x.h5"]:
-        if os.path.exists(h5): break
-    else: sys.exit("transition1x.h5 not found")
+    try:
+        ckpt = str(hip_checkpoint_path())
+        h5 = str(transition1x_h5_path())
+    except FileNotFoundError as exc:
+        sys.exit(str(exc))
 
     calculator = load_hip_calculator(ckpt, device=device)
     predict_fn = make_hip_predict_fn(calculator)
@@ -161,10 +210,14 @@ def main():
     t_total = time.time()
     for i in range(len(dataset)):
         sample = dataset[i]
-        coords_ts = sample.pos.to(device)
         z = sample.z.to(device)
         formula = getattr(sample, "formula", f"sample_{i}")
-        coords = (coords_ts + noise_vecs[i].to(device)).double()
+        start = starting_coords(sample, args.start_from, device, noise_vecs[i])
+        if start is None:
+            print(f"  [{i:3d}] {formula:>12s} | SKIP: unavailable start={args.start_from}", flush=True)
+            continue
+        coords, start_method_str = start
+        coords = coords.double()
         atomic_nums = z
 
         # Get masses for eckart variants
@@ -297,6 +350,7 @@ def main():
         rows.append({
             "sample_id": i, "formula": formula, "method": method_tag,
             "noise_pm": noise_pm, "n_steps_setting": args.n_steps,
+            "start_method": start_method_str,
             "converged": converged, "converged_step": converged_step,
             "total_steps": n_steps_actual,
             "final_force_max": final_force_max,

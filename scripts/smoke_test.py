@@ -49,20 +49,16 @@ def main():
     from gadplus.data.transition1x import Transition1xDataset, UsePos
     from gadplus.logging.trajectory import TrajectoryLogger
     from gadplus.logging.autopsy import classify_failure, FailureType
+    from gadplus.paths import hip_checkpoint_path, transition1x_h5_path
     from gadplus.search.gad_search import GADSearchConfig, run_gad_search
     print(f"  All imports OK ({time.time() - t0:.1f}s)")
 
     # ---- 2. Load HIP ----
     print("\n--- Loading HIP ---")
-    # Find checkpoint
-    for ckpt_path in [
-        "/lustre06/project/6033559/memoozd/models/hip_v2.ckpt",
-        "/project/rrg-aspuru/memoozd/models/hip_v2.ckpt",
-    ]:
-        if os.path.exists(ckpt_path):
-            break
-    else:
-        print("  ERROR: hip_v2.ckpt not found")
+    try:
+        ckpt_path = str(hip_checkpoint_path())
+    except FileNotFoundError as exc:
+        print(f"  ERROR: {exc}")
         sys.exit(1)
 
     t0 = time.time()
@@ -73,14 +69,10 @@ def main():
 
     # ---- 3. Load dataset ----
     print("\n--- Loading dataset ---")
-    for h5_path in [
-        "/lustre06/project/6033559/memoozd/data/transition1x.h5",
-        "/project/rrg-aspuru/memoozd/data/transition1x.h5",
-    ]:
-        if os.path.exists(h5_path):
-            break
-    else:
-        print("  ERROR: transition1x.h5 not found")
+    try:
+        h5_path = str(transition1x_h5_path())
+    except FileNotFoundError as exc:
+        print(f"  ERROR: {exc}")
         sys.exit(1)
 
     t0 = time.time()

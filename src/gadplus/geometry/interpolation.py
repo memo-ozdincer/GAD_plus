@@ -41,6 +41,7 @@ def geodesic_interpolation(
     reactant: Tensor,
     product: Tensor,
     n_images: int = 10,
+    atoms: list[str] | None = None,
 ) -> Tensor:
     """Geodesic interpolation between reactant and product geometries.
 
@@ -53,12 +54,14 @@ def geodesic_interpolation(
         reactant:  (N, 3) reactant coordinates.
         product:   (N, 3) product coordinates.
         n_images:  Number of interpolated images (including endpoints).
+        atoms:     Element symbols for the geometry.
 
     Returns:
         (n_images, N, 3) tensor of interpolated geometries.
     """
     try:
-        from geodesic_interpolate import geodesic  # type: ignore[import-untyped]
+        from geodesic_interpolate.geodesic import Geodesic  # type: ignore[import-untyped]
+        from geodesic_interpolate.interpolation import redistribute  # type: ignore[import-untyped]
     except ImportError:
         warnings.warn(
             "geodesic_interpolate package not found. "
@@ -67,17 +70,30 @@ def geodesic_interpolation(
         )
         return linear_interpolation(reactant, product, n_images)
 
-    # geodesic_interpolate expects numpy arrays of shape (n_images, N*3)
+    if atoms is None:
+        warnings.warn(
+            "geodesic_interpolation requires atom symbols. "
+            "Falling back to linear interpolation.",
+            stacklevel=2,
+        )
+        return linear_interpolation(reactant, product, n_images)
+
+    if n_images < 2:
+        raise ValueError("n_images must be >= 2 to include both endpoints.")
+
+    # geodesic_interpolate expects numpy arrays of shape (n_images, N, 3)
     import numpy as np
 
-    r_np = reactant.detach().cpu().numpy().reshape(1, -1)
-    p_np = product.detach().cpu().numpy().reshape(1, -1)
-    initial_path = np.concatenate([r_np, p_np], axis=0)
+    r_np = reactant.detach().cpu().numpy()
+    p_np = product.detach().cpu().numpy()
+    initial_path = np.stack([r_np, p_np], axis=0)
 
-    path = geodesic.run_geodesic_interpolation(
-        initial_path,
-        n_images=n_images,
-    )
+    raw_path = np.asarray(redistribute(atoms, initial_path, n_images, tol=1e-2))
+    smoother = Geodesic(atoms, raw_path, friction=1e-2)
+    if len(atoms) > 35:
+        path = smoother.sweep(tol=2e-3, max_iter=15, micro_iter=20)
+    else:
+        path = smoother.smooth(tol=2e-3, max_iter=15)
 
     n_atoms = reactant.shape[0]
     path_tensor = torch.tensor(

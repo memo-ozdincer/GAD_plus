@@ -3,7 +3,7 @@ defaults:
   - starting: noised_ts
   - calculator: hip
   - logging: default
-  - cluster: narval
+  - cluster: local
   - _self_
 
 seed: 42
@@ -11,4 +11,4 @@ max_samples: 300
 # Available splits: train (9561), test (287), val (225)
 # We didn't train on T1x so train split is fair game for evaluation.
 split: train
-output_dir: /lustre07/scratch/memoozd/gadplus/runs/${now:%Y%m%d_%H%M%S}
+output_dir: ${cluster.scratch_dir}/runs/${now:%Y%m%d_%H%M%S}

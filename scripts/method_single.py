@@ -20,6 +20,8 @@ from ase.io import write as ase_write
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from gadplus.paths import hip_checkpoint_path, scratch_dir, transition1x_h5_path
+
 
 METHOD_CONFIGS = {
     # === Round 1 methods ===
@@ -354,9 +356,16 @@ def main():
         default=True,
         help="Write converged TS geometries to a multi-frame XYZ file",
     )
-    parser.add_argument("--start-from", type=str, default="ts_noised",
-                        choices=["ts_noised", "reactant", "product", "midpoint"],
-                        help="Initial geometry: noised TS (default), reactant, product, or linear midpoint.")
+    parser.add_argument(
+        "--start-from",
+        type=str,
+        default="ts_noised",
+        choices=["ts_noised", "reactant", "product", "midpoint", "geodesic_mid"],
+        help=(
+            "Initial geometry: noised TS (default), reactant, product, "
+            "linear midpoint, or reactant-product geodesic midpoint."
+        ),
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -372,25 +381,13 @@ def main():
     )
 
     # ---- Paths ----
-    for ckpt_path in [
-        "/lustre06/project/6033559/memoozd/models/hip_v2.ckpt",
-        "/project/rrg-aspuru/memoozd/models/hip_v2.ckpt",
-    ]:
-        if os.path.exists(ckpt_path):
-            break
-    else:
-        sys.exit("hip_v2.ckpt not found")
+    try:
+        ckpt_path = str(hip_checkpoint_path())
+        h5_path = str(transition1x_h5_path())
+    except FileNotFoundError as exc:
+        sys.exit(str(exc))
 
-    for h5_path in [
-        "/lustre06/project/6033559/memoozd/data/transition1x.h5",
-        "/project/rrg-aspuru/memoozd/data/transition1x.h5",
-    ]:
-        if os.path.exists(h5_path):
-            break
-    else:
-        sys.exit("transition1x.h5 not found")
-
-    output_dir = args.output_dir or "/lustre07/scratch/memoozd/gadplus/runs/method_cmp_300"
+    output_dir = args.output_dir or str(scratch_dir() / "runs" / "method_cmp_300")
     os.makedirs(output_dir, exist_ok=True)
 
     # ---- Load HIP ----
@@ -544,6 +541,22 @@ def main():
                 continue
             coords_start = 0.5 * (pos_r + pos_p)
             start_method_str = "midpoint"
+        elif args.start_from == "geodesic_mid":
+            if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: geodesic_mid needs reactant+product")
+                continue
+            pos_r = sample.pos_reactant.to(device)
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product missing")
+                continue
+            from gadplus.geometry.interpolation import geodesic_interpolation
+            from gadplus.projection import atomic_nums_to_symbols
+
+            coords_start = geodesic_interpolation(
+                pos_r, pos_p, n_images=3, atoms=atomic_nums_to_symbols(z)
+            )[1]
+            start_method_str = "geodesic_mid"
 
         logger = TrajectoryLogger(
             output_dir=output_dir,
