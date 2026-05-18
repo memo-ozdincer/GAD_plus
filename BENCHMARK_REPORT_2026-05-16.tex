@@ -541,10 +541,12 @@ below).}
 \paragraph{Reading the full plateau figure (per-noise breakdown).} The
 following figure plots TS conv \% as the threshold tightens (right side
 of each panel = stricter $F_\mathrm{max}$ cutoff), one panel per noise.
-GAD curves drop \emph{vertically} from 0.01 to 0.005 across every noise
-level — plain GAD has essentially no samples in the
-\SIrange{0.001}{0.005}{eV/\angstrom} band. Hybrid and Sella retain a
-non-trivial fraction at 0.005 because Newton drives force down further.
+\textbf{All three GAD $dt$ values (0.003, 0.005, 0.007) drop to 0\% at
+$F_\mathrm{max}<0.005$ across every noise level}; the comprehensive
+fmax table above shows this explicitly — pure GAD has essentially no
+samples in the \SIrange{0.001}{0.005}{eV/\angstrom} band, regardless of
+step size. Hybrid and Sella retain a non-trivial fraction at 0.005
+because Newton drives force down further.
 
 \begin{figure}[H]
 \centering
