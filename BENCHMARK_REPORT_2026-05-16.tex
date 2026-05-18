@@ -150,8 +150,8 @@ GAD dt=0.007                                & 88.5 & 88.5 & 88.5 & \textbf{78.4}
 \midrule
 Sella cartesian tuned Hess.Freq.=1          & 88.9 & 88.9 & 87.5 & 70.7 & 46.7 & 17.8 \\
 Sella cartesian Eckart untuned Hess.Freq.=1 & \textbf{89.2} & \textbf{89.2} & 87.5 & 72.5 & 49.8 & 23.3 \\
-Sella internal tuned Hess.Freq.=1           & 88.2 & 87.5 & 83.3 & 64.5 & ---  & ---  \\
-Sella cartesian Eckart untuned Hess.Freq.=3 & 88.5 & 88.9 & 87.1 & 70.4 & 45.3 & ---  \\
+Sella internal tuned Hess.Freq.=1           & 88.2 & 87.5 & 83.3 & 64.5 & ---  & 16.0 \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & 88.5 & 88.9 & 87.1 & 70.4 & 45.3 & 22.0 \\
 \midrule
 Hybrid damped Eckart eig tr=0.05            & \textbf{89.2} & 88.9 & 88.9 & 76.7 & 57.5 & 38.7 \\
 Hybrid undamped Eckart eig tr=0.05          & 88.9 & 88.9 & 88.5 & 77.0 & 57.1 & 38.7 \\
@@ -788,11 +788,14 @@ $F_\mathrm{max}<0.01$ threshold without overshooting.
 50 pm  & 88.2 / 87.5 & \textbf{92.0} / 87.1 & $+3.8$ & $-0.4$ \\
 100 pm & 70.7 / \textbf{72.5} & 72.8 / 70.4 & $+2.1$ & $\mathbf{-2.1}$ \\
 150 pm & \textbf{54.0} / \textbf{49.8} & 50.5 / 45.3 & $-3.5$ & $\mathbf{-4.5}$ \\
+200 pm & \textbf{27.2} / \textbf{23.3} & 23.3 / 22.0 & $-3.9$ & $-1.3$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The IRC gap widens with noise: $-0.7$ pp at 10 pm $\to -4.5$ pp at 150 pm.
+The IRC gap widens with noise from $-0.7$ pp at 10 pm to $-4.5$ pp at
+150 pm, then narrows to $-1.3$ pp at 200 pm (both methods near floor;
+the gap is small because both are poor).
 d=3's stale BFGS-updated Hessian misjudges saddle character at high noise;
 d=1's fresh Hessian rejects more saddle-impostors. Net: the project's d=1
 choice is justified — the 96.5\% raw-conv "win" is a wrong-saddle false
