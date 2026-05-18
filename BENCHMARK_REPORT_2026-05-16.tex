@@ -254,6 +254,16 @@ into the saddle basin and the Newton step is decisive.
 \emph{Follow-ups:} hybrid + plain GAD from-midpoint cells not yet generated;
 add for a complete cross-family midpoint probe.
 
+\paragraph{IRC TOPO for midpoint (NEW, $n=287$).} Sella IRC validation on
+all 148 source-converged TS from the midpoint starting condition:
+\textbf{134 / 148 per-converged match T1x reactant/product graphs}
+(90.5\% per-conv). Full-N IRC TOPO \% = $134/287 = 46.7\%$, identical to
+raw conv. \textbf{Recovery vs. raw conv: $-0.0$ pp} — Sella's midpoint
+wins are essentially all real-basin (no wrong-saddle false positives on
+this cell). RMSD-intended (strict 0.3 Å) = $85/148 = 57.4\%$ per-conv =
+$29.6\%$ full-N. Source: \texttt{irc\_followup\_2026\_05\_16.csv} +
+\texttt{runs/irc\_sella\_midpoint\_2026\_05\_16/merged\_irc.parquet}.
+
 \clearpage
 % =================================================================
 \section{Convergence-criterion families: which $F_\mathrm{max}$ threshold?}
