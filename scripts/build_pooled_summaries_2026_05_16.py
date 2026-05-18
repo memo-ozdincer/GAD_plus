@@ -29,6 +29,14 @@ POOLED_CELLS = [
         "safety_glob": f"{RUNS}/safetynet/sella_internal_default/summary*200pm*.parquet",
         "out": f"{RUNS}/test_set/sella_internal_default/pooled_summary_200pm.parquet",
     },
+    {
+        # 150pm refill (job 61166201) writes 4 partitions to safetynet/ with _s0-72,
+        # _s72-144, etc. suffixes. Pool them into canonical 150pm summary.
+        "name": "Sella internal @ 150pm",
+        "main_glob":   f"{RUNS}/test_set/sella_internal_default/summary*150pm.parquet",
+        "safety_glob": f"{RUNS}/safetynet/sella_internal_default/summary*150pm*.parquet",
+        "out": f"{RUNS}/test_set/sella_internal_default/pooled_summary_150pm.parquet",
+    },
 ]
 
 
