@@ -62,27 +62,35 @@ def merge_cell(cell):
     out = f"{cell['dir']}/merged_irc.parquet"
     df.to_parquet(out)
     n_all = len(df)
-    converged = df["source_gad_converged"].sum() if "source_gad_converged" in df.columns else None
-    n_topo_intended = df["topology_intended"].sum() if "topology_intended" in df.columns else 0
-    n_intended = df["intended"].sum() if "intended" in df.columns else 0
-    # IRC TOPO % is computed over the converged subset (n=287 if everything converged)
-    # but the standard project metric is over the ENTIRE sample set, where unconverged ones
-    # are automatically not-intended. So denominator = 287.
-    denom = 287
-    topo_pct = 100 * n_topo_intended / denom
-    intended_pct = 100 * n_intended / denom
-    recovery_pp = topo_pct - cell["raw_conv_pct"]
+    n_converged = int(df["source_gad_converged"].sum()) if "source_gad_converged" in df.columns else 0
+    n_topo_intended = int(df["topology_intended"].sum()) if "topology_intended" in df.columns else 0
+    n_intended = int(df["intended"].sum()) if "intended" in df.columns else 0
+    # Two views:
+    # (a) per-converged TOPO rate (n_topo / n_converged) — projectable + intrinsic
+    # (b) full-N TOPO % (n_topo / 287) — project standard, only meaningful when n_all == 287
+    per_conv_topo = 100 * n_topo_intended / n_converged if n_converged > 0 else 0.0
+    full_n_topo = 100 * n_topo_intended / 287 if n_all == 287 else None
+    full_n_intended = 100 * n_intended / 287 if n_all == 287 else None
     print(f"  {cell['label']}: merged {len(parts)} partitions, {n_all} samples")
-    print(f"    converged (from survey): {converged}")
-    print(f"    IRC TOPO-intended:   {n_topo_intended:>3.0f}/{denom} = {topo_pct:5.1f}%")
-    print(f"    IRC RMSD-intended:   {n_intended:>3.0f}/{denom} = {intended_pct:5.1f}%")
-    print(f"    Recovery (TOPO−raw): {recovery_pp:+.1f} pp")
+    print(f"    source-converged: {n_converged}")
+    print(f"    IRC TOPO-intended:  {n_topo_intended}/{n_converged} converged = {per_conv_topo:.1f}% per-conv")
+    print(f"    IRC RMSD-intended:  {n_intended}/{n_converged} converged = "
+          f"{100*n_intended/n_converged if n_converged > 0 else 0:.1f}% per-conv")
+    if full_n_topo is not None:
+        recovery_pp = full_n_topo - cell["raw_conv_pct"]
+        print(f"    FULL n=287 IRC TOPO: {n_topo_intended}/287 = {full_n_topo:.1f}%   "
+              f"(recovery vs raw {cell['raw_conv_pct']:.1f}%: {recovery_pp:+.1f} pp)")
+    else:
+        print(f"    PARTIAL: {n_all}/287 — wait for all 4 partitions for the full-N TOPO %")
     print(f"    Wrote: {out}")
     return {
         "label": cell["label"], "method_tag": cell["method_tag"],
         "noise_pm": cell["noise_pm"], "n_partitions": len(parts), "n_samples": n_all,
-        "topo_pct": topo_pct, "intended_pct": intended_pct,
-        "raw_conv_pct": cell["raw_conv_pct"], "recovery_pp": recovery_pp,
+        "n_converged": n_converged, "n_topo": n_topo_intended, "n_intended": n_intended,
+        "per_conv_topo_pct": per_conv_topo,
+        "full_n_topo_pct": full_n_topo, "full_n_intended_pct": full_n_intended,
+        "raw_conv_pct": cell["raw_conv_pct"],
+        "recovery_pp": (full_n_topo - cell["raw_conv_pct"]) if full_n_topo is not None else None,
     }
 
 
