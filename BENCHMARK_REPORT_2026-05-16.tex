@@ -229,7 +229,7 @@ mechanism is correct, conv \% should rise as the longer GAD walk gives the
 eig-switch a chance to fire. Result will land in $\sim$6 h.
 
 \paragraph{Companion: midpoint starting condition (NEW 2026-05-16).}
-Same Sella cart+Eckart untuned d=1, $n=52$ in flight, started from the
+Same Sella cart+Eckart untuned d=1 with $n=287$ (FINAL), started from the
 \emph{linear midpoint} of reactant and product geometries:
 
 \begin{center}\footnotesize
@@ -245,14 +245,14 @@ Reactant                                & 80.8\%   & 89.9\% \\
 \end{center}
 
 The midpoint starting geometry is, surprisingly, \emph{harder} than the
-reactant for Sella: 50\% vs 80\% conv. Mechanism: the (R+P)/2 geometry
+reactant for Sella: 46.7\% vs 80.8\% conv. Mechanism: the (R+P)/2 geometry
 sits on a saddle-orthogonal direction with no clear soft mode for the
 Newton step to climb, so the trust-radius QN walks around looking for
 $n_\mathrm{neg}=1$. Reactant has a well-defined steepest-ascent direction
 into the saddle basin and the Newton step is decisive.
 
-\emph{Caveat:} $n=52$, in-flight (SLURM 61087603\_8). Final $n=287$ within
-$\sim$5 h. Hybrid + GAD from-midpoint data not yet generated.
+\emph{Follow-ups:} hybrid + plain GAD from-midpoint cells not yet generated;
+add for a complete cross-family midpoint probe.
 
 \clearpage
 % =================================================================
@@ -625,7 +625,7 @@ total wall-time. Less Hessian information, better conv: surprising.
 50 pm  & 88.2 & \textbf{92.0} & \textbf{+3.8} & 20.4 / 21.2 \\
 100 pm & 70.7 & \textbf{72.8} & +2.1          & 46.1 / 50.5 \\
 150 pm & \textbf{54.0} & 50.5 & $-3.5$        & 71.6 / 79.0 \\
-200 pm & \textbf{27.2} & 25.1 & $-2.1$ & 107.0 / pending \\
+200 pm & \textbf{27.2} & 25.1 & $-2.1$ & 107.0 / 115.4 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -675,23 +675,25 @@ monotonically widens with noise from $-0.7$ pp at 10 pm to $-4.5$ pp at
 % =================================================================
 
 \begin{itemize}[leftmargin=1.5em, itemsep=0.1em]
-\item \textbf{R1. Hybrid from reactant.} The existing hybrid runner only
-  accepts a noised-TS starting condition. Wire \texttt{--start \{reactant,
-  product, midpoint\}} into the runner and add the missing bars to
-  Figure~\ref{sec:thresholds} = the reactant @ 0 pm cross-family probe.
-\item \textbf{R2. Hess.Freq.=3 at 200 pm.} Cell pending (SLURM 60769799).
-  Expect d=1 IRC TOPO to keep widening its lead.
-\item \textbf{R3. Sella internal at 150 pm / 200 pm.} Partial data only
-  ($n=222/287, 196/287$ from log extraction after timeout). Resubmit with
-  longer wall-clock to fill the full grid.
-\item \textbf{R4. Tighter $F_\mathrm{max}$ via longer step budget.} At
-  2000 steps, no method reaches $F_\mathrm{max}<0.001$ (the Sella README
-  recommendation). Run a small sub-grid at 10k steps to test whether the
-  0.001 floor is method-limited or budget-limited.
-\item \textbf{R5. Mode-overlap-aware switching for hybrid.} Gate Newton
-  trigger on eigenvector continuity in addition to $n_\mathrm{neg}{=}1$.
-  Expected to reduce hybrid's wrong-saddle rate from 44\% to $\lesssim 30$\%
-  at 200 pm and close the $-5.9$ pp IRC TOPO gap vs plain GAD.
+\item \textbf{R1. Hybrid from reactant.} \textbf{DONE} (n=287, 2.1\% conv).
+  The runner now takes \texttt{--start \{reactant, product, midpoint\}}.
+  The 10k-budget follow-up confirmed the issue is geometric distance from
+  reactant to saddle, not step count.
+\item \textbf{R2. Hess.Freq.=3 at 200 pm.} \textbf{DONE} (n=287 pooled, 25.1\%).
+  d=3 vs d=1 raw conv gap: -2.1 pp. IRC TOPO for 200 pm queued (SLURM 61164976).
+\item \textbf{R3. Sella internal at 150 pm / 200 pm.} \textbf{DONE for 200 pm}
+  (n=287 pooled, 13.9\%). 150 pm at n=172 partial (timed out, 35.5\%).
+\item \textbf{R4. Tighter $F_\mathrm{max}$ via longer step budget.} \textbf{DONE}.
+  GAD ×10000 @ 50 pm produces \textbf{0\% conv at $F_\mathrm{max}<0.005$}
+  on n=287 — confirms the plateau is structural, not budget-limited.
+\item \textbf{R5. Mode-overlap-aware switching for hybrid.} Not started.
+  Gate Newton trigger on eigenvector continuity in addition to
+  $n_\mathrm{neg}{=}1$. Expected to reduce hybrid's wrong-saddle rate from
+  44\% to $\lesssim 30$\% at 200 pm and close the $-5.9$ pp IRC TOPO gap vs
+  plain GAD.
+\item \textbf{R6 (new).} GAD + hybrid from midpoint @ 0 pm (cross-family
+  midpoint probe to match the reactant story). Sella alone is 46.7\%; what
+  about plain GAD and hybrid?
 \end{itemize}
 
 % =================================================================
