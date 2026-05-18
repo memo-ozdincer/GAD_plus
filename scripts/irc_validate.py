@@ -98,6 +98,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--noise-pm", type=int, default=10, help="Noise level (pm) to validate")
     parser.add_argument("--max-validate", type=int, default=10, help="Max converged TS to validate")
+    parser.add_argument("--sample-start", type=int, default=None,
+                        help="Inclusive lower bound on sample_id (for partitioning across SLURM tasks).")
+    parser.add_argument("--sample-end", type=int, default=None,
+                        help="Exclusive upper bound on sample_id.")
     parser.add_argument("--irc-steps", type=int, default=500, help="Max IRC steps per direction")
     parser.add_argument("--rmsd-threshold", type=float, default=0.3, help="RMSD threshold for matching (A)")
     parser.add_argument("--survey-dir", type=str, default=None,
@@ -189,14 +193,19 @@ def main():
     # Narrow single-file read avoids O(N_files) Lustre metadata stalls on glob.
     summary_path = f"{survey_dir}/summary_{args.source_method}_{args.noise_pm}pm.parquet"
     extra_cols = ", coords_flat" if args.coords_source == "summary" else ""
+    sample_clause = ""
+    if args.sample_start is not None:
+        sample_clause += f" AND sample_id >= {args.sample_start}"
+    if args.sample_end is not None:
+        sample_clause += f" AND sample_id < {args.sample_end}"
+
     if args.all_endpoints:
-        # IRC on every sample's final trajectory coords. No converged filter;
-        # fetch at step = total_steps - 1 for each sample.
         converged_df = duckdb.execute(f"""
             SELECT sample_id, method,
                    CAST(total_steps - 1 AS DOUBLE) AS converged_step,
                    final_force_norm, final_n_neg, formula, converged {extra_cols}
             FROM '{summary_path}'
+            WHERE 1=1 {sample_clause}
             ORDER BY sample_id ASC
             LIMIT {args.max_validate}
         """).df()
@@ -205,7 +214,7 @@ def main():
             SELECT sample_id, method, converged_step, final_force_norm,
                    final_n_neg, formula, true AS converged {extra_cols}
             FROM '{summary_path}'
-            WHERE converged = true
+            WHERE converged = true {sample_clause}
             ORDER BY converged_step ASC
             LIMIT {args.max_validate}
         """).df()
