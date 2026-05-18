@@ -72,6 +72,25 @@ n=11. The aggregate fmax<0.005=0.0% would only change if 1+ of the remaining 276
 samples lands at fmax in [0.001, 0.005]. Across the 11 samples seen, the median
 final force_max is 0.0100. Final n=287 ETA ~3 h.
 
+---
+
+## CONFIRMED at FULL n=287 (2026-05-16 end of wave)
+
+GAD dt=0.005 × 10000 steps @ 50 pm, all 287 test samples processed:
+
+| threshold | conv % |
+|---|---|
+| fmax<0.05 | 95.5 |
+| fmax<0.023 (Gaussian) | 91.6 |
+| fmax<0.01 (project) | 85.7 |
+| **fmax<0.005 (tight)** | **0.0** |
+| fmax<0.001 (Sella README) | 0.0 |
+
+The 5× step budget gains +12 pp at fmax<0.01 (85.7% vs 71.8% canonical
+2000-step) but **gains zero ground at fmax<0.005**. The plateau is intrinsic
+and complete. Newton landing (via hybrid or pure Sella) is the only
+mechanism that reaches fmax<0.005 on this PES.
+
 ## Source
 
 - `/lustre07/scratch/memoozd/gadplus/logs/compr_61087774_5.out`

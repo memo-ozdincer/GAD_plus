@@ -129,8 +129,8 @@ GAD dt=0.007                                & 89.2 & 88.9 & 85.7 & 72.8 & 58.2 &
 \midrule
 Sella cartesian tuned Hess.Freq.=1          & 92.0 & 91.3 & 87.5 & 65.5 & 42.9 & 18.8 \\
 Sella cartesian Eckart untuned Hess.Freq.=1 & 92.7 & 92.0 & 88.2 & 70.7 & 54.0 & 27.2 \\
-Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & 41.7$^{p_{84}}$ & 17.0$^{p_{176}}$ \\
-Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 23.9$^{p_{222}}$ \\
+Sella internal tuned Hess.Freq.=1           & 79.1 & 77.4 & 71.8 & 50.9 & 35.5$^{p_{172}}$ & 13.9 \\
+Sella cartesian Eckart untuned Hess.Freq.=3 & \textbf{96.5} & \textbf{95.5} & \textbf{92.0} & 72.8 & 50.5 & 25.1 \\
 \midrule
 Hybrid damped Eckart eig tr=0.05            & 85.4 & 85.0 & 81.5 & 66.9 & 50.9 & 33.1 \\
 Hybrid undamped Eckart eig tr=0.05          & 84.7 & 84.3 & 81.5 & 65.5 & 49.8 & 31.0 \\
@@ -183,8 +183,8 @@ needs $>$1000 steps to walk reactant$\to$saddle and partial-run statistics
 ($n=152/287, 179/287$) show 40--54\% conv at the project threshold. The 300-step
 GAD-projected cell (force-norm criterion, no fmax in the trajectory schema)
 illustrates the step-budget collapse: only 6\% converge with a 300-step cap.
-\textbf{Hybrid damped/undamped from reactant: 1.3\%~/~5.1\% conv at $n=78$/79}
-— case-dependent (see following paragraph).
+\textbf{Hybrid damped/undamped from reactant: 2.1\% / 2.1\% conv ($n=287$, FINAL)}
+— geometrically case-dependent (see following paragraph).
 Source: \texttt{reactant\_0pm\_2026\_05\_16.csv}.}
 \end{figure}
 
@@ -195,18 +195,28 @@ becomes useful only when started near a saddle (small to moderate noise).
 This is consistent with GAD's mechanism: it follows the lowest curvature
 direction, which is only well-defined near the saddle manifold.
 
-\paragraph{Hybrid from reactant: 1--5\% (new finding, refined).} The hybrid
-trails plain GAD (40--54\% from reactant) by 35+ pp on this axis. At $n=78$
-the damped variant is at 1.3\% conv (one converged sample cluster: C3H5NO2,
-samples 75-78). The undamped variant is at 5.1\%. Mechanism: the hybrid's
-Newton step only fires when the Hessian's vibrational spectrum has
-$n_\mathrm{neg}=1$ (eig-switch). Starting from the reactant, the trajectory
-begins at $n_\mathrm{neg}=0$ (a local minimum) and the GAD walking phase
-has to drag the geometry onto the saddle manifold before Newton can
-activate. The result is \emph{case-dependent}: some molecular species
-(C3H5NO2 in the test set) reach $n_\mathrm{neg}=1$ within $\sim$250 steps
-and converge cleanly; harder species (C2H3N3O2, the first ~75 samples)
-never reach $n_\mathrm{neg}=1$ in 2000 steps. \emph{The
+\paragraph{Hybrid from reactant: 2.1\% (FINAL, $n=287$).} The hybrid
+trails plain GAD (40--54\% from reactant) by $\sim$45 pp on this axis. Both
+damped and undamped variants converged on the same 6 samples (2.1\%).
+Mechanism: the hybrid's Newton step only fires when the Hessian's
+vibrational spectrum has $n_\mathrm{neg}=1$ (eig-switch). Starting from
+the reactant, the trajectory begins at $n_\mathrm{neg}=0$ (a local minimum)
+and the GAD walking phase has to drag the geometry onto the saddle
+manifold before Newton can activate. The result is \emph{geometrically
+case-dependent}: a small subset of test-set reactants ($\sim$2\% of 287)
+sit close enough to their saddle that 2000 GAD steps suffice; the other
+$\sim$98\% don't.
+
+\textbf{The 10000-step follow-up ruled out budget-limited as the explanation.}
+SLURM 61091399 ran 72 samples at $5\times$ the canonical budget. Result:
+\textbf{0/72 converged}, including a C3H5NO2 cluster that ended at
+$n_\mathrm{neg}=0$ and $F_\mathrm{max}=0.155$ — i.e., the trajectory was
+still descending toward a minimum, not climbing toward a saddle. The
+geometric distance from these particular reactants to the nearest saddle
+is too large for GAD walking to bridge at any reasonable budget. The
+predicted ``5000+ step fix'' from the original hypothesis is therefore
+\emph{wrong}: the issue is intrinsic to where GAD walks from minima, not
+to step count. \emph{The
 hybrid is a Newton accelerator for the saddle-finding mechanism, not an
 alternative basin-finder.} See \texttt{FINDING\_HYBRID\_REACTANT\_2026\_05\_16.md}
 for the full analysis + predicted fixes (5000+ step budget; force-switch
@@ -228,7 +238,7 @@ Same Sella cart+Eckart untuned d=1, $n=52$ in flight, started from the
 \textbf{Starting condition} & \textbf{$F_\mathrm{max}<0.01$} & \textbf{$F_\mathrm{max}<0.05$} \\
 \midrule
 True TS + 10 pm noise (canonical sweep) & 92.7\%   & 98.6\% \\
-\textbf{Linear midpoint (R+P)/2}        & \textbf{51.9\%$^{p_{133}}$} & ---    \\
+\textbf{Linear midpoint (R+P)/2}        & \textbf{46.7\%} ($n=287$, final) & ---    \\
 Reactant                                & 80.8\%   & 89.9\% \\
 \bottomrule
 \end{tabular}
@@ -446,10 +456,11 @@ target $F_\mathrm{max}<0.001$. Results in flight (live numbers):
 \centering
 \includegraphics[width=0.9\textwidth]{figures_2026_05_16/fig_longbudget.pdf}
 \caption{\textbf{Long-budget probe @ 50 pm: conv \% vs threshold tightness
-with 10000-step budget.} GAD (orange, $n=61$) plateaus at $\approx 0.01$
-just like in the 2000-step sweep — \textbf{0\% reach $F_\mathrm{max}<0.005$
-even at 5$\times$ budget}. Hybrid (green, $n=8$) and Sella (blue, $n=7$)
-both reach $\sim$50--70\% at $F_\mathrm{max}<0.005$ via Newton landing.
+with 10000-step budget.} GAD (orange, FINAL $n=287$) plateaus at
+$\approx 0.01$ just like in the 2000-step sweep — \textbf{0\% reach
+$F_\mathrm{max}<0.005$ even at 5$\times$ budget}. Hybrid (green, $n=72$,
+partial — SLURM timeout) and Sella (blue, $n=66$, partial) both reach
+$\sim$47--77\% at $F_\mathrm{max}<0.005$ via Newton landing.
 \emph{None} reach $F_\mathrm{max}<0.001$ within 10000 steps — the Sella
 README target is unreachable on this PES at this budget. Source:
 \texttt{longbudget\_2026\_05\_16.csv}, log-parsed live from SLURM
@@ -614,7 +625,7 @@ total wall-time. Less Hessian information, better conv: surprising.
 50 pm  & 88.2 & \textbf{92.0} & \textbf{+3.8} & 20.4 / 21.2 \\
 100 pm & 70.7 & \textbf{72.8} & +2.1          & 46.1 / 50.5 \\
 150 pm & \textbf{54.0} & 50.5 & $-3.5$        & 71.6 / 79.0 \\
-200 pm & \textbf{27.2} & 23.9$^{p_{222}}$ & $-3.3$ & 107.0 / pending \\
+200 pm & \textbf{27.2} & 25.1 & $-2.1$ & 107.0 / pending \\
 \bottomrule
 \end{tabular}
 \end{center}

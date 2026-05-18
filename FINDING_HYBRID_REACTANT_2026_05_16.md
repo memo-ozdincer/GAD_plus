@@ -26,6 +26,39 @@ samples. ETA $\sim$5 h.
 
 ---
 
+## REVISION 2 (FINAL, 2026-05-16 end of wave)
+
+**Wave 1 final n=287:** Both hybrid damped and undamped converged to
+**2.1% conv (6 of 287)**. The "1.3 / 5.1%" mid-run numbers were small-n
+noise that resolved with more samples.
+
+**Wave 2 (10000-step budget, n=72 partial — SLURM timed out):**
+**0 of 72 samples converged.** Notably, a C3H5NO2 cluster (samples 60-69)
+ended at $n_\mathrm{neg}=0$ and $F_\mathrm{max}=0.155$ — i.e., trajectory
+was still descending toward a minimum, not climbing toward a saddle. The
+"5000+ step fix" prediction is **wrong**.
+
+**Corrected mechanism (third revision, final):** the issue is not step
+budget. It is the geometric distance from the reactant to the saddle in
+coordinate space. For most reactants in T1x, GAD-from-reactant starts in
+a basin of attraction that pulls *toward a minimum*, not *toward the
+nearest saddle*. No GAD-only walking budget can overcome this — the
+trajectory just plateaus at a minimum.
+
+The hybrid is therefore **fundamentally not a basin-finder when started
+from a minimum**. Useful predicted fixes (untested):
+1. Combine GAD with an outward force perturbation when $n_\mathrm{neg}=0$
+   persists for $>$N steps (jiggling the trajectory off the minimum basin)
+2. Start from a midpoint or noised TS, not a true reactant minimum
+3. Replace the GAD walking phase with a more aggressive saddle-search
+   (e.g.\ NEB or Dimer) until $n_\mathrm{neg}=1$, then switch to Newton
+
+The honest paper framing: \textbf{the hybrid (and plain GAD) require a
+near-saddle starting condition.} Their advantage is on noised-TS sweeps,
+not on reactant starts. Sella is the right tool for reactant starts.
+
+---
+
 ## Original snapshot (n=11/287, log-parsed mid-run)
 
 | Method | Starting condition | Conv % (fmax<0.01) |
