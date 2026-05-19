@@ -95,12 +95,23 @@ def parse_args():
     p.add_argument("--trust-radius", type=float, default=0.01)
     p.add_argument("--switch-force", type=float, default=1.0e-3)
     p.add_argument(
+        "--target-mode-strategy",
+        default="fixed",
+        choices=["fixed", "neg_force_coupling"],
+        help=(
+            "For hybrid_damped_eckart only: use fixed target_mode=0, or select "
+            "the negative internal mode with the largest absolute force "
+            "projection at each Markovian step."
+        ),
+    )
+    p.add_argument(
         "--high-index-descent",
         default="gad",
-        choices=["gad", "gradient", "newton"],
+        choices=["gad", "gradient", "index_controlled", "newton"],
         help=(
             "For hybrid_damped_eckart only: when n_neg > 1, use the normal GAD "
-            "branch, projected gradient descent, or projected Newton descent."
+            "branch, projected gradient descent, index-controlled Newton, or "
+            "projected Newton descent."
         ),
     )
     # min_curvature defaults match each hybrid_gad_newton file's own default:
@@ -180,6 +191,8 @@ def main():
     args = parse_args()
     if args.method != "hybrid_damped_eckart" and args.high_index_descent != "gad":
         sys.exit("--high-index-descent is only implemented for --method hybrid_damped_eckart")
+    if args.method != "hybrid_damped_eckart" and args.target_mode_strategy != "fixed":
+        sys.exit("--target-mode-strategy is only implemented for --method hybrid_damped_eckart")
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     noise_pm = int(round(args.noise * 1000))
@@ -210,6 +223,8 @@ def main():
     method_tag = f"{method_tag}_dt{args.gad_dt:g}_tr{args.trust_radius:g}"
     if args.high_index_descent != "gad":
         method_tag = f"{method_tag}_hi{args.high_index_descent}"
+    if args.target_mode_strategy != "fixed":
+        method_tag = f"{method_tag}_tm{args.target_mode_strategy}"
     run_id = f"{method_tag}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     summary_path = out_dir / f"summary_{method_tag}_{noise_pm}pm.parquet"
 
@@ -258,6 +273,8 @@ def main():
         final_step_norm_cart = float("nan")
         final_force_norm_internal = float("nan")
         final_target_eigval = float("nan")
+        final_target_mode = -1
+        final_target_force_coupling = float("nan")
         n_steps_actual = 0
         for step_idx in range(args.n_steps):
             out = predict_fn(coords, atomic_nums, do_hessian=True,
@@ -302,6 +319,7 @@ def main():
                     switch_based_on_hessian_eigval=switch_by_eig,
                     switch_force=args.switch_force,
                     trust_radius=args.trust_radius,
+                    target_mode_strategy=args.target_mode_strategy,
                     high_index_descent=args.high_index_descent,
                     **mc_kw,
                 )
@@ -311,6 +329,9 @@ def main():
                 n_neg = count_negative_eigenvalues(evals_sorted)
                 eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
                 eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
+            target_eigval = info_scalar(info, "target_eigval")
+            target_mode_v = int(info.get("target_mode", 0))
+            target_force_coupling = info_scalar(info, "target_force_coupling")
 
             if args.save_traj:
                 traj_rows.append({
@@ -321,6 +342,8 @@ def main():
                     "step_norm_cart": None,
                     "force_norm_internal": None,
                     "target_eigval": None,
+                    "target_mode": None,
+                    "target_force_coupling": None,
                 })
 
             # Convergence check. For Eckart variants, this uses the spectrum
@@ -332,6 +355,9 @@ def main():
                 final_force_max = fmax_v; final_force_norm = fnorm_v
                 final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
                 final_energy = E_v
+                final_target_eigval = target_eigval
+                final_target_mode = target_mode_v
+                final_target_force_coupling = target_force_coupling
                 n_steps_actual = step_idx + 1
                 break
             final_method_used = used
@@ -345,13 +371,14 @@ def main():
                 "force_norm_internal",
                 default=info.get("force_norm"),
             )
-            target_eigval = info_scalar(info, "target_eigval")
             if args.save_traj:
                 traj_rows[-1].update({
                     "step_method": used,
                     "step_norm_cart": step_norm_cart,
                     "force_norm_internal": force_norm_internal,
                     "target_eigval": target_eigval,
+                    "target_mode": target_mode_v,
+                    "target_force_coupling": target_force_coupling,
                 })
 
             # Apply step. Defensive on shape.
@@ -364,6 +391,8 @@ def main():
             final_step_norm_cart = step_norm_cart
             final_force_norm_internal = force_norm_internal
             final_target_eigval = target_eigval
+            final_target_mode = target_mode_v
+            final_target_force_coupling = target_force_coupling
             n_steps_actual = step_idx + 1
 
         wall = time.time() - t0
@@ -383,6 +412,8 @@ def main():
             "final_step_norm_cart": final_step_norm_cart,
             "final_force_norm_internal": final_force_norm_internal,
             "final_target_eigval": final_target_eigval,
+            "final_target_mode": final_target_mode,
+            "final_target_force_coupling": final_target_force_coupling,
             "final_n_neg": final_n_neg,
             "final_eig0": final_eig0, "final_eig1": final_eig1,
             "final_energy": final_energy,
@@ -391,6 +422,7 @@ def main():
             "gad_dt": args.gad_dt,
             "switch_by_eig": switch_by_eig,
             "high_index_descent": args.high_index_descent,
+            "target_mode_strategy": args.target_mode_strategy,
             "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
             "atomic_nums": atomic_nums.detach().cpu().numpy().astype(int).tolist(),
         })
