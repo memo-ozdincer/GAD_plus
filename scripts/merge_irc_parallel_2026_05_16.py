@@ -47,10 +47,8 @@ CELLS = [
         "method_tag": "Sella internal tuned Hess.Freq.=1",
         "dir": f"{RUNS}/irc_sella_internal_2026_05_16/150pm",
         "noise_pm": 150,
-        # Raw conv % is provisional — final value depends on the 150pm refill landing.
-        # Use the live partial estimate from the refill in flight; if all 4 partitions
-        # finish, this will round to ~35-42%.
-        "raw_conv_pct": 41.7,
+        # Final raw conv from pooled_summary_150pm.parquet (job 61166201): 26.83%.
+        "raw_conv_pct": 26.8,
     },
 ]
 
