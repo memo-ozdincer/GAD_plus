@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Configure dynamic library paths for gpu4pyscf/cupy in the shared HIP venv.
+# Configure dynamic library paths for gpu4pyscf/cupy in the project venv.
 #
 # Usage:
 #   source scripts/setup_cuda.sh
-#   external/hip/.venv/bin/python -c "import gpu4pyscf"
+#   uv run python -c "import gpu4pyscf"
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   echo "Source this script instead of executing it:"
@@ -12,12 +12,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_DIR="${GADPLUS_VENV:-$REPO_ROOT/external/hip/.venv}"
+VENV_DIR="${GADPLUS_VENV:-$REPO_ROOT/.venv}"
 SITE_PACKAGES_BASE="$VENV_DIR/lib"
 
 if [[ ! -d "$SITE_PACKAGES_BASE" ]]; then
   echo "Could not find venv lib directory at $SITE_PACKAGES_BASE." >&2
-  echo "Set GADPLUS_VENV or create external/hip/.venv first." >&2
+  echo "Set GADPLUS_VENV or run uv sync first." >&2
   return 1 2>/dev/null || exit 1
 fi
 
@@ -31,7 +31,7 @@ done
 
 if [[ -z "$NVPKG" ]]; then
   echo "Could not find nvidia libs in $VENV_DIR site-packages." >&2
-  echo "Install GPU deps in the shared HIP environment first." >&2
+  echo "Install GPU deps in the project environment first." >&2
   return 1 2>/dev/null || exit 1
 fi
 

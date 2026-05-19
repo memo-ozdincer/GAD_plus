@@ -6,6 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH -t 4:00:00
+#SBATCH --output=/lustre/fs12/portfolios/nvr/projects/nvr_qualg_lmbm/users/anburger/GAD_plus/outslurm/slurm-%j.out
 
 set -euo pipefail
 
