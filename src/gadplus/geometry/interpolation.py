@@ -10,6 +10,7 @@ import warnings
 
 import torch
 from torch import Tensor
+import numpy as np
 
 
 def linear_interpolation(
@@ -59,30 +60,13 @@ def geodesic_interpolation(
     Returns:
         (n_images, N, 3) tensor of interpolated geometries.
     """
-    try:
-        from geodesic_interpolate.geodesic import Geodesic  # type: ignore[import-untyped]
-        from geodesic_interpolate.interpolation import redistribute  # type: ignore[import-untyped]
-    except ImportError:
-        warnings.warn(
-            "geodesic_interpolate package not found. "
-            "Falling back to linear interpolation.",
-            stacklevel=2,
-        )
-        return linear_interpolation(reactant, product, n_images)
-
-    if atoms is None:
-        warnings.warn(
-            "geodesic_interpolation requires atom symbols. "
-            "Falling back to linear interpolation.",
-            stacklevel=2,
-        )
-        return linear_interpolation(reactant, product, n_images)
+    from geodesic_interpolate.geodesic import Geodesic  # type: ignore[import-untyped]
+    from geodesic_interpolate.interpolation import redistribute  # type: ignore[import-untyped]
 
     if n_images < 2:
         raise ValueError("n_images must be >= 2 to include both endpoints.")
 
     # geodesic_interpolate expects numpy arrays of shape (n_images, N, 3)
-    import numpy as np
 
     r_np = reactant.detach().cpu().numpy()
     p_np = product.detach().cpu().numpy()

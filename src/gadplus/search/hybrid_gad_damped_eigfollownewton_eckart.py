@@ -436,6 +436,7 @@ def projected_hybrid_gad_newton_step(
     coords,
     masses,
     target_mode=0,
+    target_mode_strategy="fixed",
     gad_dt=1.0e-2,
     switch_based_on_hessian_eigval=False,
     switch_force=1.0e-3,
@@ -449,6 +450,14 @@ def projected_hybrid_gad_newton_step(
     By default, the switch criterion uses the internal mass-weighted force norm.
     If switch_based_on_hessian_eigval is True, GAD is used until the internal
     mass-weighted Hessian clearly has index 1.
+
+    If high_index_descent is "index_controlled", higher-index regions use the
+    same index-1 eigenvector-following step as the Newton branch: Newton-like
+    ascent along target_mode and descent/escape along every other mode.
+
+    If target_mode_strategy is "neg_force_coupling", target_mode is replaced
+    by the negative-curvature internal mode with the largest absolute force
+    projection. If no negative modes exist, the fixed target_mode is retained.
     """
 
     state = _internal_mass_weighted_state(
@@ -473,13 +482,34 @@ def projected_hybrid_gad_newton_step(
     num_negative_modes = torch.sum(negative_modes)
     num_zero_modes = torch.sum(zero_modes)
     num_positive_modes = torch.sum(eigvals > inertia_tol)
+
+    valid_target_mode_strategies = {"fixed", "neg_force_coupling"}
+    if target_mode_strategy not in valid_target_mode_strategies:
+        valid = ", ".join(sorted(valid_target_mode_strategies))
+        raise ValueError(f"target_mode_strategy must be one of: {valid}")
+
+    fixed_target_mode = int(target_mode)
+    target_force_coupling = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
+    if target_mode_strategy == "neg_force_coupling" and bool(
+        (num_negative_modes > 0).detach().cpu().item()
+    ):
+        F_eig_for_selection = eigvecs.T @ F_i
+        candidate_modes = torch.nonzero(negative_modes, as_tuple=False).reshape(-1)
+        candidate_couplings = torch.abs(F_eig_for_selection[candidate_modes])
+        selected = torch.argmax(candidate_couplings)
+        target_mode = int(candidate_modes[selected].detach().cpu().item())
+        target_force_coupling = candidate_couplings[selected]
+    else:
+        target_mode = fixed_target_mode
+        target_force_coupling = torch.abs((eigvecs.T @ F_i)[target_mode])
+
     hessian_has_clear_index1 = (
         (num_negative_modes == 1)
         & (num_zero_modes == 0)
         & negative_modes[target_mode]
     )
 
-    valid_high_index_descent = {"gad", "gradient", "newton"}
+    valid_high_index_descent = {"gad", "gradient", "index_controlled", "newton"}
     if high_index_descent not in valid_high_index_descent:
         valid = ", ".join(sorted(valid_high_index_descent))
         raise ValueError(f"high_index_descent must be one of: {valid}")
@@ -505,7 +535,7 @@ def projected_hybrid_gad_newton_step(
             )
             method = "projected_gradient_descent"
             damping_mu = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
-        else:
+        elif high_index_descent == "newton":
             F_eig = eigvecs.T @ F_i
             curv = eigvals.abs().clamp_min(min_curvature)
             step_i = eigvecs @ (F_eig / curv)
@@ -517,6 +547,31 @@ def projected_hybrid_gad_newton_step(
             direction_i = step_i
             method = "projected_newton_descent"
             damping_mu = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
+        else:
+            def cartesian_step_norm(step_i):
+                step_x = _internal_step_to_cartesian(
+                    step_i=step_i,
+                    state=state,
+                    trust_radius=None,
+                )
+                return torch.linalg.vector_norm(step_x)
+
+            step_i, damping_mu = damped_eigenfollowing_step(
+                F_i=F_i,
+                eigvals=eigvals,
+                eigvecs=eigvecs,
+                target_mode=target_mode,
+                min_curvature=min_curvature,
+                trust_radius=trust_radius,
+                trust_norm_fn=cartesian_step_norm,
+            )
+            step_cart = _internal_step_to_cartesian(
+                step_i=step_i,
+                state=state,
+                trust_radius=None,
+            )
+            direction_i = step_i
+            method = "projected_index_controlled_newton"
 
     elif not use_newton:
         v = eigvecs[:, target_mode]
@@ -568,6 +623,10 @@ def projected_hybrid_gad_newton_step(
         "method": method,
         "internal_eigvals": eigvals,
         "target_eigval": eigvals[target_mode],
+        "target_mode": target_mode,
+        "fixed_target_mode": fixed_target_mode,
+        "target_mode_strategy": target_mode_strategy,
+        "target_force_coupling": target_force_coupling,
         "damping_mu": damping_mu,
         "num_external_modes": state["U_ext"].shape[1],
         "num_internal_modes": state["U_int"].shape[1],
