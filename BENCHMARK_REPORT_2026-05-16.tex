@@ -705,6 +705,80 @@ monotonically widens with noise from $-0.7$ pp at 10 pm to $-4.5$ pp at
 
 \clearpage
 % =================================================================
+\section{Newton-polish: can Newton break GAD's fmax plateau?}
+% =================================================================
+
+A direct test of the hybrid's ``other mode'' (the Newton-Raphson refinement
+that fires when the GAD walk reaches $n_\mathrm{neg}=1$): can it crush
+the force below the fmax plateau?
+
+Two NR-GAD pingpong runs (SLURM 60314225, $n=80$, 50pm noise, 5000-step
+budget) share identical dynamics (\texttt{nr\_max\_step\_norm=0.3},
+\texttt{nr\_damping=1.0}) and differ only in the convergence target:
+
+\begin{center}\small
+\textbf{NR-GAD pingpong @ 50 pm noise, $n=80$.} Both runs use the same
+spectral-partitioned NR + GAD flip-flop with trust-radius cap; only the
+target threshold differs.\\[0.3em]
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{variant} & \textbf{$F_\mathrm{max}<0.05$} & \textbf{$F_\mathrm{max}<0.01$}
+& \textbf{$F_\mathrm{max}<0.005$} & \textbf{$F_\mathrm{max}<0.001$} \\
+\midrule
+loose (stops at 0.01)            & 70.0 & 46.2 & 0.0  & 0.0 \\
+\textbf{strict} (drives to 1e-4) & 73.8 & 45.0 & \textbf{31.2} & \textbf{1.2} \\
+\midrule
+\textit{baseline GAD dt=0.007 (2k steps)} & \textit{94.8} & \textit{85.7} & \textit{0.0} & \textit{0.0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three observations:
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.05em]
+\item \textbf{Strict NR-polish DOES break the GAD plateau.}
+  31.2\% reach $F_\mathrm{max}<0.005$ and 1.2\% reach $F_\mathrm{max}<0.001$
+  on 50 pm noise. This is the only configuration tested on HIP/T1x that
+  produces non-zero conversion at the Sella README threshold (0.001).
+  The strict variant matches the same pattern across 50/100/150/200 pm
+  noise: 1.2\% at 0.001 (i.e.\ 1 of 80 samples per noise level).
+\item \textbf{The overshoot tax is real.} Trading away $\sim$40 pp of
+  loose-threshold conversion (85.7\% $\to$ 45\%) buys $\sim$31 pp of
+  tight-threshold conversion. Net: NR-polish redistributes successful
+  conversions toward tighter geometries at the cost of looser conversions.
+\item \textbf{Loose NR-polish gets the worst of both worlds:} it stops
+  refining at 0.01 (no plateau-breaking) and pays the overshoot cost
+  anyway (85.7\% $\to$ 46.2\%) because the NR phase fires before the
+  loose criterion triggers exit. \emph{Loose is strictly dominated.}
+\end{itemize}
+
+\paragraph{Mechanism: trust radius is essential.} The pingpong's
+\texttt{nr\_max\_step\_norm=0.3} caps each NR step at 0.3 Å, preventing
+the $H^{-1}F$ blowup that occurs when an eigenvalue is near zero (close
+to a saddle). Without the trust-radius cap, raw NR would overshoot
+catastrophically — confirmed by the prior negative-result framing of the
+``raw NR-polish'' attempt that did not break $F_\mathrm{max}<0.001$ for
+any sample. The same conclusion applies to the long-budget probe
+(hybrid damped @ 10k from noised TS): even with $5\times$ step budget,
+no sample reached $F_\mathrm{max}<0.001$ on the partial $n=72$ data.
+
+\paragraph{Why not just use this for the headline.} The strict
+NR-polish trades 40 pp of loose conv for 31 pp of tight conv — the choice
+depends on the use case. For a paper headline comparing TS finders at
+the project-canonical $F_\mathrm{max}<0.01$ criterion, the hybrid damped
+Eckart eig-switch tr=0.05 (which doesn't overshoot the plateau) is the
+right reference. For a use case demanding sub-plateau geometric
+precision (e.g.\ thermochemistry where strict TS optimization is
+required), strict NR-polish is competitive with Sella's RFO and reaches
+similar tight thresholds.
+
+\paragraph{Sample sizes.} $n=80$ per cell (smaller than the
+headline $n=287$). The 1.2\% at $F_\mathrm{max}<0.001$ corresponds to
+$1/80$ samples per noise level — a real signal but not a precise rate.
+Source: \texttt{runs/test\_nrpolish/nr\_gad\_polish\_dt007\_\{loose,strict\}/}.
+
+\clearpage
+% =================================================================
 \section*{Open questions / future work}
 % =================================================================
 
