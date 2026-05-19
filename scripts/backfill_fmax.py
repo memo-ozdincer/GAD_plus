@@ -269,6 +269,7 @@ def main() -> None:
     print(f"Found {len(summary_files)} summary files and {len(traj_files)} trajectory files")
 
     from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+    from gadplus.core.convergence import count_negative_eigenvalues
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
     calculator = load_hip_calculator(ckpt_path, device=device)
@@ -338,7 +339,7 @@ def main() -> None:
                 atomic_nums_to_symbols(z),
                 purify=False,
             )
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = count_negative_eigenvalues(evals_vib)
 
             out_row["final_force_norm_recomputed"] = fn
             out_row["final_force_max_recomputed"] = fm

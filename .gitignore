@@ -9,3 +9,11 @@ mlruns/
 logs/
 outputs/
 
+*.pdf
+*.csv
+*.png
+*.log
+*.out
+*.err
+
+outslurm

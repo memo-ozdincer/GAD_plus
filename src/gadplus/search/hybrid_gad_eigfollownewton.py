@@ -2,6 +2,8 @@
 
 import torch
 
+from gadplus.core.convergence import NEG_EIGVAL_THRESHOLD
+
 
 def _symmetrize(H: torch.Tensor) -> torch.Tensor:
     return 0.5 * (H + H.transpose(-1, -2))
@@ -111,7 +113,7 @@ def index1_saddle_step_from_force(
 
     step = _trust_limit(step, trust_radius)
 
-    inertia_tol = min_curvature
+    inertia_tol = NEG_EIGVAL_THRESHOLD
     info = {
         "eigvals": eigvals,
         "denom": denom,

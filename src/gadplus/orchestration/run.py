@@ -28,6 +28,7 @@ from gadplus.geometry.noise import add_gaussian_noise
 from gadplus.geometry.starting import make_starting_coords
 from gadplus.logging.trajectory import TrajectoryLogger
 from gadplus.logging.autopsy import classify_failure
+from gadplus.paths import REPO_ROOT
 from gadplus.projection import atomic_nums_to_symbols
 from gadplus.search.gad_search import GADSearchConfig, run_gad_search
 from gadplus.search.nr_gad_flipflop import NRGADConfig, run_nr_gad_flipflop
@@ -110,7 +111,7 @@ def _build_nr_gad_config(cfg: DictConfig) -> NRGADConfig:
     )
 
 
-@hydra.main(version_base=None, config_path="../../../configs", config_name="config")
+@hydra.main(version_base=None, config_path=str(REPO_ROOT / "configs"), config_name="config")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
 

@@ -326,11 +326,11 @@ METHOD_CONFIGS = {
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", type=str, required=True, choices=list(METHOD_CONFIGS.keys()))
-    parser.add_argument("--noise", type=float, required=True, help="Gaussian noise std (Angstrom)")
-    parser.add_argument("--n-samples", type=int, default=300)
-    parser.add_argument("--n-steps", type=int, default=1000)
+    parser.add_argument("--noise", type=float, default=0.0, help="Gaussian noise std (Angstrom)")
+    parser.add_argument("--n-samples", type=int, default=287)
+    parser.add_argument("--n-steps", type=int, default=400)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--split", type=str, default="train")
+    parser.add_argument("--split", type=str, default="test")
     parser.add_argument(
         "--random-offset",
         type=int,
@@ -359,7 +359,7 @@ def main():
     parser.add_argument(
         "--start-from",
         type=str,
-        default="ts_noised",
+        default="geodesic_mid",
         choices=["ts_noised", "reactant", "product", "midpoint", "geodesic_mid"],
         help=(
             "Initial geometry: noised TS (default), reactant, product, "

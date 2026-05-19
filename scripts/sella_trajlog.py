@@ -94,6 +94,7 @@ def main():
         noise_vecs[i] = torch.randn_like(dataset[i].pos) * args.noise
 
     from sella import Sella
+    from gadplus.core.convergence import count_negative_eigenvalues
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
     summary_rows = []
@@ -174,7 +175,7 @@ def main():
             final_force_norm = float(np.mean(np.linalg.norm(forces_final, axis=1)))
             atomsymbols = atomic_nums_to_symbols(z)
             evals_vib, _, _ = vib_eig(out["hessian"], final_coords, atomsymbols)
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = count_negative_eigenvalues(evals_vib)
         except Exception:
             final_fmax = 999.0; final_force_norm = 999.0; n_neg = 0
 

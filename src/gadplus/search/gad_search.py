@@ -27,6 +27,7 @@ from gadplus.core.convergence import (
     force_mean,
     force_max,
     force_value_from_criterion,
+    count_negative_eigenvalues,
 )
 from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
 from gadplus.projection import vib_eig
@@ -146,7 +147,7 @@ def run_gad_search(
             hessian, coords, atomsymbols, purify=cfg.purify_hessian,
         )
 
-        n_neg = int((evals_vib < 0).sum().item())
+        n_neg = count_negative_eigenvalues(evals_vib)
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
         eig1 = float(evals_vib[1].item()) if evals_vib.numel() > 1 else 0.0
 

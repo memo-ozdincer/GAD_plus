@@ -218,6 +218,7 @@ def main():
 
     # ---- Import Sella ----
     from sella import Sella
+    from gadplus.core.convergence import count_negative_eigenvalues
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
     # ---- Run ----
@@ -311,7 +312,7 @@ def main():
             # Our convergence check: Eckart-projected n_neg + force_norm
             atomsymbols = atomic_nums_to_symbols(z)
             evals_vib, _, _ = vib_eig(out_final["hessian"], final_coords, atomsymbols)
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = count_negative_eigenvalues(evals_vib)
             eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
             eig1 = float(evals_vib[1].item()) if evals_vib.numel() > 1 else 0.0
         except Exception as e2:

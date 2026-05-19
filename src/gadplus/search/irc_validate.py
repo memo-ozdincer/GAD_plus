@@ -24,6 +24,7 @@ except ImportError:  # pragma: no cover - optional runtime dependency
     nx = None
 
 from gadplus.projection import Z_TO_SYMBOL
+from gadplus.core.convergence import count_negative_eigenvalues
 from gadplus.geometry.alignment import aligned_rmsd_by_element
 
 
@@ -153,7 +154,7 @@ def _endpoint_spectral(
             hess_t = torch.tensor(hess)
         atomsymbols = atomic_nums_to_symbols(atomic_nums)
         evals_vib, _, _ = vib_eig(hess_t, coords_t, atomsymbols, purify=False)
-        n_neg = int((evals_vib < 0).sum().cpu().item())
+        n_neg = count_negative_eigenvalues(evals_vib)
         min_eig = float(evals_vib[0].cpu().item())
         return n_neg, min_eig
     except Exception:

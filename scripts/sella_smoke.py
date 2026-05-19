@@ -142,6 +142,7 @@ def _run_one_sample(args_tuple):
     from ase import Atoms
     from sella import Sella
 
+    from gadplus.core.convergence import count_negative_eigenvalues
     from gadplus.data.transition1x import Transition1xDataset, UsePos
     from gadplus.geometry.starting import make_starting_coords
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
@@ -208,7 +209,7 @@ def _run_one_sample(args_tuple):
         )
         atomsymbols = atomic_nums_to_symbols(z)
         evals_vib, _, _ = vib_eig(out_final["hessian"], final_coords, atomsymbols)
-        n_neg = int((evals_vib < 0).sum().item())
+        n_neg = count_negative_eigenvalues(evals_vib)
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
     except Exception:
         final_fmax = float("nan"); final_force_norm = float("nan")

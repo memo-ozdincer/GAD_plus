@@ -2,6 +2,8 @@
 
 import torch
 
+from gadplus.core.convergence import NEG_EIGVAL_THRESHOLD
+
 MASS_AMU = {
     1: 1.008,
     6: 12.011,
@@ -383,7 +385,7 @@ def projected_hybrid_gad_newton_step(
     if not (0 <= target_mode < eigvals.numel()):
         raise ValueError("target_mode is outside the internal-mode spectrum.")
 
-    inertia_tol = min_curvature
+    inertia_tol = NEG_EIGVAL_THRESHOLD
     negative_modes = eigvals < -inertia_tol
     zero_modes = eigvals.abs() <= inertia_tol
     num_negative_modes = torch.sum(negative_modes)

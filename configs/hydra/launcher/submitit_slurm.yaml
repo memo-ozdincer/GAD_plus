@@ -26,7 +26,8 @@ hydra:
     setup:
       - module purge
       - module load StdEnv/2023 python/3.11 cuda/12.6
-      - source ${cluster.project_dir}/GAD_plus/.venv/bin/activate
+      - source ${cluster.project_dir}/GAD_plus/external/hip/.venv/bin/activate
+      - source ${cluster.project_dir}/GAD_plus/scripts/setup_cuda.sh
       - export OMP_NUM_THREADS=${cluster.omp_num_threads}
       - export MKL_NUM_THREADS=${cluster.omp_num_threads}
       - export OPENBLAS_NUM_THREADS=${cluster.omp_num_threads}

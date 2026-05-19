@@ -22,6 +22,7 @@ import torch
 # Cascade thresholds for diagnostic evaluation (never used for convergence gating)
 CASCADE_THRESHOLDS: List[float] = [0.0, 1e-4, 5e-4, 1e-3, 2e-3, 5e-3, 8e-3, 1e-2]
 FORCE_CRITERIA = {"fmax", "force_norm"}
+NEG_EIGVAL_THRESHOLD = 1e-6
 
 
 class ConvergenceStatus(Enum):
@@ -63,6 +64,11 @@ def is_ts_converged(
     """
     _validate_force_criterion(criterion)
     return n_neg == 1 and force_value < force_threshold
+
+
+def count_negative_eigenvalues(evals_vib: torch.Tensor) -> int:
+    """Count physically negative vibrational modes using HIP's frequency cutoff."""
+    return int((evals_vib < -NEG_EIGVAL_THRESHOLD).sum().item())
 
 
 def compute_cascade_n_neg(evals_vib: torch.Tensor) -> dict[str, int]:

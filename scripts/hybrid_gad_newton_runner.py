@@ -35,6 +35,7 @@ import torch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+from gadplus.core.convergence import count_negative_eigenvalues
 from gadplus.data.transition1x import Transition1xDataset, UsePos
 from gadplus.paths import hip_checkpoint_path, transition1x_h5_path
 from gadplus.projection import vib_eig, atomic_nums_to_symbols
@@ -53,8 +54,7 @@ from gadplus.search.hybrid_gad_damped_eigfollownewton_eckart import (
 
 
 def fmax(forces: torch.Tensor) -> float:
-    f = forces.reshape(-1, 3)
-    return float(torch.linalg.vector_norm(f, dim=1).max().item())
+    return float(forces.reshape(-1).abs().max().item())
 
 
 def fnorm(forces: torch.Tensor) -> float:
@@ -78,7 +78,7 @@ def n_neg_eckart(hessian: torch.Tensor, coords: torch.Tensor,
     syms = atomic_nums_to_symbols(atomic_nums)
     evals, _, _ = vib_eig(hessian, coords, syms, purify=False)
     evals_sorted = torch.sort(evals).values
-    n_neg = int((evals_sorted < 0).sum().item())
+    n_neg = count_negative_eigenvalues(evals_sorted)
     eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
     eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
     return n_neg, eig0, eig1
@@ -94,23 +94,34 @@ def parse_args():
     p.add_argument("--gad-dt", type=float, default=5e-3)
     p.add_argument("--trust-radius", type=float, default=0.01)
     p.add_argument("--switch-force", type=float, default=1.0e-3)
+    p.add_argument(
+        "--high-index-descent",
+        default="gad",
+        choices=["gad", "gradient", "newton"],
+        help=(
+            "For hybrid_damped_eckart only: when n_neg > 1, use the normal GAD "
+            "branch, projected gradient descent, or projected Newton descent."
+        ),
+    )
     # min_curvature defaults match each hybrid_gad_newton file's own default:
     #   hybrid_gad_eigfollownewton.py:                 1.0e-6
     #   hybrid_gad_eigfollownewton_eckart.py:          1.0e-6
     #   hybrid_gad_damped_eigfollownewton_eckart.py:   1.0e-8
     p.add_argument("--min-curvature", type=float, default=None,
                    help="Override min_curvature; if None, use each function's natural default")
-    p.add_argument("--noise", type=float, required=True,
+    p.add_argument("--noise", type=float, default=0.0,
                    help="Gaussian noise stddev in Å (e.g. 0.01 = 10pm)")
     p.add_argument("--n-samples", type=int, default=287)
-    p.add_argument("--n-steps", type=int, default=1000)
+    p.add_argument("--n-steps", type=int, default=400)
     p.add_argument("--split", default="test")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output-dir", required=True)
+    p.add_argument("--save-traj", "-save-traj", action="store_true",
+                   help="Write per-sample trajectory parquet files.")
     p.add_argument("--device", default="cuda")
     p.add_argument(
         "--start-from",
-        default="ts_noised",
+        default="geodesic_mid",
         choices=["ts_noised", "reactant", "product", "midpoint", "geodesic_mid"],
         help=(
             "Initial geometry: noised TS (default), reactant, product, "
@@ -167,6 +178,8 @@ def starting_coords(sample, start_from: str, device: str, noise: torch.Tensor) -
 
 def main():
     args = parse_args()
+    if args.method != "hybrid_damped_eckart" and args.high_index_descent != "gad":
+        sys.exit("--high-index-descent is only implemented for --method hybrid_damped_eckart")
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     noise_pm = int(round(args.noise * 1000))
@@ -195,6 +208,8 @@ def main():
     if args.method != "hybrid":
         method_tag = f"{args.method}_swEIG" if switch_by_eig else f"{args.method}_swFORCE"
     method_tag = f"{method_tag}_dt{args.gad_dt:g}_tr{args.trust_radius:g}"
+    if args.high_index_descent != "gad":
+        method_tag = f"{method_tag}_hi{args.high_index_descent}"
     run_id = f"{method_tag}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     summary_path = out_dir / f"summary_{method_tag}_{noise_pm}pm.parquet"
 
@@ -255,34 +270,14 @@ def main():
             fnorm_v = fnorm(F)
             E_v = float(E.item()) if hasattr(E, "item") else float(E)
 
-            # n_neg from Eckart-projected vibrational Hessian
-            n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
-
-            traj_rows.append({
-                "sample_id": i, "step": step_idx, "energy": E_v,
-                "force_max": fmax_v, "force_norm": fnorm_v,
-                "n_neg": n_neg, "eig0": eig0, "eig1": eig1,
-                "step_method": None,
-                "step_norm_cart": None,
-                "force_norm_internal": None,
-                "target_eigval": None,
-            })
-
-            # Convergence check
-            if n_neg == 1 and fmax_v < args.force_threshold:
-                converged = True
-                converged_step = step_idx
-                final_force_max = fmax_v; final_force_norm = fnorm_v
-                final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
-                final_energy = E_v
-                n_steps_actual = step_idx + 1
-                break
-
             # Compute step from hybrid_gad_newton.
             # Pass min_curvature only if the user overrode it; otherwise let
             # each function use its own default (matches hybrid_gad_newton's __main__).
             mc_kw = {} if args.min_curvature is None else {"min_curvature": args.min_curvature}
             if args.method == "hybrid":
+                # Non-Eckart hybrid step does not compute the vibrational
+                # spectrum, so keep the separate diagnostic path here only.
+                n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
                 step, info = hybrid_gad_newton_step_from_force(
                     F.reshape(-1), H, target_mode=0, gad_dt=args.gad_dt,
                     switch_force=args.switch_force,
@@ -307,9 +302,38 @@ def main():
                     switch_based_on_hessian_eigval=switch_by_eig,
                     switch_force=args.switch_force,
                     trust_radius=args.trust_radius,
+                    high_index_descent=args.high_index_descent,
                     **mc_kw,
                 )
                 used = info.get("method", "?")
+            if args.method != "hybrid":
+                evals_sorted = torch.sort(info["internal_eigvals"]).values
+                n_neg = count_negative_eigenvalues(evals_sorted)
+                eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
+                eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
+
+            if args.save_traj:
+                traj_rows.append({
+                    "sample_id": i, "step": step_idx, "energy": E_v,
+                    "force_max": fmax_v, "force_norm": fnorm_v,
+                    "n_neg": n_neg, "eig0": eig0, "eig1": eig1,
+                    "step_method": None,
+                    "step_norm_cart": None,
+                    "force_norm_internal": None,
+                    "target_eigval": None,
+                })
+
+            # Convergence check. For Eckart variants, this uses the spectrum
+            # already computed by the step function, avoiding a duplicate
+            # Eckart projection/eigendecomposition.
+            if n_neg == 1 and fmax_v < args.force_threshold:
+                converged = True
+                converged_step = step_idx
+                final_force_max = fmax_v; final_force_norm = fnorm_v
+                final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
+                final_energy = E_v
+                n_steps_actual = step_idx + 1
+                break
             final_method_used = used
             step_norm_cart = info_scalar(
                 info,
@@ -322,12 +346,13 @@ def main():
                 default=info.get("force_norm"),
             )
             target_eigval = info_scalar(info, "target_eigval")
-            traj_rows[-1].update({
-                "step_method": used,
-                "step_norm_cart": step_norm_cart,
-                "force_norm_internal": force_norm_internal,
-                "target_eigval": target_eigval,
-            })
+            if args.save_traj:
+                traj_rows[-1].update({
+                    "step_method": used,
+                    "step_norm_cart": step_norm_cart,
+                    "force_norm_internal": force_norm_internal,
+                    "target_eigval": target_eigval,
+                })
 
             # Apply step. Defensive on shape.
             step = step.reshape_as(coords)
@@ -344,7 +369,7 @@ def main():
         wall = time.time() - t0
         # Write trajectory parquet
         traj_path = out_dir / f"traj_{method_tag}_{noise_pm}pm_{run_id[-8:]}_{i}.parquet"
-        if traj_rows:
+        if args.save_traj and traj_rows:
             pd.DataFrame(traj_rows).to_parquet(traj_path)
 
         rows.append({
@@ -365,6 +390,7 @@ def main():
             "trust_radius": args.trust_radius,
             "gad_dt": args.gad_dt,
             "switch_by_eig": switch_by_eig,
+            "high_index_descent": args.high_index_descent,
             "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
             "atomic_nums": atomic_nums.detach().cpu().numpy().astype(int).tolist(),
         })

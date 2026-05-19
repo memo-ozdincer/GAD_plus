@@ -2,6 +2,8 @@
 
 import torch
 
+from gadplus.core.convergence import NEG_EIGVAL_THRESHOLD
+
 MASS_AMU = {
     1: 1.008,
     6: 12.011,
@@ -439,6 +441,7 @@ def projected_hybrid_gad_newton_step(
     switch_force=1.0e-3,
     min_curvature=1.0e-8,
     trust_radius=None,
+    high_index_descent="gad",
 ):
     """
     Uses projected GAD far from the saddle and projected damped eigenvector-following Newton near the saddle.
@@ -464,7 +467,7 @@ def projected_hybrid_gad_newton_step(
     if not (0 <= target_mode < eigvals.numel()):
         raise ValueError("target_mode is outside the internal-mode spectrum.")
 
-    inertia_tol = min_curvature
+    inertia_tol = NEG_EIGVAL_THRESHOLD
     negative_modes = eigvals < -inertia_tol
     zero_modes = eigvals.abs() <= inertia_tol
     num_negative_modes = torch.sum(negative_modes)
@@ -476,12 +479,46 @@ def projected_hybrid_gad_newton_step(
         & negative_modes[target_mode]
     )
 
+    valid_high_index_descent = {"gad", "gradient", "newton"}
+    if high_index_descent not in valid_high_index_descent:
+        valid = ", ".join(sorted(valid_high_index_descent))
+        raise ValueError(f"high_index_descent must be one of: {valid}")
+
     if switch_based_on_hessian_eigval:
         use_newton = bool(hessian_has_clear_index1.detach().cpu().item())
     else:
         use_newton = bool((force_norm_internal <= switch_force).detach().cpu().item())
 
-    if not use_newton:
+    use_high_index_descent = (
+        high_index_descent != "gad"
+        and bool((num_negative_modes > 1).detach().cpu().item())
+    )
+
+    if use_high_index_descent:
+        if high_index_descent == "gradient":
+            direction_i = F_i
+            step_i = gad_dt * direction_i
+            step_cart = _internal_step_to_cartesian(
+                step_i=step_i,
+                state=state,
+                trust_radius=trust_radius,
+            )
+            method = "projected_gradient_descent"
+            damping_mu = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
+        else:
+            F_eig = eigvecs.T @ F_i
+            curv = eigvals.abs().clamp_min(min_curvature)
+            step_i = eigvecs @ (F_eig / curv)
+            step_cart = _internal_step_to_cartesian(
+                step_i=step_i,
+                state=state,
+                trust_radius=trust_radius,
+            )
+            direction_i = step_i
+            method = "projected_newton_descent"
+            damping_mu = torch.zeros((), dtype=F_i.dtype, device=F_i.device)
+
+    elif not use_newton:
         v = eigvecs[:, target_mode]
 
         # Projected GAD direction.
@@ -538,6 +575,7 @@ def projected_hybrid_gad_newton_step(
         "num_zero_modes": num_zero_modes,
         "num_positive_modes": num_positive_modes,
         "hessian_has_clear_index1": hessian_has_clear_index1,
+        "high_index_descent": high_index_descent,
         "direction_cart": direction_cart,
         "direction_norm_cart": torch.linalg.vector_norm(direction_cart),
         "force_norm_internal": force_norm_internal,

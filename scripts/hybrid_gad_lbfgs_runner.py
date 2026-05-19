@@ -34,6 +34,7 @@ import torch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+from gadplus.core.convergence import count_negative_eigenvalues
 from gadplus.data.transition1x import Transition1xDataset, UsePos
 from gadplus.paths import hip_checkpoint_path, transition1x_h5_path
 from gadplus.projection import atomic_nums_to_symbols, vib_eig
@@ -42,8 +43,7 @@ from gadplus.projection.masses import get_mass_weights_torch
 
 
 def fmax(forces: torch.Tensor) -> float:
-    f = forces.reshape(-1, 3)
-    return float(torch.linalg.vector_norm(f, dim=1).max().item())
+    return float(forces.reshape(-1).abs().max().item())
 
 
 def fnorm(forces: torch.Tensor) -> float:
@@ -158,7 +158,7 @@ def n_neg_eckart(
     syms = atomic_nums_to_symbols(atomic_nums)
     evals, _, _ = vib_eig(hessian, coords, syms, purify=False)
     evals_sorted = torch.sort(evals).values
-    n_neg = int((evals_sorted < 0).sum().item())
+    n_neg = count_negative_eigenvalues(evals_sorted)
     eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
     eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
     return n_neg, eig0, eig1
