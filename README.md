@@ -51,11 +51,12 @@ Paths can be overridden with `GADPLUS_PROJECT_DIR`, `GADPLUS_SCRATCH_DIR`, `GADP
 
 ## Runners
 
-Regular GAD: `scripts/method_single.py`. Recommended method:
-`gad_dt003_fmax` for canonical Eckart GAD with `fmax < 0.01`.
+Regular GAD: `scripts/gad_runner.py`. Recommended settings:
+Eckart-projected GAD with `--dt 0.003`, `--force-criterion fmax`, and
+`--force-threshold 0.01`.
 
 ```bash
-cd /lustre/fs12/portfolios/nvr/projects/nvr_qualg_lmbm/users/anburger/GAD_plus && sbatch scripts/run_batch_singlenode_uv.sbatch python -u scripts/method_single.py --method gad_dt003_fmax --noise 0.01 --n-samples 287 --n-steps 5000 --split test --output-dir runs/test_dtgrid/gad_dt003_fmax
+sbatch scripts/run_batch_singlenode_uv.sbatch python -u scripts/gad_runner.py --dt 0.003 --noise 0.01 --n-samples 287 --n-steps 5000 --split test --label gad_dt003_fmax --output-dir runs/test_dtgrid/gad_dt003_fmax
 ```
 
 Hybrid GAD + Newton: `scripts/hybrid_gad_newton_runner.py`. Recommended method:
