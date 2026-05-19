@@ -28,6 +28,5 @@ def add_gaussian_noise(
     """
     if seed is not None:
         torch.manual_seed(seed)
-
     noise = torch.randn_like(coords) * rms_angstrom
     return coords + noise

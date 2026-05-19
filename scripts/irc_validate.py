@@ -112,10 +112,9 @@ def main():
         "--method",
         type=str,
         default="sella_baseline",
-        choices=["sella_baseline", "sella_hip", "rigorous"],
+        choices=["sella_baseline", "sella_hip"],
         help="IRC integrator: sella_baseline (vanilla Sella + BFGS Hessian), "
-             "sella_hip (Sella IRC + HIP MW+Eckart Hessian every step), "
-             "rigorous (HIP predictor-corrector with K-step hold).",
+             "sella_hip (Sella IRC + HIP MW+Eckart Hessian every step).",
     )
     parser.add_argument(
         "--source-method",
@@ -226,15 +225,12 @@ def main():
     # ---- Dispatch IRC integrator based on --method ----
     from gadplus.search.irc_validate import run_irc_validation
     from gadplus.search.irc_sella_hip import run_irc_sella_hip
-    from gadplus.search.irc_rigorous import run_irc_rigorous
 
     def _run_irc(**kwargs):
         if args.method == "sella_baseline":
             return run_irc_validation(**kwargs)
         if args.method == "sella_hip":
             return run_irc_sella_hip(**kwargs)
-        if args.method == "rigorous":
-            return run_irc_rigorous(**kwargs)
         raise ValueError(f"unknown --method: {args.method}")
 
     print(f"Method: {args.method} | max_steps={args.irc_steps}")

@@ -301,8 +301,7 @@ def run_irc_validation(
     """Baseline: vanilla Sella IRC with BFGS-updated Hessian, Cartesian coords.
 
     Identical wiring to what the codebase has always used. Kept as the
-    control condition for comparison against `irc_sella_hip.run_irc_sella_hip`
-    and `irc_rigorous.run_irc_rigorous`.
+    control condition for comparison against `irc_sella_hip.run_irc_sella_hip`.
     """
     try:
         from sella import IRC
