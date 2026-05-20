@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run GAD at a SINGLE noise level. Designed for max parallelism.
+"""Run GAD at a single noise level. Designed for max parallelism.
 
 Usage:
   uv run python scripts/gad_runner.py --dt 0.003 --noise 0.05 --n-samples 300 --n-steps 1000
@@ -133,6 +133,12 @@ def main():
         ),
     )
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument(
+        "--save-traj",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Write per-sample trajectory parquet files.",
+    )
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -274,13 +280,17 @@ def main():
             )[1]
             start_method_str = "geodesic_mid"
 
-        logger = TrajectoryLogger(
-            output_dir=output_dir,
-            run_id=run_id,
-            sample_id=i,
-            start_method=start_method_str,
-            search_method=method_label,
-            formula=formula,
+        logger = (
+            TrajectoryLogger(
+                output_dir=output_dir,
+                run_id=run_id,
+                sample_id=i,
+                start_method=start_method_str,
+                search_method=method_label,
+                formula=formula,
+            )
+            if args.save_traj
+            else None
         )
 
         t0 = time.time()
@@ -288,7 +298,8 @@ def main():
             predict_fn, coords_start, z, cfg, logger=logger, known_ts_coords=coords_ts
         )
         wall = time.time() - t0
-        logger.flush()
+        if logger is not None:
+            logger.flush()
 
         status = "CONV" if result.converged else "FAIL"
         print(

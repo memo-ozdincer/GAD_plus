@@ -93,6 +93,22 @@ def parse_args():
                    help="(only for *_eckart methods) switch_based_on_hessian_eigval")
     p.add_argument("--gad-dt", type=float, default=5e-3)
     p.add_argument("--trust-radius", type=float, default=0.01)
+    p.add_argument(
+        "--final-trust-radius",
+        type=float,
+        default=None,
+        help=(
+            "Optional second-stage trust radius. Once a trajectory reaches "
+            "n_neg=1 and fmax <= --final-trust-force, subsequent steps use "
+            "this smaller radius for polishing."
+        ),
+    )
+    p.add_argument(
+        "--final-trust-force",
+        type=float,
+        default=0.05,
+        help="fmax threshold that activates --final-trust-radius polishing.",
+    )
     p.add_argument("--switch-force", type=float, default=1.0e-3)
     p.add_argument(
         "--target-mode-strategy",
@@ -127,7 +143,8 @@ def parse_args():
     p.add_argument("--split", default="test")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output-dir", required=True)
-    p.add_argument("--save-traj", "-save-traj", action="store_true",
+    p.add_argument("--save-traj", "-save-traj", action=argparse.BooleanOptionalAction,
+                   default=True,
                    help="Write per-sample trajectory parquet files.")
     p.add_argument("--device", default="cuda")
     p.add_argument(
@@ -193,6 +210,10 @@ def main():
         sys.exit("--high-index-descent is only implemented for --method hybrid_damped_eckart")
     if args.method != "hybrid_damped_eckart" and args.target_mode_strategy != "fixed":
         sys.exit("--target-mode-strategy is only implemented for --method hybrid_damped_eckart")
+    if args.final_trust_radius is not None and args.final_trust_radius <= 0:
+        sys.exit("--final-trust-radius must be positive when set")
+    if args.final_trust_force <= 0:
+        sys.exit("--final-trust-force must be positive")
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     noise_pm = int(round(args.noise * 1000))
@@ -225,6 +246,8 @@ def main():
         method_tag = f"{method_tag}_hi{args.high_index_descent}"
     if args.target_mode_strategy != "fixed":
         method_tag = f"{method_tag}_tm{args.target_mode_strategy}"
+    if args.final_trust_radius is not None:
+        method_tag = f"{method_tag}_polishtr{args.final_trust_radius:g}"
     run_id = f"{method_tag}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     summary_path = out_dir / f"summary_{method_tag}_{noise_pm}pm.parquet"
 
@@ -275,8 +298,16 @@ def main():
         final_target_eigval = float("nan")
         final_target_mode = -1
         final_target_force_coupling = float("nan")
+        final_active_trust_radius = args.trust_radius
+        polish_active = False
+        polish_activated_step = None
         n_steps_actual = 0
         for step_idx in range(args.n_steps):
+            active_trust_radius = (
+                args.final_trust_radius
+                if polish_active and args.final_trust_radius is not None
+                else args.trust_radius
+            )
             out = predict_fn(coords, atomic_nums, do_hessian=True,
                              require_grad=False)
             E = out["energy"]; F = out["forces"]; H = out["hessian"]
@@ -287,51 +318,7 @@ def main():
             fnorm_v = fnorm(F)
             E_v = float(E.item()) if hasattr(E, "item") else float(E)
 
-            # Compute step from hybrid_gad_newton.
-            # Pass min_curvature only if the user overrode it; otherwise let
-            # each function use its own default (matches hybrid_gad_newton's __main__).
-            mc_kw = {} if args.min_curvature is None else {"min_curvature": args.min_curvature}
-            if args.method == "hybrid":
-                # Non-Eckart hybrid step does not compute the vibrational
-                # spectrum, so keep the separate diagnostic path here only.
-                n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
-                step, info = hybrid_gad_newton_step_from_force(
-                    F.reshape(-1), H, target_mode=0, gad_dt=args.gad_dt,
-                    switch_force=args.switch_force,
-                    trust_radius=args.trust_radius,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            elif args.method == "hybrid_eckart":
-                step, info = proj_step_plain(
-                    force_cart=F, hessian_cart=H, coords=coords.double(),
-                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
-                    switch_based_on_hessian_eigval=switch_by_eig,
-                    switch_force=args.switch_force,
-                    trust_radius=args.trust_radius,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            elif args.method == "hybrid_damped_eckart":
-                step, info = proj_step_damped(
-                    force_cart=F, hessian_cart=H, coords=coords.double(),
-                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
-                    switch_based_on_hessian_eigval=switch_by_eig,
-                    switch_force=args.switch_force,
-                    trust_radius=args.trust_radius,
-                    target_mode_strategy=args.target_mode_strategy,
-                    high_index_descent=args.high_index_descent,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            if args.method != "hybrid":
-                evals_sorted = torch.sort(info["internal_eigvals"]).values
-                n_neg = count_negative_eigenvalues(evals_sorted)
-                eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
-                eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
-            target_eigval = info_scalar(info, "target_eigval")
-            target_mode_v = int(info.get("target_mode", 0))
-            target_force_coupling = info_scalar(info, "target_force_coupling")
+            n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
 
             if args.save_traj:
                 traj_rows.append({
@@ -344,22 +331,59 @@ def main():
                     "target_eigval": None,
                     "target_mode": None,
                     "target_force_coupling": None,
+                    "active_trust_radius": active_trust_radius,
+                    "polish_active": polish_active,
                 })
 
-            # Convergence check. For Eckart variants, this uses the spectrum
-            # already computed by the step function, avoiding a duplicate
-            # Eckart projection/eigendecomposition.
+            # Convergence check before computing or applying the next step, so
+            # an already-converged starting geometry exits at step 0.
             if n_neg == 1 and fmax_v < args.force_threshold:
                 converged = True
                 converged_step = step_idx
                 final_force_max = fmax_v; final_force_norm = fnorm_v
                 final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
                 final_energy = E_v
-                final_target_eigval = target_eigval
-                final_target_mode = target_mode_v
-                final_target_force_coupling = target_force_coupling
+                final_active_trust_radius = active_trust_radius
                 n_steps_actual = step_idx + 1
                 break
+
+            # Compute step from hybrid_gad_newton.
+            # Pass min_curvature only if the user overrode it; otherwise let
+            # each function use its own default (matches hybrid_gad_newton's __main__).
+            mc_kw = {} if args.min_curvature is None else {"min_curvature": args.min_curvature}
+            if args.method == "hybrid":
+                step, info = hybrid_gad_newton_step_from_force(
+                    F.reshape(-1), H, target_mode=0, gad_dt=args.gad_dt,
+                    switch_force=args.switch_force,
+                    trust_radius=active_trust_radius,
+                    **mc_kw,
+                )
+                used = info.get("method", "?")
+            elif args.method == "hybrid_eckart":
+                step, info = proj_step_plain(
+                    force_cart=F, hessian_cart=H, coords=coords.double(),
+                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
+                    switch_based_on_hessian_eigval=switch_by_eig,
+                    switch_force=args.switch_force,
+                    trust_radius=active_trust_radius,
+                    **mc_kw,
+                )
+                used = info.get("method", "?")
+            elif args.method == "hybrid_damped_eckart":
+                step, info = proj_step_damped(
+                    force_cart=F, hessian_cart=H, coords=coords.double(),
+                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
+                    switch_based_on_hessian_eigval=switch_by_eig,
+                    switch_force=args.switch_force,
+                    trust_radius=active_trust_radius,
+                    target_mode_strategy=args.target_mode_strategy,
+                    high_index_descent=args.high_index_descent,
+                    **mc_kw,
+                )
+                used = info.get("method", "?")
+            target_eigval = info_scalar(info, "target_eigval")
+            target_mode_v = int(info.get("target_mode", 0))
+            target_force_coupling = info_scalar(info, "target_force_coupling")
             final_method_used = used
             step_norm_cart = info_scalar(
                 info,
@@ -381,6 +405,15 @@ def main():
                     "target_force_coupling": target_force_coupling,
                 })
 
+            if (
+                args.final_trust_radius is not None
+                and not polish_active
+                and n_neg == 1
+                and fmax_v <= args.final_trust_force
+            ):
+                polish_active = True
+                polish_activated_step = step_idx
+
             # Apply step. Defensive on shape.
             step = step.reshape_as(coords)
             coords = (coords + step).detach()
@@ -393,6 +426,7 @@ def main():
             final_target_eigval = target_eigval
             final_target_mode = target_mode_v
             final_target_force_coupling = target_force_coupling
+            final_active_trust_radius = active_trust_radius
             n_steps_actual = step_idx + 1
 
         wall = time.time() - t0
@@ -419,6 +453,10 @@ def main():
             "final_energy": final_energy,
             "wall_time_s": wall, "last_step_method": final_method_used,
             "trust_radius": args.trust_radius,
+            "final_trust_radius": args.final_trust_radius,
+            "final_trust_force": args.final_trust_force,
+            "final_active_trust_radius": final_active_trust_radius,
+            "polish_activated_step": polish_activated_step,
             "gad_dt": args.gad_dt,
             "switch_by_eig": switch_by_eig,
             "high_index_descent": args.high_index_descent,
