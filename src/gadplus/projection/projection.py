@@ -201,18 +201,27 @@ def gad_dynamics_projected(
     masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
     P = _eckart_projector(coords_3d, masses, eps=eps)
 
-    grad_mw = P @ (-sqrt_m_inv * f_flat)
+    # Guide vector projected in MW space (returned for mode-tracking continuity,
+    # which compares against the MW vibrational eigenvectors from vib_eig).
     v_proj = P @ v_flat
     v_proj = v_proj / (v_proj.norm() + 1e-12)
 
-    v_dot_grad = torch.dot(v_proj, grad_mw)
-    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
-    dq = P @ (-grad_mw + 2.0 * w * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
+    # --- Cartesian step (no sqrt_m back-transform) ---
+    # Run the GAD flip in Cartesian space: take the TR-projected Cartesian force
+    # and the Cartesian image of the guide vector, then apply the Cartesian GAD
+    # formula from core.gad.compute_gad_vector_tracked:
+    #     F_GAD = F + 2w(-F·v)v  (w=1 full GAD flip, w=0 pure descent).
+    f_cart = sqrt_m * (P @ (sqrt_m_inv * f_flat))      # TR-clean Cartesian force
+    v_cart = sqrt_m_inv * v_proj                       # MW eigvec -> Cartesian direction
+    v_cart = v_cart / (v_cart.norm() + 1e-12)
 
-    gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
+    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
+    gad_flat = f_cart + 2.0 * w * torch.dot(-f_cart, v_cart) * v_cart
+
+    gad_vec = gad_flat.reshape(num_atoms, 3).to(forces.dtype)
     info = {
-        "v_dot_grad": float(v_dot_grad.item()),
-        "grad_norm_mw": float(grad_mw.norm().item()),
+        "v_dot_grad": float(torch.dot(v_cart, -f_cart).item()),
+        "grad_norm_cart": float(f_cart.norm().item()),
         "gad_blend_weight": float(w) if isinstance(w, (int, float)) else float(w.item()),
     }
     return gad_vec, v_proj.to(v.dtype), info
@@ -253,15 +262,16 @@ def multimode_gad_dynamics_projected(
     masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
     P = _eckart_projector(coords_3d, masses, eps=eps)
 
-    # Gradient in MW vibrational space
-    grad_mw = P @ (-sqrt_m_inv * f_flat)
-
+    # --- Cartesian step (no sqrt_m back-transform) ---
+    # TR-clean Cartesian force, and Cartesian images of the vibrational modes.
+    f_cart = sqrt_m * (P @ (sqrt_m_inv * f_flat))          # (3N,) TR-clean Cartesian force
     evecs = evecs_vib_3N.to(torch.float64)
     evals = evals_vib.to(torch.float64)
+    U = sqrt_m_inv[:, None] * evecs                         # MW eigvecs -> Cartesian directions
+    U = U / (U.norm(dim=0, keepdim=True) + 1e-12)           # (3N, M), unit columns
 
-    # Project gradient onto each vibrational eigenvector
-    # g_i = grad_mw · v_i
-    coeffs = evecs.T @ grad_mw  # (M,)
+    # Project Cartesian force onto each Cartesian mode direction: g_i = F·uᵢ
+    coeffs = U.T @ f_cart  # (M,)
 
     # Compute weights for each mode
     if mode == "all_neg":
@@ -279,15 +289,13 @@ def multimode_gad_dynamics_projected(
     else:
         raise ValueError(f"Unknown multi-mode GAD mode: {mode}")
 
-    # Multi-mode GAD: dq = -g + 2·Σᵢ wᵢ·(g·vᵢ)·vᵢ
-    # The flip term for each mode i: 2·wᵢ·(g·vᵢ)·vᵢ
-    flip_coeffs = 2.0 * weights * coeffs  # (M,)
-    flip_term = evecs @ flip_coeffs  # (3N,)
+    # Multi-mode GAD in Cartesian space: F_GAD = F + 2·Σᵢ wᵢ·(-F·uᵢ)·uᵢ
+    # (flip the force component along every selected mode; matches the
+    # single-mode Cartesian flip in core.gad.compute_gad_vector_tracked).
+    flip_coeffs = 2.0 * weights * (-coeffs)  # (M,)
+    flip_term = U @ flip_coeffs  # (3N,)
 
-    dq = P @ (-grad_mw + flip_term)
-
-    # Back to Cartesian
-    gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
+    gad_vec = (f_cart + flip_term).reshape(num_atoms, 3).to(forces.dtype)
 
     # Return v₁ for mode tracking (even though we flip multiple modes)
     v1_proj = P @ evecs[:, 0]
@@ -297,7 +305,7 @@ def multimode_gad_dynamics_projected(
     info = {
         "n_modes_flipped": n_flipped,
         "weights_sum": float(weights.sum().item()),
-        "grad_norm_mw": float(grad_mw.norm().item()),
+        "grad_norm_cart": float(f_cart.norm().item()),
         "mode": mode,
     }
     return gad_vec, v1_proj.to(forces.dtype), info
@@ -354,34 +362,38 @@ def preconditioned_gad_dynamics_projected(
     masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
     P = _eckart_projector(coords_3d, masses, eps=eps)
 
-    # Blended GAD direction in MW vibrational space
-    # F_blend = -grad + 2·w·(grad·v)·v  →  dq = P @ (-grad + 2w·(grad·v)·v)
-    grad_mw = P @ (-sqrt_m_inv * f_flat)
+    # --- Cartesian step (no sqrt_m back-transform) ---
+    # Guide vector projected in MW space (returned for mode-tracking continuity).
     v_proj = P @ v_flat
     v_proj = v_proj / (v_proj.norm() + 1e-12)
 
-    v_dot_grad = torch.dot(v_proj, grad_mw)
-    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
-    dq = P @ (-grad_mw + 2.0 * w * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
+    # Blended Cartesian GAD direction (same flip as gad_dynamics_projected):
+    #     F_blend = F + 2w(-F·v)v   (w=1 full GAD, w=0 pure descent).
+    f_cart = sqrt_m * (P @ (sqrt_m_inv * f_flat))      # TR-clean Cartesian force
+    v_cart = sqrt_m_inv * v_proj                       # MW eigvec -> Cartesian direction
+    v_cart = v_cart / (v_cart.norm() + 1e-12)
 
-    # Precondition: decompose dq into eigenvector components, scale by 1/|λᵢ|
+    w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
+    v_dot_grad = torch.dot(v_cart, -f_cart)
+    g_blend = f_cart + 2.0 * w * torch.dot(-f_cart, v_cart) * v_cart
+
+    # Precondition: decompose along the Cartesian mode directions, scale by 1/|λᵢ|.
     evecs = evecs_vib_3N.to(torch.float64)
     evals = evals_vib.to(torch.float64)
+    U = sqrt_m_inv[:, None] * evecs                    # MW eigvecs -> Cartesian directions
+    U = U / (U.norm(dim=0, keepdim=True) + 1e-12)      # (3N, M), unit columns
 
-    coeffs = evecs.T @ dq  # (3N-k,)
+    coeffs = U.T @ g_blend  # (3N-k,)
     inv_abs_evals = 1.0 / torch.clamp(evals.abs(), min=eig_floor)
     scaled_coeffs = coeffs * inv_abs_evals
 
-    dq_precond = evecs @ scaled_coeffs
-
-    # Back to Cartesian
-    gad_vec = (sqrt_m * dq_precond).reshape(num_atoms, 3).to(forces.dtype)
+    gad_vec = (U @ scaled_coeffs).reshape(num_atoms, 3).to(forces.dtype)
 
     # Diagnostics
     scale_range = float(inv_abs_evals.max().item()) / max(float(inv_abs_evals.min().item()), 1e-12)
     info = {
         "v_dot_grad": float(v_dot_grad.item()),
-        "grad_norm_mw": float(grad_mw.norm().item()),
+        "grad_norm_cart": float(f_cart.norm().item()),
         "precond_scale_min": float(inv_abs_evals.min().item()),
         "precond_scale_max": float(inv_abs_evals.max().item()),
         "precond_scale_range": scale_range,
