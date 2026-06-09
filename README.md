@@ -66,3 +66,15 @@ testing eigenvalue-based switching.
 ```bash
 cd /lustre/fs12/portfolios/nvr/projects/nvr_qualg_lmbm/users/anburger/GAD_plus && sbatch scripts/run_batch_singlenode_uv.sbatch python -u scripts/hybrid_gad_newton_runner.py --method hybrid_damped_eckart --switch-by-eig false --gad-dt 5e-3 --trust-radius 0.01 --noise 0.01 --n-samples 287 --n-steps 1000 --split test --output-dir runs/hybrid_gad_newton/hybrid_damped_eckart_swFORCE_dt5e-3_tr0.01
 ```
+
+Analytic X4 EVB toy benchmark: `scripts/toy_x4_runner.py`. It uses the same
+`PredictFn` interface as HIP and supports both regular GAD and the hybrid
+GAD/Newton step functions.
+
+```bash
+uv run python scripts/toy_x4_runner.py --method gad --start-from mixed_ts --n-samples 24 --n-steps 1000 --dt 3e-3 --noise 0.02 --output-dir runs/toy_x4/gad
+```
+
+```bash
+uv run python scripts/toy_x4_runner.py --method hybrid_damped_eckart --start-from mixed_ts --n-samples 24 --n-steps 1000 --gad-dt 5e-3 --trust-radius 0.02 --noise 0.02 --output-dir runs/toy_x4/hybrid_damped_eckart
+```

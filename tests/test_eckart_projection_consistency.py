@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from gadplus.core.convergence import count_negative_eigenvalues
-from gadplus.projection import atomic_nums_to_symbols, vib_eig
+from gadplus.projection import atomic_nums_to_symbols, gad_dynamics_projected, vib_eig
 from gadplus.search.hybrid_gad_damped_eigfollownewton_eckart import (
     eckart_internal_basis,
     _internal_mass_weighted_state,
@@ -84,6 +84,54 @@ def test_negative_mode_count_uses_hip_frequency_cutoff():
     eigvals = torch.tensor([-1.0e-3, -5.0e-7, 0.0, 1.0e-4], dtype=torch.float64)
 
     assert count_negative_eigenvalues(eigvals) == 1
+
+
+def test_projected_gad_returns_unweighted_step_direction_by_default():
+    coords = torch.tensor(
+        [
+            [0.0000, 0.0000, 0.0000],
+            [1.2300, 0.1100, -0.0200],
+            [-0.5200, 1.0700, 0.2600],
+            [-0.6100, -0.9400, 0.1900],
+        ],
+        dtype=torch.float64,
+    )
+    atomic_nums = torch.tensor([6, 8, 7, 1])
+    atomsymbols = atomic_nums_to_symbols(atomic_nums)
+    forces = torch.tensor(
+        [
+            [0.30, -0.20, 0.10],
+            [-0.40, 0.50, -0.10],
+            [0.20, 0.10, -0.30],
+            [-0.10, -0.40, 0.20],
+        ],
+        dtype=torch.float64,
+    )
+    v = torch.arange(1, coords.numel() + 1, dtype=torch.float64)
+    masses3d = masses_from_z(atomic_nums, dtype=torch.float64).repeat_interleave(3)
+
+    unweighted, _, unweighted_info = gad_dynamics_projected(
+        coords=coords,
+        forces=forces,
+        v=v,
+        atomsymbols=atomsymbols,
+    )
+    weighted, _, weighted_info = gad_dynamics_projected(
+        coords=coords,
+        forces=forces,
+        v=v,
+        atomsymbols=atomsymbols,
+        return_weighted_step_direction=True,
+    )
+
+    assert not unweighted_info["return_weighted_step_direction"]
+    assert weighted_info["return_weighted_step_direction"]
+    torch.testing.assert_close(
+        weighted.reshape(-1),
+        masses3d * unweighted.reshape(-1),
+        atol=1e-12,
+        rtol=1e-12,
+    )
 
 
 def test_hybrid_damped_eckart_inertia_uses_hip_frequency_cutoff():

@@ -50,9 +50,10 @@ class BlendedGADConfig:
     force_threshold: float = 0.01
     force_criterion: str = "fmax"
     purify_hessian: bool = False
+    return_weighted_step_direction: bool = False
 
 
-def _projected_forces(coords, forces, atomsymbols):
+def _projected_forces(coords, forces, atomsymbols, return_weighted_step_direction=False):
     """Project forces into vibrational subspace (remove TR components)."""
     device = coords.device
     coords_3d = coords.reshape(-1, 3).to(torch.float64)
@@ -62,10 +63,10 @@ def _projected_forces(coords, forces, atomsymbols):
     masses, _, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=device)
     P = _eckart_projector(coords_3d, masses)
 
-    # Project gradient, then convert back to force direction
+    # Project gradient, then convert back to a Cartesian coordinate-step direction.
     grad_mw = P @ (-sqrt_m_inv * f_flat)
-    # Descent direction in Cartesian: F_proj = -sqrt_m * grad_mw_proj
-    f_proj = -(sqrt_m * (P @ grad_mw)).reshape(num_atoms, 3).to(forces.dtype)
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    f_proj = -(step_scale * (P @ grad_mw)).reshape(num_atoms, 3).to(forces.dtype)
     return f_proj
 
 
@@ -165,11 +166,17 @@ def run_blended_gad(
 
         gad_vec, v_proj, _ = gad_dynamics_projected(
             coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
+            return_weighted_step_direction=cfg.return_weighted_step_direction,
         )
         v_prev = v_proj.detach().clone().reshape(-1)
 
         # Compute projected descent direction (plain forces, Eckart-projected)
-        f_proj = _projected_forces(coords, forces, atomsymbols)
+        f_proj = _projected_forces(
+            coords,
+            forces,
+            atomsymbols,
+            return_weighted_step_direction=cfg.return_weighted_step_direction,
+        )
 
         # Blend: weight = sigmoid(k * lambda_2)
         # lambda_2 = eig1 (second eigenvalue, ascending order)

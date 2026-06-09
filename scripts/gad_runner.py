@@ -35,12 +35,16 @@ def _default_label(args: argparse.Namespace) -> str:
         parts.append(f"adaptive_{_label_float(args.dt_min)}_{_label_float(args.dt_max)}")
     if args.use_preconditioning:
         parts.append(f"precond{_label_float(args.eig_floor)}")
+    if args.return_weighted_step_direction:
+        parts.append("weighted_step")
     if args.blend_sharpness > 0:
         parts.append(f"blend{_label_float(args.blend_sharpness)}")
     if args.descent_until_nneg > 0:
         parts.append(f"descent_until_nneg{args.descent_until_nneg}")
     if args.multimode:
         parts.append(f"multimode_{args.multimode}")
+    if args.multimode == "softmin":
+        parts.append(f"tau{_label_float(args.softmin_tau)}")
     parts.append(f"{args.force_criterion}{_label_float(args.force_threshold)}")
     return "_".join(parts)
 
@@ -82,10 +86,22 @@ def main():
         help="Use Hessian absolute-value preconditioning",
     )
     parser.add_argument("--eig-floor", type=float, default=0.01)
+    parser.add_argument(
+        "--return-weighted-step-direction",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Return the legacy sqrt(M)-weighted projected direction instead of the unweighted Cartesian step",
+    )
     parser.add_argument("--blend-sharpness", type=float, default=0.0)
     parser.add_argument("--descent-until-nneg", type=int, default=0)
-    parser.add_argument("--multimode", type=str, default="", choices=["", "all_neg", "smooth", "top2"])
+    parser.add_argument("--multimode", type=str, default="", choices=["", "all_neg", "smooth", "top2", "softmin"])
     parser.add_argument("--multimode-sharpness", type=float, default=50.0)
+    parser.add_argument(
+        "--softmin-tau",
+        type=float,
+        default=0.01,
+        help="Temperature for multimode=softmin smooth min-mode projector",
+    )
     parser.add_argument(
         "--purify-hessian",
         action=argparse.BooleanOptionalAction,
@@ -200,10 +216,12 @@ def main():
         purify_hessian=args.purify_hessian,
         use_preconditioning=args.use_preconditioning,
         eig_floor=args.eig_floor,
+        return_weighted_step_direction=args.return_weighted_step_direction,
         blend_sharpness=args.blend_sharpness,
         descent_until_nneg=args.descent_until_nneg,
         multimode=args.multimode,
         multimode_sharpness=args.multimode_sharpness,
+        softmin_tau=args.softmin_tau,
     )
 
     # ---- Sample range (supports random offset into full dataset) ----

@@ -21,7 +21,7 @@ MASS_DICT: dict[str, float] = {
 # Atomic number to element symbol
 Z_TO_SYMBOL: dict[int, str] = {
     1: "H", 6: "C", 7: "N", 8: "O", 9: "F", 15: "P", 16: "S",
-    17: "Cl", 35: "Br", 53: "I",
+    17: "Cl", 18: "Ar", 35: "Br", 53: "I",
 }
 
 

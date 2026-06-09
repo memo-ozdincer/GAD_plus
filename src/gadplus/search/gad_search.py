@@ -57,6 +57,7 @@ class GADSearchConfig:
     purify_hessian: bool = False
     use_preconditioning: bool = False
     eig_floor: float = 0.01
+    return_weighted_step_direction: bool = False
     # One-way descent→GAD switch: follow plain forces until n_neg <= threshold,
     # then switch to GAD permanently. 0 = disabled (pure GAD from start).
     descent_until_nneg: int = 0
@@ -66,6 +67,7 @@ class GADSearchConfig:
     # Multi-mode GAD: "" = standard single-mode, "all_neg"/"smooth"/"top2"
     multimode: str = ""
     multimode_sharpness: float = 50.0  # sigmoid sharpness for "smooth" mode
+    softmin_tau: float = 0.01  # temperature for multimode="softmin"
 
 
 @dataclass
@@ -222,6 +224,7 @@ def run_gad_search(
                 gad_vec, v_proj, _info = gad_dynamics_projected(
                     coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
                     gad_blend_weight=0.0,  # pure descent
+                    return_weighted_step_direction=cfg.return_weighted_step_direction,
                 )
                 v_prev = v_proj.detach().clone().reshape(-1)
             else:
@@ -234,6 +237,8 @@ def run_gad_search(
                     evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
                     mode=cfg.multimode,
                     sigmoid_sharpness=cfg.multimode_sharpness,
+                    softmin_tau=cfg.softmin_tau,
+                    return_weighted_step_direction=cfg.return_weighted_step_direction,
                 )
                 v_prev = v_proj.detach().clone().reshape(-1)
             else:
@@ -262,11 +267,13 @@ def run_gad_search(
                         coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
                         evals_vib=evals_vib, evecs_vib_3N=evecs_vib_3N,
                         eig_floor=cfg.eig_floor, gad_blend_weight=blend_w,
+                        return_weighted_step_direction=cfg.return_weighted_step_direction,
                     )
                 else:
                     gad_vec, v_proj, _info = gad_dynamics_projected(
                         coords=coords, forces=forces, v=v, atomsymbols=atomsymbols,
                         gad_blend_weight=blend_w,
+                        return_weighted_step_direction=cfg.return_weighted_step_direction,
                     )
                 v_prev = v_proj.detach().clone().reshape(-1)
         else:

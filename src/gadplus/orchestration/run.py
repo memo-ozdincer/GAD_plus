@@ -93,6 +93,7 @@ def _build_gad_config(cfg: DictConfig) -> GADSearchConfig:
         force_threshold=cfg.search.get("force_threshold", 0.01),
         force_criterion=cfg.search.get("force_criterion", "fmax"),
         purify_hessian=cfg.search.get("purify_hessian", False),
+        return_weighted_step_direction=cfg.search.get("return_weighted_step_direction", False),
     )
 
 

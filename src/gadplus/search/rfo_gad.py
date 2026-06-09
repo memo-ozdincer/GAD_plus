@@ -56,6 +56,7 @@ class RFOGADConfig:
     rfo_max_iter: int = 20   # Max Newton iterations for secular equation
     rfo_tol: float = 1e-8    # Convergence tolerance for secular equation
     eig_floor: float = 1e-4  # Floor for eigenvalue regularization
+    return_weighted_step_direction: bool = False
 
 
 def _solve_rfo_secular(
@@ -122,6 +123,7 @@ def rfo_gad_step(
     rfo_max_iter: int = 20,
     rfo_tol: float = 1e-8,
     eig_floor: float = 1e-4,
+    return_weighted_step_direction: bool = False,
 ) -> tuple[torch.Tensor, dict]:
     """Compute RFO-GAD step direction.
 
@@ -177,13 +179,16 @@ def rfo_gad_step(
     # Project to ensure vibrational subspace
     dq = P @ dq
 
-    # Back to Cartesian
-    step_cart = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype) * dt
+    # Back to Cartesian coordinate-step direction. The weighted legacy
+    # convention can be requested for old runs/configurations.
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    step_cart = (step_scale * dq).reshape(num_atoms, 3).to(forces.dtype) * dt
 
     info = {
         "rfo_mu": mu,
         "lam0": lam0,
         "step_norm": float(step_cart.norm().item()),
+        "return_weighted_step_direction": bool(return_weighted_step_direction),
     }
     return step_cart, info
 
@@ -266,6 +271,7 @@ def run_rfo_gad(
             forces, evals_vib, evecs_vib_3N, coords, atomsymbols,
             dt=cfg.dt, rfo_max_iter=cfg.rfo_max_iter, rfo_tol=cfg.rfo_tol,
             eig_floor=cfg.eig_floor,
+            return_weighted_step_direction=cfg.return_weighted_step_direction,
         )
         step_disp = cap_displacement(step_disp, cfg.max_atom_disp)
 

@@ -27,14 +27,15 @@ import os
 import sys
 import time
 import uuid
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
 from gadplus.core.convergence import count_negative_eigenvalues
 from gadplus.data.transition1x import Transition1xDataset, UsePos
 from gadplus.paths import hip_checkpoint_path, transition1x_h5_path
@@ -51,6 +52,9 @@ from gadplus.search.hybrid_gad_eigfollownewton_eckart import (
 from gadplus.search.hybrid_gad_damped_eigfollownewton_eckart import (
     projected_hybrid_gad_newton_step as proj_step_damped,
 )
+
+
+_SCINE_WORKER_PREDICT_FN = None
 
 
 def fmax(forces: torch.Tensor) -> float:
@@ -148,12 +152,55 @@ def parse_args():
                    help="Write per-sample trajectory parquet files.")
     p.add_argument("--device", default="cuda")
     p.add_argument(
+        "--calculator",
+        default="hip",
+        choices=["hip", "scine"],
+        help="Calculator backend for energy/forces/Hessian.",
+    )
+    p.add_argument(
+        "--scine-functional",
+        default="DFTB0",
+        help="SCINE Sparrow method when --calculator=scine.",
+    )
+    p.add_argument(
+        "--scine-workers",
+        type=int,
+        default=None,
+        help=(
+            "Parallel worker processes for --calculator=scine. Defaults to the "
+            "allocated CPU count capped at 30."
+        ),
+    )
+    p.add_argument(
         "--start-from",
         default="geodesic_mid",
-        choices=["ts_noised", "reactant", "product", "midpoint", "geodesic_mid"],
+        choices=[
+            "ts_noised",
+            "reactant",
+            "product",
+            "midpoint",
+            "geodesic_mid",
+            "gaussian_origin",
+        ],
         help=(
             "Initial geometry: noised TS (default), reactant, product, "
-            "linear midpoint, or reactant-product geodesic midpoint."
+            "linear midpoint, reactant-product geodesic midpoint, or "
+            "isotropic Gaussian coordinates centered at the origin."
+        ),
+    )
+    p.add_argument(
+        "--gaussian-sigma",
+        type=float,
+        default=1.0,
+        help="Coordinate standard deviation in Angstrom for --start-from gaussian_origin.",
+    )
+    p.add_argument(
+        "--n-starts",
+        type=int,
+        default=None,
+        help=(
+            "Number of starts to run. Defaults to dataset length; for "
+            "--start-from gaussian_origin this is the total random starts."
         ),
     )
     p.add_argument("--force-threshold", type=float, default=0.01,
@@ -161,10 +208,19 @@ def parse_args():
     return p.parse_args()
 
 
-def starting_coords(sample, start_from: str, device: str, noise: torch.Tensor) -> tuple[torch.Tensor, str] | None:
+def starting_coords(
+    sample,
+    start_from: str,
+    device: str,
+    noise: torch.Tensor,
+    gaussian_sigma: float,
+) -> tuple[torch.Tensor, str] | None:
     coords_ts = sample.pos.to(device)
     if start_from == "ts_noised":
         return coords_ts + noise.to(device), "ts_noised"
+
+    if start_from == "gaussian_origin":
+        return noise.to(device), f"gaussian_origin_sigma{gaussian_sigma:g}"
 
     if start_from == "reactant":
         if not hasattr(sample, "pos_reactant"):
@@ -204,6 +260,306 @@ def starting_coords(sample, start_from: str, device: str, noise: torch.Tensor) -
     raise ValueError(f"Unknown start_from: {start_from}")
 
 
+def _set_single_thread_env() -> None:
+    """Keep each SCINE worker single-threaded so process parallelism is stable."""
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+    torch.set_num_threads(1)
+
+
+def _init_scine_search_worker(functional: str) -> None:
+    """Initialize one Sparrow calculator per worker process."""
+    global _SCINE_WORKER_PREDICT_FN
+
+    _set_single_thread_env()
+    from gadplus.calculator.scine import load_scine_calculator, make_scine_predict_fn
+
+    calculator = load_scine_calculator(functional=functional, device="cpu")
+    _SCINE_WORKER_PREDICT_FN = make_scine_predict_fn(calculator)
+
+
+def _resolve_scine_workers(requested: int | None) -> int:
+    available = int(os.environ.get("SLURM_CPUS_PER_TASK") or (os.cpu_count() or 1))
+    if requested is None:
+        requested = min(30, available)
+    return max(1, min(int(requested), available, 30))
+
+
+def _sample_to_namespace(sample) -> SimpleNamespace:
+    payload = {
+        "z": sample.z.detach().cpu(),
+        "pos": sample.pos.detach().cpu(),
+        "formula": getattr(sample, "formula", ""),
+        "rxn": getattr(sample, "rxn", ""),
+    }
+    for attr in ("pos_transition", "pos_reactant", "pos_product", "has_product"):
+        if hasattr(sample, attr):
+            value = getattr(sample, attr)
+            payload[attr] = value.detach().cpu() if isinstance(value, torch.Tensor) else value
+    return SimpleNamespace(**payload)
+
+
+def _run_one_search(payload: dict, predict_fn=None) -> tuple[dict, str]:
+    args = payload["args"]
+    sample = payload["sample"]
+    run_idx = payload["run_idx"]
+    dataset_idx = payload["dataset_idx"]
+    start_noise = payload["start_noise"]
+    method_tag = payload["method_tag"]
+    noise_pm = payload["noise_pm"]
+    run_id_suffix = payload["run_id_suffix"]
+    out_dir = Path(payload["out_dir"])
+    switch_by_eig = payload["switch_by_eig"]
+    device = payload["device"]
+
+    if predict_fn is None:
+        predict_fn = _SCINE_WORKER_PREDICT_FN
+    if predict_fn is None:
+        raise RuntimeError("No predict_fn available for search worker")
+
+    z = sample.z.to(device)
+    formula = getattr(sample, "formula", f"sample_{dataset_idx}")
+    start = starting_coords(
+        sample,
+        args.start_from,
+        device,
+        start_noise,
+        args.gaussian_sigma,
+    )
+    if start is None:
+        row = {
+            "sample_id": run_idx,
+            "reference_sample_id": dataset_idx,
+            "formula": formula,
+            "method": method_tag,
+            "gaussian_sigma": args.gaussian_sigma if args.start_from == "gaussian_origin" else None,
+            "noise_pm": noise_pm,
+            "n_steps_setting": args.n_steps,
+            "start_method": args.start_from,
+            "converged": False,
+            "converged_step": None,
+            "total_steps": 0,
+            "final_force_max": float("nan"),
+            "final_force_norm": float("nan"),
+            "final_n_neg": -1,
+        }
+        return row, f"  [{run_idx:3d}] {formula:>12s} | SKIP: unavailable start={args.start_from}"
+
+    coords, start_method_str = start
+    coords = coords.double()
+    atomic_nums = z
+
+    masses = (
+        masses_from_z(atomic_nums, device=coords.device, dtype=coords.dtype)
+        if args.method != "hybrid"
+        else None
+    )
+
+    traj_rows = []
+    t0 = time.time()
+    converged = False
+    converged_step = None
+    final_force_max = float("nan")
+    final_force_norm = float("nan")
+    final_n_neg = -1
+    final_eig0 = 0.0
+    final_eig1 = 0.0
+    final_energy = float("nan")
+    final_method_used = ""
+    final_step_norm_cart = float("nan")
+    final_force_norm_internal = float("nan")
+    final_target_eigval = float("nan")
+    final_target_mode = -1
+    final_target_force_coupling = float("nan")
+    final_active_trust_radius = args.trust_radius
+    polish_active = False
+    polish_activated_step = None
+    n_steps_actual = 0
+
+    for step_idx in range(args.n_steps):
+        active_trust_radius = (
+            args.final_trust_radius
+            if polish_active and args.final_trust_radius is not None
+            else args.trust_radius
+        )
+        out = predict_fn(coords, atomic_nums, do_hessian=True, require_grad=False)
+        E = out["energy"]
+        F = out["forces"].reshape(-1, 3).double()
+        H = out["hessian"].reshape(F.numel(), F.numel()).double()
+
+        fmax_v = fmax(F)
+        fnorm_v = fnorm(F)
+        E_v = float(E.item()) if hasattr(E, "item") else float(E)
+        n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
+
+        if args.save_traj:
+            traj_rows.append({
+                "sample_id": run_idx,
+                "reference_sample_id": dataset_idx,
+                "step": step_idx,
+                "energy": E_v,
+                "force_max": fmax_v,
+                "force_norm": fnorm_v,
+                "n_neg": n_neg,
+                "eig0": eig0,
+                "eig1": eig1,
+                "step_method": None,
+                "step_norm_cart": None,
+                "force_norm_internal": None,
+                "target_eigval": None,
+                "target_mode": None,
+                "target_force_coupling": None,
+                "active_trust_radius": active_trust_radius,
+                "polish_active": polish_active,
+                "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
+            })
+
+        if n_neg == 1 and fmax_v < args.force_threshold:
+            converged = True
+            converged_step = step_idx
+            final_force_max = fmax_v
+            final_force_norm = fnorm_v
+            final_n_neg = n_neg
+            final_eig0 = eig0
+            final_eig1 = eig1
+            final_energy = E_v
+            final_active_trust_radius = active_trust_radius
+            n_steps_actual = step_idx + 1
+            break
+
+        mc_kw = {} if args.min_curvature is None else {"min_curvature": args.min_curvature}
+        if args.method == "hybrid":
+            step, info = hybrid_gad_newton_step_from_force(
+                F.reshape(-1), H, target_mode=0, gad_dt=args.gad_dt,
+                switch_force=args.switch_force, trust_radius=active_trust_radius, **mc_kw,
+            )
+            used = info.get("method", "?")
+        elif args.method == "hybrid_eckart":
+            step, info = proj_step_plain(
+                force_cart=F, hessian_cart=H, coords=coords.double(),
+                masses=masses, target_mode=0, gad_dt=args.gad_dt,
+                switch_based_on_hessian_eigval=switch_by_eig,
+                switch_force=args.switch_force, trust_radius=active_trust_radius, **mc_kw,
+            )
+            used = info.get("method", "?")
+        elif args.method == "hybrid_damped_eckart":
+            step, info = proj_step_damped(
+                force_cart=F, hessian_cart=H, coords=coords.double(),
+                masses=masses, target_mode=0, gad_dt=args.gad_dt,
+                switch_based_on_hessian_eigval=switch_by_eig,
+                switch_force=args.switch_force, trust_radius=active_trust_radius,
+                target_mode_strategy=args.target_mode_strategy,
+                high_index_descent=args.high_index_descent,
+                **mc_kw,
+            )
+            used = info.get("method", "?")
+        else:
+            raise ValueError(f"Unknown method: {args.method}")
+
+        target_eigval = info_scalar(info, "target_eigval")
+        target_mode_v = int(info.get("target_mode", 0))
+        target_force_coupling = info_scalar(info, "target_force_coupling")
+        final_method_used = used
+        step_norm_cart = info_scalar(
+            info,
+            "step_norm_cart",
+            default=torch.linalg.vector_norm(step),
+        )
+        force_norm_internal = info_scalar(
+            info,
+            "force_norm_internal",
+            default=info.get("force_norm"),
+        )
+        if args.save_traj:
+            traj_rows[-1].update({
+                "step_method": used,
+                "step_norm_cart": step_norm_cart,
+                "force_norm_internal": force_norm_internal,
+                "target_eigval": target_eigval,
+                "target_mode": target_mode_v,
+                "target_force_coupling": target_force_coupling,
+            })
+
+        if (
+            args.final_trust_radius is not None
+            and not polish_active
+            and n_neg == 1
+            and fmax_v <= args.final_trust_force
+        ):
+            polish_active = True
+            polish_activated_step = step_idx
+
+        step = step.reshape_as(coords)
+        coords = (coords + step).detach()
+
+        final_force_max = fmax_v
+        final_force_norm = fnorm_v
+        final_n_neg = n_neg
+        final_eig0 = eig0
+        final_eig1 = eig1
+        final_energy = E_v
+        final_step_norm_cart = step_norm_cart
+        final_force_norm_internal = force_norm_internal
+        final_target_eigval = target_eigval
+        final_target_mode = target_mode_v
+        final_target_force_coupling = target_force_coupling
+        final_active_trust_radius = active_trust_radius
+        n_steps_actual = step_idx + 1
+
+    wall = time.time() - t0
+    traj_path = out_dir / f"traj_{method_tag}_{noise_pm}pm_{run_id_suffix}_{run_idx}.parquet"
+    if args.save_traj and traj_rows:
+        pd.DataFrame(traj_rows).to_parquet(traj_path, compression="snappy")
+
+    row = {
+        "sample_id": run_idx,
+        "reference_sample_id": dataset_idx,
+        "formula": formula,
+        "method": method_tag,
+        "gaussian_sigma": args.gaussian_sigma if args.start_from == "gaussian_origin" else None,
+        "noise_pm": noise_pm,
+        "n_steps_setting": args.n_steps,
+        "start_method": start_method_str,
+        "converged": converged,
+        "converged_step": converged_step,
+        "total_steps": n_steps_actual,
+        "final_force_max": final_force_max,
+        "final_force_norm": final_force_norm,
+        "final_step_norm_cart": final_step_norm_cart,
+        "final_force_norm_internal": final_force_norm_internal,
+        "final_target_eigval": final_target_eigval,
+        "final_target_mode": final_target_mode,
+        "final_target_force_coupling": final_target_force_coupling,
+        "final_n_neg": final_n_neg,
+        "final_eig0": final_eig0,
+        "final_eig1": final_eig1,
+        "final_energy": final_energy,
+        "wall_time_s": wall,
+        "last_step_method": final_method_used,
+        "trust_radius": args.trust_radius,
+        "final_trust_radius": args.final_trust_radius,
+        "final_trust_force": args.final_trust_force,
+        "final_active_trust_radius": final_active_trust_radius,
+        "polish_activated_step": polish_activated_step,
+        "gad_dt": args.gad_dt,
+        "switch_by_eig": switch_by_eig,
+        "high_index_descent": args.high_index_descent,
+        "target_mode_strategy": args.target_mode_strategy,
+        "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
+        "atomic_nums": atomic_nums.detach().cpu().numpy().astype(int).tolist(),
+    }
+
+    status = "CONV" if converged else "FAIL"
+    line = (
+        f"  [{run_idx:3d}] {formula:>12s} | {status} | n_neg={final_n_neg} "
+        f"fmax={final_force_max:.4f} steps={n_steps_actual} wall={wall:.1f}s "
+        f"last_method={final_method_used}"
+    )
+    return row, line
+
+
 def main():
     args = parse_args()
     if args.method != "hybrid_damped_eckart" and args.high_index_descent != "gad":
@@ -218,24 +574,54 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     noise_pm = int(round(args.noise * 1000))
 
-    device = args.device if torch.cuda.is_available() else "cpu"
+    if args.calculator == "scine":
+        device = "cpu"
+        scine_workers = _resolve_scine_workers(args.scine_workers)
+        _set_single_thread_env()
+        if scine_workers < 16:
+            print(
+                f"WARNING: SCINE requested parallelism but only {scine_workers} "
+                "worker(s) are available from this allocation.",
+                flush=True,
+            )
+    else:
+        device = args.device if torch.cuda.is_available() else "cpu"
+        scine_workers = 1
 
-    # Locate HIP + dataset
+    # Locate calculator inputs + dataset
     try:
-        ckpt = str(hip_checkpoint_path())
         h5 = str(transition1x_h5_path())
+        if args.calculator == "hip":
+            ckpt = str(hip_checkpoint_path())
     except FileNotFoundError as exc:
         sys.exit(str(exc))
 
-    calculator = load_hip_calculator(ckpt, device=device)
-    predict_fn = make_hip_predict_fn(calculator)
-    print(f"HIP loaded on {device}")
+    if args.calculator == "hip":
+        from gadplus.calculator.hip import load_hip_calculator, make_hip_predict_fn
+
+        calculator = load_hip_calculator(ckpt, device=device)
+        predict_fn = make_hip_predict_fn(calculator)
+        print(f"HIP loaded on {device}")
+    elif args.calculator == "scine":
+        from gadplus.calculator.scine import load_scine_calculator, make_scine_predict_fn
+
+        calculator = load_scine_calculator(functional=args.scine_functional, device=device)
+        predict_fn = make_scine_predict_fn(calculator)
+        print(
+            f"SCINE Sparrow loaded ({args.scine_functional}) on {device} | "
+            f"workers={scine_workers}",
+            flush=True,
+        )
+    else:
+        raise ValueError(f"Unknown calculator backend: {args.calculator!r}")
 
     dataset = Transition1xDataset(
         h5, split=args.split, max_samples=args.n_samples,
         transform=UsePos("pos_transition"),
     )
     print(f"Loaded {len(dataset)} samples (split={args.split})")
+    if len(dataset) == 0:
+        sys.exit("Dataset is empty")
 
     switch_by_eig = (args.switch_by_eig.lower() == "true")
     method_tag = args.method
@@ -248,229 +634,66 @@ def main():
         method_tag = f"{method_tag}_tm{args.target_mode_strategy}"
     if args.final_trust_radius is not None:
         method_tag = f"{method_tag}_polishtr{args.final_trust_radius:g}"
+    if args.calculator == "scine":
+        method_tag = f"scine_{args.scine_functional.lower()}_{method_tag}"
+    if args.start_from == "gaussian_origin":
+        method_tag = f"{method_tag}_gauss0_sig{args.gaussian_sigma:g}_n{args.n_starts or len(dataset)}"
     run_id = f"{method_tag}_{noise_pm}pm_{uuid.uuid4().hex[:8]}"
     summary_path = out_dir / f"summary_{method_tag}_{noise_pm}pm.parquet"
 
-    # Pre-generate noise
+    # Pre-generate deterministic starts/noise.
     torch.manual_seed(args.seed)
-    noise_vecs = {}
-    for i in range(len(dataset)):
-        s = dataset[i]
-        noise_vecs[i] = torch.randn_like(s.pos) * args.noise
+    n_runs = args.n_starts if args.n_starts is not None else len(dataset)
+    if n_runs <= 0:
+        sys.exit("--n-starts must be positive when set")
+    run_specs = []
+    for run_idx in range(n_runs):
+        dataset_idx = run_idx % len(dataset)
+        s = dataset[dataset_idx]
+        scale = args.gaussian_sigma if args.start_from == "gaussian_origin" else args.noise
+        start_noise = torch.randn_like(s.pos) * scale
+        run_specs.append((run_idx, dataset_idx, start_noise))
 
-    # ── Per-sample loop ──────────────────────────────────────────────
     rows = []
     t_total = time.time()
-    for i in range(len(dataset)):
-        sample = dataset[i]
-        z = sample.z.to(device)
-        formula = getattr(sample, "formula", f"sample_{i}")
-        start = starting_coords(sample, args.start_from, device, noise_vecs[i])
-        if start is None:
-            print(f"  [{i:3d}] {formula:>12s} | SKIP: unavailable start={args.start_from}", flush=True)
-            continue
-        coords, start_method_str = start
-        coords = coords.double()
-        atomic_nums = z
-
-        # Get masses for eckart variants
-        if args.method != "hybrid":
-            masses = masses_from_z(atomic_nums, device=coords.device,
-                                   dtype=coords.dtype)
-        else:
-            masses = None
-
-        # Per-step trajectory accumulator (light, sparse)
-        traj_rows = []
-
-        t0 = time.time()
-        converged = False
-        converged_step = None
-        final_force_max = float("nan")
-        final_force_norm = float("nan")
-        final_n_neg = -1
-        final_eig0 = 0.0
-        final_eig1 = 0.0
-        final_energy = float("nan")
-        final_method_used = ""
-        final_step_norm_cart = float("nan")
-        final_force_norm_internal = float("nan")
-        final_target_eigval = float("nan")
-        final_target_mode = -1
-        final_target_force_coupling = float("nan")
-        final_active_trust_radius = args.trust_radius
-        polish_active = False
-        polish_activated_step = None
-        n_steps_actual = 0
-        for step_idx in range(args.n_steps):
-            active_trust_radius = (
-                args.final_trust_radius
-                if polish_active and args.final_trust_radius is not None
-                else args.trust_radius
-            )
-            out = predict_fn(coords, atomic_nums, do_hessian=True,
-                             require_grad=False)
-            E = out["energy"]; F = out["forces"]; H = out["hessian"]
-            F = F.reshape(-1, 3).double()
-            H = H.reshape(F.numel(), F.numel()).double()
-
-            fmax_v = fmax(F)
-            fnorm_v = fnorm(F)
-            E_v = float(E.item()) if hasattr(E, "item") else float(E)
-
-            n_neg, eig0, eig1 = n_neg_eckart(H, coords, atomic_nums)
-
-            if args.save_traj:
-                traj_rows.append({
-                    "sample_id": i, "step": step_idx, "energy": E_v,
-                    "force_max": fmax_v, "force_norm": fnorm_v,
-                    "n_neg": n_neg, "eig0": eig0, "eig1": eig1,
-                    "step_method": None,
-                    "step_norm_cart": None,
-                    "force_norm_internal": None,
-                    "target_eigval": None,
-                    "target_mode": None,
-                    "target_force_coupling": None,
-                    "active_trust_radius": active_trust_radius,
-                    "polish_active": polish_active,
-                })
-
-            # Convergence check before computing or applying the next step, so
-            # an already-converged starting geometry exits at step 0.
-            if n_neg == 1 and fmax_v < args.force_threshold:
-                converged = True
-                converged_step = step_idx
-                final_force_max = fmax_v; final_force_norm = fnorm_v
-                final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
-                final_energy = E_v
-                final_active_trust_radius = active_trust_radius
-                n_steps_actual = step_idx + 1
-                break
-
-            # Compute step from hybrid_gad_newton.
-            # Pass min_curvature only if the user overrode it; otherwise let
-            # each function use its own default (matches hybrid_gad_newton's __main__).
-            mc_kw = {} if args.min_curvature is None else {"min_curvature": args.min_curvature}
-            if args.method == "hybrid":
-                step, info = hybrid_gad_newton_step_from_force(
-                    F.reshape(-1), H, target_mode=0, gad_dt=args.gad_dt,
-                    switch_force=args.switch_force,
-                    trust_radius=active_trust_radius,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            elif args.method == "hybrid_eckart":
-                step, info = proj_step_plain(
-                    force_cart=F, hessian_cart=H, coords=coords.double(),
-                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
-                    switch_based_on_hessian_eigval=switch_by_eig,
-                    switch_force=args.switch_force,
-                    trust_radius=active_trust_radius,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            elif args.method == "hybrid_damped_eckart":
-                step, info = proj_step_damped(
-                    force_cart=F, hessian_cart=H, coords=coords.double(),
-                    masses=masses, target_mode=0, gad_dt=args.gad_dt,
-                    switch_based_on_hessian_eigval=switch_by_eig,
-                    switch_force=args.switch_force,
-                    trust_radius=active_trust_radius,
-                    target_mode_strategy=args.target_mode_strategy,
-                    high_index_descent=args.high_index_descent,
-                    **mc_kw,
-                )
-                used = info.get("method", "?")
-            target_eigval = info_scalar(info, "target_eigval")
-            target_mode_v = int(info.get("target_mode", 0))
-            target_force_coupling = info_scalar(info, "target_force_coupling")
-            final_method_used = used
-            step_norm_cart = info_scalar(
-                info,
-                "step_norm_cart",
-                default=torch.linalg.vector_norm(step),
-            )
-            force_norm_internal = info_scalar(
-                info,
-                "force_norm_internal",
-                default=info.get("force_norm"),
-            )
-            if args.save_traj:
-                traj_rows[-1].update({
-                    "step_method": used,
-                    "step_norm_cart": step_norm_cart,
-                    "force_norm_internal": force_norm_internal,
-                    "target_eigval": target_eigval,
-                    "target_mode": target_mode_v,
-                    "target_force_coupling": target_force_coupling,
-                })
-
-            if (
-                args.final_trust_radius is not None
-                and not polish_active
-                and n_neg == 1
-                and fmax_v <= args.final_trust_force
-            ):
-                polish_active = True
-                polish_activated_step = step_idx
-
-            # Apply step. Defensive on shape.
-            step = step.reshape_as(coords)
-            coords = (coords + step).detach()
-
-            final_force_max = fmax_v; final_force_norm = fnorm_v
-            final_n_neg = n_neg; final_eig0 = eig0; final_eig1 = eig1
-            final_energy = E_v
-            final_step_norm_cart = step_norm_cart
-            final_force_norm_internal = force_norm_internal
-            final_target_eigval = target_eigval
-            final_target_mode = target_mode_v
-            final_target_force_coupling = target_force_coupling
-            final_active_trust_radius = active_trust_radius
-            n_steps_actual = step_idx + 1
-
-        wall = time.time() - t0
-        # Write trajectory parquet
-        traj_path = out_dir / f"traj_{method_tag}_{noise_pm}pm_{run_id[-8:]}_{i}.parquet"
-        if args.save_traj and traj_rows:
-            pd.DataFrame(traj_rows).to_parquet(traj_path)
-
-        rows.append({
-            "sample_id": i, "formula": formula, "method": method_tag,
-            "noise_pm": noise_pm, "n_steps_setting": args.n_steps,
-            "start_method": start_method_str,
-            "converged": converged, "converged_step": converged_step,
-            "total_steps": n_steps_actual,
-            "final_force_max": final_force_max,
-            "final_force_norm": final_force_norm,
-            "final_step_norm_cart": final_step_norm_cart,
-            "final_force_norm_internal": final_force_norm_internal,
-            "final_target_eigval": final_target_eigval,
-            "final_target_mode": final_target_mode,
-            "final_target_force_coupling": final_target_force_coupling,
-            "final_n_neg": final_n_neg,
-            "final_eig0": final_eig0, "final_eig1": final_eig1,
-            "final_energy": final_energy,
-            "wall_time_s": wall, "last_step_method": final_method_used,
-            "trust_radius": args.trust_radius,
-            "final_trust_radius": args.final_trust_radius,
-            "final_trust_force": args.final_trust_force,
-            "final_active_trust_radius": final_active_trust_radius,
-            "polish_activated_step": polish_activated_step,
-            "gad_dt": args.gad_dt,
+    payloads = [
+        {
+            "args": args,
+            "sample": _sample_to_namespace(dataset[dataset_idx]),
+            "run_idx": run_idx,
+            "dataset_idx": dataset_idx,
+            "start_noise": start_noise.detach().cpu(),
+            "method_tag": method_tag,
+            "noise_pm": noise_pm,
+            "run_id_suffix": run_id[-8:],
+            "out_dir": str(out_dir),
             "switch_by_eig": switch_by_eig,
-            "high_index_descent": args.high_index_descent,
-            "target_mode_strategy": args.target_mode_strategy,
-            "coords_flat": coords.detach().reshape(-1).cpu().numpy().astype(float).tolist(),
-            "atomic_nums": atomic_nums.detach().cpu().numpy().astype(int).tolist(),
-        })
+            "device": device,
+        }
+        for run_idx, dataset_idx, start_noise in run_specs
+    ]
 
-        status = "CONV" if converged else "FAIL"
-        print(f"  [{i:3d}] {formula:>12s} | {status} | n_neg={final_n_neg} "
-              f"fmax={final_force_max:.4f} steps={n_steps_actual} wall={wall:.1f}s "
-              f"last_method={final_method_used}", flush=True)
+    if args.calculator == "scine" and scine_workers > 1 and len(payloads) > 1:
+        effective_workers = min(scine_workers, len(payloads))
+        print(f"Running SCINE searches with {effective_workers} worker processes", flush=True)
+        with ProcessPoolExecutor(
+            max_workers=effective_workers,
+            initializer=_init_scine_search_worker,
+            initargs=(args.scine_functional,),
+        ) as pool:
+            futures = [pool.submit(_run_one_search, payload) for payload in payloads]
+            for future in as_completed(futures):
+                row, line = future.result()
+                rows.append(row)
+                print(line, flush=True)
+    else:
+        for payload in payloads:
+            row, line = _run_one_search(payload, predict_fn=predict_fn)
+            rows.append(row)
+            print(line, flush=True)
 
-    pd.DataFrame(rows).to_parquet(summary_path)
+    rows = sorted(rows, key=lambda row: int(row["sample_id"]))
+    pd.DataFrame(rows).to_parquet(summary_path, compression="snappy")
     print(f"\nWrote {summary_path} ({len(rows)} rows)")
     print(f"Total wall: {time.time()-t_total:.0f}s")
 

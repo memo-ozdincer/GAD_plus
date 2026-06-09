@@ -20,6 +20,7 @@ def gad_dynamics_projected_torch(
     forces: torch.Tensor,
     v: torch.Tensor,
     atomsymbols: list[str],
+    return_weighted_step_direction: bool = False,
     eps: float = 1e-10,
 ) -> tuple[torch.Tensor, torch.Tensor, dict]:
     """Compute GAD dynamics with consistent Eckart projection.
@@ -34,6 +35,9 @@ def gad_dynamics_projected_torch(
         forces: (N, 3) or (3N,) forces (negative gradient).
         v: (3N,) guide vector (eigenvector of projected Hessian).
         atomsymbols: List of atom symbols.
+        return_weighted_step_direction: If True, return the legacy
+            mass-weighted Cartesian-like direction sqrt(M) dq. By default,
+            return the Cartesian coordinate step direction M^-1/2 dq.
         eps: Regularization for projector construction.
 
     Returns:
@@ -70,8 +74,9 @@ def gad_dynamics_projected_torch(
     dq_dt_mw = -grad_mw_proj + 2.0 * (v_dot_grad / (v_dot_v + 1e-12)) * v_proj
     dq_dt_mw = P @ dq_dt_mw  # project output
 
-    # Convert back to Cartesian
-    dq_dt_cart = sqrt_m * dq_dt_mw
+    # Convert back to Cartesian coordinate-step direction.
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    dq_dt_cart = step_scale * dq_dt_mw
 
     gad_vec = dq_dt_cart.reshape(num_atoms, 3).to(forces.dtype)
 
@@ -79,6 +84,7 @@ def gad_dynamics_projected_torch(
         "v_dot_grad": float(v_dot_grad.item()),
         "grad_norm_mw": float(grad_mw_proj.norm().item()),
         "v_norm": float(v_proj.norm().item()),
+        "return_weighted_step_direction": bool(return_weighted_step_direction),
     }
     return gad_vec, v_proj.to(v.dtype), info
 

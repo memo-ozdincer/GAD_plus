@@ -13,6 +13,7 @@ MASS_AMU = {
     15: 30.974,
     16: 32.065,
     17: 35.453,
+    18: 39.948,
     35: 79.904,
     53: 126.904,
 }
@@ -102,8 +103,8 @@ def eckart_internal_basis(coords, masses, tol=None):
     U_ext = Q[:, :rank]
     U_int = Q[:, rank:]
 
-    I = torch.eye(dim, dtype=dtype, device=device)
-    P = I - U_ext @ U_ext.T
+    eye = torch.eye(dim, dtype=dtype, device=device)
+    P = eye - U_ext @ U_ext.T
     P = 0.5 * (P + P.T)
 
     return P, U_int, U_ext

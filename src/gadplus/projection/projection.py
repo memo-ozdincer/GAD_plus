@@ -31,7 +31,7 @@ MASS_DICT: dict[str, float] = {
 
 Z_TO_SYMBOL: dict[int, str] = {
     1: "H", 6: "C", 7: "N", 8: "O", 9: "F", 15: "P", 16: "S",
-    17: "Cl", 35: "Br", 53: "I",
+    17: "Cl", 18: "Ar", 35: "Br", 53: "I",
 }
 
 
@@ -176,6 +176,7 @@ def gad_dynamics_projected(
     v: torch.Tensor,
     atomsymbols: list[str],
     gad_blend_weight: float = 1.0,
+    return_weighted_step_direction: bool = False,
     eps: float = 1e-10,
 ) -> tuple[torch.Tensor, torch.Tensor, dict]:
     """GAD direction with consistent Eckart projection.
@@ -186,6 +187,9 @@ def gad_dynamics_projected(
         gad_blend_weight: Blend weight w in F + 2w(F·v₁)v₁.
             1.0 = full GAD (default), 0.0 = pure descent.
             Use sigmoid(k·λ₂) for smooth λ₂-blended dynamics.
+        return_weighted_step_direction: If True, return the legacy
+            mass-weighted Cartesian-like direction sqrt(M) dq. By default,
+            return the Cartesian coordinate step direction M^-1/2 dq.
 
     Returns:
         gad_vec: (N, 3) GAD direction in Cartesian space.
@@ -209,11 +213,13 @@ def gad_dynamics_projected(
     w = float(gad_blend_weight) if not isinstance(gad_blend_weight, torch.Tensor) else gad_blend_weight
     dq = P @ (-grad_mw + 2.0 * w * (v_dot_grad / (torch.dot(v_proj, v_proj) + 1e-12)) * v_proj)
 
-    gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    gad_vec = (step_scale * dq).reshape(num_atoms, 3).to(forces.dtype)
     info = {
         "v_dot_grad": float(v_dot_grad.item()),
         "grad_norm_mw": float(grad_mw.norm().item()),
         "gad_blend_weight": float(w) if isinstance(w, (int, float)) else float(w.item()),
+        "return_weighted_step_direction": bool(return_weighted_step_direction),
     }
     return gad_vec, v_proj.to(v.dtype), info
 
@@ -226,6 +232,8 @@ def multimode_gad_dynamics_projected(
     evecs_vib_3N: torch.Tensor,
     mode: str = "all_neg",
     sigmoid_sharpness: float = 50.0,
+    softmin_tau: float = 0.01,
+    return_weighted_step_direction: bool = False,
     eps: float = 1e-10,
 ) -> tuple[torch.Tensor, torch.Tensor, dict]:
     """Multi-mode GAD: ascend along multiple Hessian eigenvectors.
@@ -233,10 +241,11 @@ def multimode_gad_dynamics_projected(
     Standard GAD: F_GAD = -g + 2(g·v₁)v₁  (flip force along lowest mode only)
     Multi-mode:   F_GAD = -g + 2·Σᵢ wᵢ(g·vᵢ)vᵢ  (flip along multiple modes)
 
-    Three modes:
+    Modes:
       "all_neg":  wᵢ = 1 if λᵢ < 0, else 0. Flip all negative-eigenvalue modes.
       "smooth":   wᵢ = sigmoid(-λᵢ · sharpness). Differentiable soft version.
       "top2":     Flip the 2 lowest modes (v₁ and v₂), regardless of sign.
+      "softmin":  wᵢ = softmax(-λᵢ / τ). Smooth rank-one min-mode projector.
 
     All operate in Eckart-projected mass-weighted vibrational space.
 
@@ -270,6 +279,11 @@ def multimode_gad_dynamics_projected(
     elif mode == "smooth":
         # Soft: sigmoid(-λ · k), differentiable
         weights = torch.sigmoid(-evals * sigmoid_sharpness)
+    elif mode == "softmin":
+        if softmin_tau <= 0:
+            raise ValueError(f"softmin_tau must be positive, got {softmin_tau}")
+        # Smooth spectral projector onto the lowest mode.
+        weights = torch.softmax(-evals / float(softmin_tau), dim=0)
     elif mode == "top2":
         # Flip the 2 lowest modes regardless of sign
         weights = torch.zeros_like(evals)
@@ -286,19 +300,26 @@ def multimode_gad_dynamics_projected(
 
     dq = P @ (-grad_mw + flip_term)
 
-    # Back to Cartesian
-    gad_vec = (sqrt_m * dq).reshape(num_atoms, 3).to(forces.dtype)
+    # Back to Cartesian coordinate-step direction. The weighted legacy
+    # convention can be requested for old runs/configurations.
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    gad_vec = (step_scale * dq).reshape(num_atoms, 3).to(forces.dtype)
 
     # Return v₁ for mode tracking (even though we flip multiple modes)
     v1_proj = P @ evecs[:, 0]
     v1_proj = v1_proj / (v1_proj.norm() + 1e-12)
 
     n_flipped = int((weights > 0.5).sum().item())
+    effective_rank = 1.0 / torch.clamp(torch.sum(weights * weights), min=1e-12)
     info = {
         "n_modes_flipped": n_flipped,
         "weights_sum": float(weights.sum().item()),
+        "weight_0": float(weights[0].item()) if weights.numel() > 0 else 0.0,
+        "weight_1": float(weights[1].item()) if weights.numel() > 1 else 0.0,
+        "effective_rank": float(effective_rank.item()),
         "grad_norm_mw": float(grad_mw.norm().item()),
         "mode": mode,
+        "return_weighted_step_direction": bool(return_weighted_step_direction),
     }
     return gad_vec, v1_proj.to(forces.dtype), info
 
@@ -312,6 +333,7 @@ def preconditioned_gad_dynamics_projected(
     evecs_vib_3N: torch.Tensor,
     eig_floor: float = 0.01,
     gad_blend_weight: float = 1.0,
+    return_weighted_step_direction: bool = False,
     eps: float = 1e-10,
 ) -> tuple[torch.Tensor, torch.Tensor, dict]:
     """Preconditioned GAD: Δx = dt · |H|⁻¹ F_blend.
@@ -338,6 +360,9 @@ def preconditioned_gad_dynamics_projected(
         eig_floor: Clamp |λᵢ| from below to avoid blowup near zero.
         gad_blend_weight: Blend weight w in F + 2w(F·v₁)v₁.
             1.0 = full GAD, 0.0 = pure descent. Use sigmoid(k·λ₂) for smooth blend.
+        return_weighted_step_direction: If True, return the legacy
+            mass-weighted Cartesian-like direction sqrt(M) dq. By default,
+            return the Cartesian coordinate step direction M^-1/2 dq.
         eps: Numerical stability for projector.
 
     Returns:
@@ -374,8 +399,9 @@ def preconditioned_gad_dynamics_projected(
 
     dq_precond = evecs @ scaled_coeffs
 
-    # Back to Cartesian
-    gad_vec = (sqrt_m * dq_precond).reshape(num_atoms, 3).to(forces.dtype)
+    # Back to Cartesian coordinate-step direction.
+    step_scale = sqrt_m if return_weighted_step_direction else sqrt_m_inv
+    gad_vec = (step_scale * dq_precond).reshape(num_atoms, 3).to(forces.dtype)
 
     # Diagnostics
     scale_range = float(inv_abs_evals.max().item()) / max(float(inv_abs_evals.min().item()), 1e-12)
@@ -387,6 +413,7 @@ def preconditioned_gad_dynamics_projected(
         "precond_scale_range": scale_range,
         "n_clamped": int((evals.abs() < eig_floor).sum().item()),
         "gad_blend_weight": float(w) if isinstance(w, (int, float)) else float(w.item()),
+        "return_weighted_step_direction": bool(return_weighted_step_direction),
     }
     return gad_vec, v_proj.to(v.dtype), info
 
