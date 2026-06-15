@@ -58,9 +58,9 @@ class GADSearchConfig:
     use_preconditioning: bool = False
     eig_floor: float = 0.01
     return_weighted_step_direction: bool = False
-    # One-way descent→GAD switch: follow plain forces until n_neg <= threshold,
-    # then switch to GAD permanently. 0 = disabled (pure GAD from start).
-    descent_until_nneg: int = 0
+    # Per-step high-index handling. "gradient" follows plain forces whenever
+    # n_neg > 1, then returns to GAD as soon as n_neg <= 1.
+    high_index_descent: str = "gad"
     # Lambda2-blended preconditioning: w = sigmoid(k * lambda_2)
     # 0 = no blend (standard GAD/precond GAD), >0 = blended
     blend_sharpness: float = 0.0
@@ -115,9 +115,6 @@ def run_gad_search(
     v_prev: Optional[torch.Tensor] = None
     t_start = time.time()
 
-    # One-way descent→GAD switch
-    gad_locked = (cfg.descent_until_nneg == 0)  # if 0, start in GAD immediately
-
     # Track last eigenvalues for result
     last_n_neg = 0
     last_force_norm = float("inf")
@@ -159,11 +156,9 @@ def run_gad_search(
         last_eig0 = eig0
         last_energy = energy
 
-        # One-way switch: once n_neg <= threshold, lock into GAD permanently
-        if not gad_locked and n_neg <= cfg.descent_until_nneg:
-            gad_locked = True
-
-        phase = "gad" if gad_locked else "descent"
+        if cfg.high_index_descent not in {"gad", "gradient"}:
+            raise ValueError("high_index_descent must be one of: gad, gradient")
+        phase = "descent" if cfg.high_index_descent == "gradient" and n_neg > 1 else "gad"
 
         # Log step
         if logger is not None:

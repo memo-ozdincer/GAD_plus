@@ -8,6 +8,7 @@ runs/
 mlruns/
 logs/
 outputs/
+baseline_outputs/
 
 *.pdf
 *.csv
@@ -15,5 +16,10 @@ outputs/
 *.log
 *.out
 *.err
+*.h5
+*.hdf5
+*.bak
+*.hess
+
 
 outslurm

@@ -39,8 +39,8 @@ def _default_label(args: argparse.Namespace) -> str:
         parts.append("weighted_step")
     if args.blend_sharpness > 0:
         parts.append(f"blend{_label_float(args.blend_sharpness)}")
-    if args.descent_until_nneg > 0:
-        parts.append(f"descent_until_nneg{args.descent_until_nneg}")
+    if args.high_index_descent != "gad":
+        parts.append(f"hi_{args.high_index_descent}")
     if args.multimode:
         parts.append(f"multimode_{args.multimode}")
     if args.multimode == "softmin":
@@ -93,7 +93,12 @@ def main():
         help="Return the legacy sqrt(M)-weighted projected direction instead of the unweighted Cartesian step",
     )
     parser.add_argument("--blend-sharpness", type=float, default=0.0)
-    parser.add_argument("--descent-until-nneg", type=int, default=0)
+    parser.add_argument(
+        "--high-index-descent",
+        choices=["gad", "gradient"],
+        default="gad",
+        help="Use gradient descent on steps with n_neg > 1; otherwise use GAD.",
+    )
     parser.add_argument("--multimode", type=str, default="", choices=["", "all_neg", "smooth", "top2", "softmin"])
     parser.add_argument("--multimode-sharpness", type=float, default=50.0)
     parser.add_argument(
@@ -218,7 +223,7 @@ def main():
         eig_floor=args.eig_floor,
         return_weighted_step_direction=args.return_weighted_step_direction,
         blend_sharpness=args.blend_sharpness,
-        descent_until_nneg=args.descent_until_nneg,
+        high_index_descent=args.high_index_descent,
         multimode=args.multimode,
         multimode_sharpness=args.multimode_sharpness,
         softmin_tau=args.softmin_tau,

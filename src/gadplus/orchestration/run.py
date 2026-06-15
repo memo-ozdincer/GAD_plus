@@ -94,6 +94,7 @@ def _build_gad_config(cfg: DictConfig) -> GADSearchConfig:
         force_criterion=cfg.search.get("force_criterion", "fmax"),
         purify_hessian=cfg.search.get("purify_hessian", False),
         return_weighted_step_direction=cfg.search.get("return_weighted_step_direction", False),
+        high_index_descent=cfg.search.get("high_index_descent", "gad"),
     )
 
 

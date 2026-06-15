@@ -177,7 +177,10 @@ def info_scalar(info: dict, key: str, default=None) -> float | None:
 
 def method_tag(args: argparse.Namespace) -> str:
     if args.method == "gad":
-        return f"lj{args.n_atoms}_gad_dt{args.dt:g}_eps{args.epsilon:g}_sig{args.sigma:g}"
+        tag = f"lj{args.n_atoms}_gad_dt{args.dt:g}_eps{args.epsilon:g}_sig{args.sigma:g}"
+        if args.high_index_descent != "gad":
+            tag = f"{tag}_hi{args.high_index_descent}"
+        return tag
     switch = "swEIG" if args.switch_by_eig == "true" else "swFORCE"
     return (
         f"lj{args.n_atoms}_{args.method}_{switch}_sf{args.switch_force:g}"
@@ -215,6 +218,7 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
         use_projection=args.use_projection,
         use_adaptive_dt=args.use_adaptive_dt,
         return_weighted_step_direction=args.return_weighted_step_direction,
+        high_index_descent=args.high_index_descent,
         dt_min=args.dt_min,
         dt_max=args.dt_max,
         max_atom_disp=args.max_atom_disp,
@@ -488,10 +492,12 @@ def main() -> None:
     args = parse_args()
     if args.n_atoms < 2:
         sys.exit("--n-atoms must be at least 2")
-    if args.method != "hybrid_damped_eckart" and (
-        args.high_index_descent != "gad" or args.target_mode_strategy != "fixed"
-    ):
-        sys.exit("--high-index-descent and --target-mode-strategy only apply to hybrid_damped_eckart")
+    if args.method == "gad" and args.high_index_descent not in {"gad", "gradient"}:
+        sys.exit("--method gad supports --high-index-descent gad or gradient")
+    if args.method not in {"gad", "hybrid_damped_eckart"} and args.high_index_descent != "gad":
+        sys.exit("--high-index-descent only applies to --method gad or hybrid_damped_eckart")
+    if args.method != "hybrid_damped_eckart" and args.target_mode_strategy != "fixed":
+        sys.exit("--target-mode-strategy only applies to hybrid_damped_eckart")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     params = LennardJonesParams(epsilon=args.epsilon, sigma=args.sigma)
