@@ -95,7 +95,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-interatomic-dist", type=float, default=0.75)
 
     parser.add_argument("--dt", type=float, default=1.0e-3, help="Regular GAD timestep.")
-    parser.add_argument("--k-track", type=int, default=8)
+    parser.add_argument(
+        "--k-track",
+        type=int,
+        default=0,
+        help="Mode-tracking window (0 = always use lowest Eckart eigenvector).",
+    )
     parser.add_argument("--use-projection", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use-adaptive-dt", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(

@@ -8,32 +8,58 @@ from gadplus.calculator.lennard_jones import (
     random_cluster_geometry,
 )
 from gadplus.search import transition_state_optimizer as tso
-from gadplus.search.transition_state_optimizer import (
-    TransitionStateOptimizationResult,
-    TransitionStateOptimizer,
-)
+from gadplus.search.transition_state_optimizer import TransitionStateVectorfield
 
 
-def test_transition_state_optimizer_stores_potential_energy_surface_and_dt():
+def test_transition_state_vectorfield_stores_potential_energy_surface():
     predict_fn = make_lj_predict_fn(n_atoms=4)
+    atomic_nums = lj_atomic_nums(4, atomic_number=1)
 
-    optimizer = TransitionStateOptimizer(
-        potential_energy_surface=predict_fn,
-        n_atoms=4,
-        atomic_nums=lj_atomic_nums(4, atomic_number=1),
-        dt=0.007,
-        n_steps=2,
+    vectorfield = TransitionStateVectorfield(
+        predict_fn,
+        atomic_nums=atomic_nums,
     )
 
-    assert optimizer.potential_energy_surface is predict_fn
-    assert optimizer.dt == 0.007
-    assert optimizer.config.dt == 0.007
-    assert optimizer.config.n_steps == 2
+    assert vectorfield.potential_energy_surface is predict_fn
+    assert vectorfield.n_atoms == 4
+    assert vectorfield.last_info == {}
 
 
-def test_projected_step_uses_gradient_descent_only_for_high_index(monkeypatch):
-    optimizer = TransitionStateOptimizer(n_atoms=2, n_steps=1)
+def test_transition_state_vectorfield_returns_finite_lj_direction():
+    predict_fn = make_lj_predict_fn(n_atoms=3)
+    atomic_nums = lj_atomic_nums(3, atomic_number=1)
+    vectorfield = TransitionStateVectorfield(predict_fn, atomic_nums=atomic_nums)
+    coords = random_cluster_geometry(3, sigma=1.0, generator=torch.Generator().manual_seed(0))
+
+    direction = vectorfield(coords)
+
+    assert direction.shape == (3, 3)
+    assert torch.isfinite(direction).all()
+    assert vectorfield.last_info["phase"] in {"descent", "gad"}
+    assert isinstance(vectorfield.last_info["n_neg"], int)
+
+
+def test_transition_state_vectorfield_blend_switches_with_projected_index(monkeypatch):
+    atomic_nums = lj_atomic_nums(2, atomic_number=1)
+
+    def fake_predict_fn(coords, atomic_nums_arg, *, do_hessian=True, require_grad=False):
+        del atomic_nums_arg, do_hessian, require_grad
+        return {
+            "energy": torch.tensor(0.0, dtype=coords.dtype),
+            "forces": torch.ones_like(coords),
+            "hessian": torch.eye(coords.numel(), dtype=coords.dtype),
+        }
+
+    vectorfield = TransitionStateVectorfield(fake_predict_fn, atomic_nums=atomic_nums)
     calls: list[float] = []
+
+    def fake_vib_eig(hessian, coords, atomsymbols, purify=False):
+        del hessian, coords, atomsymbols, purify
+        evals = torch.tensor([-2.0, -1.0, 0.5, 1.0, 2.0, 3.0])
+        return evals, torch.eye(6), torch.eye(6)
+
+    def fake_count_negative_eigenvalues(evals):
+        return int((evals < 0).sum().item())
 
     def fake_gad_dynamics_projected(
         coords,
@@ -47,44 +73,20 @@ def test_projected_step_uses_gradient_descent_only_for_high_index(monkeypatch):
         calls.append(float(gad_blend_weight))
         return forces.clone(), v.clone(), {}
 
+    monkeypatch.setattr(tso, "vib_eig", fake_vib_eig)
+    monkeypatch.setattr(tso, "count_negative_eigenvalues", fake_count_negative_eigenvalues)
     monkeypatch.setattr(tso, "gad_dynamics_projected", fake_gad_dynamics_projected)
-    coords = torch.zeros((2, 3), dtype=torch.float32)
-    forces = torch.ones((2, 3), dtype=torch.float32)
-    evecs = torch.eye(6, dtype=torch.float32)
 
-    optimizer._projected_step_direction(
-        coords=coords,
-        forces=forces,
-        evecs_vib_3n=evecs,
-        atomsymbols=["H", "H"],
-        n_neg=2,
-        v_prev=None,
-    )
-    optimizer._projected_step_direction(
-        coords=coords,
-        forces=forces,
-        evecs_vib_3n=evecs,
-        atomsymbols=["H", "H"],
-        n_neg=1,
-        v_prev=None,
-    )
+    coords = torch.zeros((2, 3), dtype=torch.float32)
+    vectorfield(coords)
+
+    def fake_vib_eig_index1(hessian, coords, atomsymbols, purify=False):
+        del hessian, coords, atomsymbols, purify
+        evals = torch.tensor([-1.0, 0.5, 1.0, 2.0, 3.0, 4.0])
+        return evals, torch.eye(6), torch.eye(6)
+
+    monkeypatch.setattr(tso, "vib_eig", fake_vib_eig_index1)
+    vectorfield.reset()
+    vectorfield(coords)
 
     assert calls == [0.0, 1.0]
-
-
-def test_transition_state_optimizer_runs_tiny_lj_optimization():
-    optimizer = TransitionStateOptimizer(
-        n_atoms=3,
-        atomic_number=1,
-        n_steps=1,
-        dt=1.0e-3,
-        min_interatomic_dist=0.1,
-    )
-    coords = random_cluster_geometry(3, sigma=1.0, generator=torch.Generator().manual_seed(0))
-
-    result = optimizer.optimize(coords)
-
-    assert isinstance(result, TransitionStateOptimizationResult)
-    assert result.total_steps == 1
-    assert result.final_coords.shape == (3, 3)
-    assert torch.isfinite(result.final_coords).all()
