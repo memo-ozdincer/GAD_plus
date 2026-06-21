@@ -76,6 +76,7 @@ class LennardJonesAnalyticalPredictor(PredictFn):
         *,
         compile_forces: bool = False,
         compile_hessian: bool = False,
+        oscillator: bool = False,
     ):
         if n_atoms < 2:
             raise ValueError("Lennard-Jones clusters require at least two atoms.")
@@ -87,7 +88,7 @@ class LennardJonesAnalyticalPredictor(PredictFn):
             n_particles=n_atoms,
             eps=p.epsilon,
             rm=params_to_analytical_rm(p.sigma),
-            oscillator=False,
+            oscillator=oscillator,
             compile_forces=compile_forces,
             compile_hessian=compile_hessian,
         )
@@ -98,47 +99,73 @@ class LennardJonesAnalyticalPredictor(PredictFn):
         atomic_nums: torch.Tensor,
         *,
         do_hessian: bool = True,
-        require_grad: bool = False,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         del atomic_nums
 
-        n_atoms = coords.numel() // 3
-        if n_atoms != self.n_atoms:
-            raise ValueError(
-                f"Analytical LJ predictor was built for {self.n_atoms} atoms, got {n_atoms}."
-            )
-
-        positions = coords.reshape(1, n_atoms, 3).to(dtype=torch.float64)
-        if not require_grad:
-            positions = positions.detach()
-
-        if require_grad:
-            positions = positions.clone().requires_grad_(True)
+        positions, is_batched = self._positions_from_coords(coords)
+        positions = positions.detach()
 
         batch = {"positions": positions}
-        energy = self._model._energy_from_positions(positions)[0]
-        if require_grad:
-            forces = self._model.compute_forces_autograd(batch).reshape(n_atoms, 3)
-        else:
-            forces = self._model.compute_forces(
-                batch,
-                create_graph=False,
-            ).reshape(n_atoms, 3)
+        energy = self._model._energy_from_positions(positions)
+        forces = self._model.compute_forces(batch)
+
+        if not is_batched:
+            energy = energy[0]
+            forces = forces[0]
 
         out: dict[str, Any] = {
-            "energy": energy if require_grad else energy.detach(),
-            "forces": forces if require_grad else forces.detach(),
+            "energy": energy.detach(),
+            "forces": forces.detach(),
         }
 
         if do_hessian:
-            if require_grad:
-                hessian = self._model.compute_hessian_autograd(batch, create_graph=True)[0]
-            else:
-                hessian = self._model.compute_hessian(batch, create_graph=False)[0]
-            hessian = 0.5 * (hessian + hessian.transpose(0, 1))
-            out["hessian"] = hessian if require_grad else hessian.detach()
+            hessian = self._model.compute_hessian(batch)
+            hessian = 0.5 * (hessian + hessian.transpose(-1, -2))
+            if not is_batched:
+                hessian = hessian[0]
+            out["hessian"] = hessian.detach()
 
         return out
+
+    def _positions_from_coords(self, coords: torch.Tensor) -> tuple[torch.Tensor, bool]:
+        """Normalize supported coordinate shapes to batched ``(B, N, 3)`` positions."""
+
+        xyz = coords.to(dtype=torch.float64)
+        if xyz.dim() == 1:
+            if xyz.numel() != 3 * self.n_atoms:
+                raise ValueError(
+                    f"Analytical LJ predictor was built for {self.n_atoms} atoms, "
+                    f"got flat coordinate length {xyz.numel()}."
+                )
+            return xyz.reshape(1, self.n_atoms, 3), False
+
+        if xyz.dim() == 2:
+            if xyz.shape == (self.n_atoms, 3):
+                return xyz.reshape(1, self.n_atoms, 3), False
+            if xyz.shape[1] == 3 * self.n_atoms:
+                return xyz.reshape(xyz.shape[0], self.n_atoms, 3), True
+            raise ValueError(
+                f"Analytical LJ predictor was built for {self.n_atoms} atoms and expected "
+                f"coords shaped ({self.n_atoms}, 3), ({3 * self.n_atoms},), "
+                f"or a batch with trailing size {3 * self.n_atoms}; "
+                f"got {tuple(xyz.shape)}."
+            )
+
+        if xyz.dim() == 3:
+            if xyz.shape[1:] != (self.n_atoms, 3):
+                raise ValueError(
+                    f"Analytical LJ predictor was built for {self.n_atoms} atoms and expected "
+                    f"batched coords shaped (B, {self.n_atoms}, 3), got {tuple(xyz.shape)}."
+                )
+            return xyz, True
+
+        raise ValueError(
+            f"Analytical LJ predictor was built for {self.n_atoms} atoms and expected "
+            "coords shaped "
+            f"({self.n_atoms}, 3), ({3 * self.n_atoms},), "
+            f"(B, {self.n_atoms}, 3), or (B, {3 * self.n_atoms}); got {tuple(xyz.shape)}."
+        )
 
 
 def make_lj_predict_fn(
@@ -147,6 +174,7 @@ def make_lj_predict_fn(
     n_atoms: int,
     compile_forces: bool = False,
     compile_hessian: bool = False,
+    oscillator: bool = False,
 ) -> PredictFn:
     """Create an analytical PredictFn for the Lennard-Jones cluster potential.
 
@@ -155,6 +183,7 @@ def make_lj_predict_fn(
         n_atoms: Cluster size.
         compile_forces: Enable ``torch.compile`` for analytical forces on CUDA.
         compile_hessian: Enable ``torch.compile`` for analytical Hessians on CUDA.
+        oscillator: Add a harmonic tether restoring each atom toward the origin.
     """
 
     return LennardJonesAnalyticalPredictor(
@@ -162,6 +191,7 @@ def make_lj_predict_fn(
         params,
         compile_forces=compile_forces,
         compile_hessian=compile_hessian,
+        oscillator=oscillator,
     )
 
 

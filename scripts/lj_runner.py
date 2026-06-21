@@ -79,6 +79,12 @@ def parse_args() -> argparse.Namespace:
         help="Enable torch.compile for LJ force and Hessian kernels on CUDA.",
     )
     parser.add_argument(
+        "--lj-oscillator",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Add a harmonic tether in the analytical LJ energy (default: off).",
+    )
+    parser.add_argument(
         "--atomic-number",
         type=int,
         default=18,
@@ -222,7 +228,7 @@ def final_diagnostics(
     atomic_nums: torch.Tensor,
 ) -> tuple[dict, torch.Tensor, torch.Tensor]:
     n_atoms = coords.numel() // 3
-    out = predict_fn(coords, atomic_nums, do_hessian=True, require_grad=False)
+    out = predict_fn(coords, atomic_nums, do_hessian=True)
     hessian = out["hessian"].reshape(3 * n_atoms, 3 * n_atoms).double()
     forces = out["forces"].reshape(n_atoms, 3).double()
     n_neg, eig0, eig1 = n_neg_eckart(hessian, coords, atomic_nums)
@@ -540,6 +546,7 @@ def main() -> None:
         n_atoms=args.n_atoms,
         compile_forces=args.lj_compile,
         compile_hessian=args.lj_compile,
+        oscillator=args.lj_oscillator,
     )
     atomic_nums = lj_atomic_nums(args.n_atoms, atomic_number=args.atomic_number)
     run_id = uuid.uuid4().hex[:8]

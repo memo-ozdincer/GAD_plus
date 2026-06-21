@@ -15,18 +15,22 @@ class PredictFn(Protocol):
     """Callable interface for energy/force/Hessian predictions.
 
     All algorithms call this to obtain energy, forces, and optionally a
-    Hessian for a single molecular geometry.
+    Hessian for molecular geometries. Implementations may support either
+    single-geometry inputs or both single and batched inputs.
 
     Args:
-        coords: (N, 3) atomic coordinates in Angstrom.
-        atomic_nums: (N,) atomic numbers.
+        coords: Single geometry as (N, 3) or (3N,), or a batch as
+            (B, N, 3) or (B, 3N).
+        atomic_nums: (N,) atomic numbers, or optionally (B, N) for batched
+            calculators that need per-system element identities.
         do_hessian: If True, compute and return the Hessian.
         require_grad: If True, returned tensors are connected to coords
             for autograd differentiation.
 
     Returns:
-        Dict with keys "energy" (scalar), "forces" (N, 3), and
-        optionally "hessian" (3N, 3N).
+        Dict with keys "energy", "forces", and optionally "hessian".
+        For single inputs, shapes are scalar, (N, 3), and (3N, 3N).
+        For batched inputs, shapes are (B,), (B, N, 3), and (B, 3N, 3N).
     """
 
     def __call__(

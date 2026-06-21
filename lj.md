@@ -23,6 +23,8 @@ Current LJ runner defaults and conventions:
 - `--force-criterion fmax`
 - `--force-threshold 0.05`
 - `--k-track 0` (mode tracking off; always flip along the lowest Eckart eigenvector)
+- `--no-lj-oscillator` by default (pure pairwise LJ; no harmonic tether)
+- `--no-lj-compile` by default (`torch.compile` only activates on CUDA)
 
 The dynamics are first order only:
 
@@ -74,6 +76,28 @@ Current best setting:
 
 `dt=0.007` with `n_steps=2000`, giving 73/100 TS candidates.
 
+## Best-Setting Ablations (`dt=0.007`, `n_steps=2000`)
+
+Repeated the best setting on `cpu_short` with 100 starts to compare LJ backend
+options. All rows match the sweep conventions above unless noted.
+
+| Output directory | Variant | TS candidates | Index-1 finals | Final index pattern | Slurm elapsed | Total wall time |
+| --- | --- | ---: | ---: | --- | ---: | ---: |
+| `dt007_n2000_baseline` | defaults | 73/100 | 87 | `{1: 87, 2: 12, 3: 1}` | 3:33 | 183 s |
+| `dt007_n2000_ljcompile` | `--lj-compile` | 73/100 | 87 | `{1: 87, 2: 12, 3: 1}` | 4:20 | 170 s |
+| `dt007_n2000_noosc` | `--no-lj-oscillator` | 73/100 | 87 | `{1: 87, 2: 12, 3: 1}` | 4:21 | 171 s |
+| `dt007_n2000_oscillator` | `--lj-oscillator` | 1/100 | 96 | `{0: 4, 1: 96}` | 7:28 | 434 s |
+
+Notes:
+
+- `baseline` and `--no-lj-oscillator` are the same physics; the default already
+  disables the harmonic tether.
+- `--lj-compile` has no effect on `cpu_short` (compile path requires CUDA), so
+  the small timing differences are node noise rather than a speedup.
+- `--lj-oscillator` adds a harmonic tether toward the origin. It reaches index 1
+  more often but leaves large residual forces, so TS success collapses to 1/100
+  and runtime roughly doubles.
+
 ## Interpretation
 
 The step size matters strongly for Gaussian-origin LJ7 starts. Small `dt`
@@ -82,3 +106,7 @@ values spend too much of the 1000-step budget in high-index regions. Increasing
 trajectories. Larger steps, starting at `dt=0.01`, often reach index 1 but keep
 large residual forces, so they do not satisfy the TS criterion. Extending the
 budget from 1000 to 2000 steps improves `dt=0.007` from 70/100 to 73/100.
+
+For the LJ backend, keep the pure pairwise potential (`--no-lj-oscillator`,
+the default). The harmonic tether interferes with Gaussian-origin TS search even
+when index 1 is reached easily.

@@ -5,6 +5,8 @@ import argparse
 
 import torch
 
+from gadplus.calculator.lennard_jones import lj_atomic_nums, params_to_analytical_rm
+from gadplus.calculator.lennard_jones_analytical import LennardJonesEnergy
 from gadplus.core.convergence import (
     count_negative_eigenvalues,
     force_max,
@@ -12,7 +14,6 @@ from gadplus.core.convergence import (
     force_value_from_criterion,
     is_ts_converged,
 )
-from gadplus.core.types import PredictFn
 from gadplus.projection import atomic_nums_to_symbols, gad_dynamics_projected, vib_eig
 
 class TransitionStateVectorfield:
@@ -30,20 +31,30 @@ class TransitionStateVectorfield:
 
     def __init__(
         self,
-        potential_energy_surface: PredictFn,
         *,
-        atomic_nums: torch.Tensor,
+        n_atoms: int = 7,
+        epsilon: float = 1.0,
+        sigma: float = 1.0,
+        atomic_number: int = 1,
+        compile_forces: bool = False,
+        compile_hessian: bool = False,
+        oscillator: bool = False,
         purify_hessian: bool = False,
         return_weighted_step_direction: bool = False,
     ) -> None:
-        atomic_nums = atomic_nums.detach().clone().reshape(-1)
-        n_atoms = int(atomic_nums.numel())
         if n_atoms < 2:
             raise ValueError("TransitionStateVectorfield requires at least two atoms.")
 
         self.n_atoms = n_atoms
-        self.atomic_nums = atomic_nums
-        self.potential_energy_surface = potential_energy_surface
+        self.atomic_nums = lj_atomic_nums(n_atoms, atomic_number=atomic_number)
+        self.potential_energy_surface = LennardJonesEnergy(
+            n_particles=n_atoms,
+            eps=epsilon,
+            rm=params_to_analytical_rm(sigma),
+            oscillator=oscillator,
+            compile_forces=compile_forces,
+            compile_hessian=compile_hessian,
+        )
         self.purify_hessian = purify_hessian
         self.return_weighted_step_direction = return_weighted_step_direction
         self.last_info: dict[str, float | int | str] = {}
@@ -57,12 +68,7 @@ class TransitionStateVectorfield:
 
         atomic_nums = self.atomic_nums.to(device=coords_3d.device)
         atomsymbols = atomic_nums_to_symbols(atomic_nums)
-        out = self.potential_energy_surface(
-            coords_3d,
-            atomic_nums,
-            do_hessian=True,
-            require_grad=False,
-        )
+        out = self._evaluate(coords_3d)
         forces = out["forces"]
         if forces.dim() == 3 and forces.shape[0] == 1:
             forces = forces[0]
@@ -102,6 +108,21 @@ class TransitionStateVectorfield:
         """Clear cached diagnostics before starting an independent trajectory."""
 
         self.last_info = {}
+
+    def _evaluate(self, coords: torch.Tensor) -> dict[str, torch.Tensor]:
+        coords_3d = coords.detach().reshape(-1, 3)
+        positions = coords_3d.reshape(1, self.n_atoms, 3).to(dtype=torch.float64).detach()
+        batch = {"positions": positions}
+
+        energy = self.potential_energy_surface._energy_from_positions(positions)[0].detach()
+        forces = self.potential_energy_surface.compute_forces(batch)[0].detach()
+        hessian = self.potential_energy_surface.compute_hessian(batch)[0].detach()
+        hessian = 0.5 * (hessian + hessian.transpose(0, 1))
+        return {
+            "energy": energy,
+            "forces": forces,
+            "hessian": hessian,
+        }
 
 ##################################################################################################
 # Optimization
@@ -158,12 +179,7 @@ def _diagnostics(
 ) -> dict[str, float | int]:
     coords_3d = coords.detach().reshape(-1, 3)
     atomic_nums = vectorfield.atomic_nums.to(device=coords_3d.device)
-    out = vectorfield.potential_energy_surface(
-        coords_3d,
-        atomic_nums,
-        do_hessian=True,
-        require_grad=False,
-    )
+    out = vectorfield._evaluate(coords_3d)
     forces = out["forces"].reshape(-1, 3)
     evals_vib, _, _ = vib_eig(
         out["hessian"],
@@ -203,23 +219,16 @@ def _example_args() -> argparse.Namespace:
 
 
 def _run_example() -> None:
-    from gadplus.calculator.lennard_jones import (
-        LennardJonesParams,
-        lj_atomic_nums,
-        make_lj_predict_fn,
-    )
-
     args = _example_args()
     if args.gaussian_origin_sigma <= 0:
         raise ValueError("--gaussian-origin-sigma must be positive.")
 
     generator = torch.Generator().manual_seed(args.seed)
-    lj_params = LennardJonesParams(epsilon=args.epsilon, sigma=args.sigma)
-    atomic_nums = lj_atomic_nums(args.n_atoms, atomic_number=args.atomic_number)
-    predict_fn = make_lj_predict_fn(lj_params, n_atoms=args.n_atoms)
     vectorfield = TransitionStateVectorfield(
-        predict_fn,
-        atomic_nums=atomic_nums,
+        n_atoms=args.n_atoms,
+        epsilon=args.epsilon,
+        sigma=args.sigma,
+        atomic_number=args.atomic_number,
     )
 
     print(

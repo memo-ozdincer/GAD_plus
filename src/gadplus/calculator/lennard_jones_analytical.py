@@ -30,18 +30,7 @@ def lennard_jones_pair_energy(
 
 
 class LennardJonesEnergy(torch.nn.Module):
-    """Graph-native Lennard-Jones cluster energy for atoms-only BMS runs.
-
-    LJ-13 on CUDA with batch size 128:
-    autograd forces:            0.839 ms
-    eager analytical forces:    0.172 ms
-    compiled analytical forces: 0.046 ms
-    autograd/compiled speedup:  18.2x
-
-    compiled analytical Hessian: 0.051 ms
-    autograd Hessian:            37.593 ms
-    autograd/compiled speedup:   743.8x
-    """
+    """Graph-native Lennard-Jones cluster energy for atoms-only BMS runs."""
 
     def __init__(
         self,
@@ -150,24 +139,13 @@ class LennardJonesEnergy(torch.nn.Module):
             "reg_forces": torch.zeros_like(forces.detach()),
         }
 
-    def compute_forces_autograd(self, batch) -> torch.Tensor:
-        """Compute forces from autograd for validation."""
-        with torch.enable_grad():
-            positions = self._batched_positions(batch).detach().requires_grad_(True)
-            energy = self._energy_from_positions(positions)
-            forces = -torch.autograd.grad(energy.sum(), positions)[0]
-        return forces.detach()
-
-    def compute_forces(self, batch, create_graph: bool = False) -> torch.Tensor:
+    def compute_forces(self, batch) -> torch.Tensor:
         """Compute per-particle analytical forces for the LJ energy."""
         positions = self._batched_positions(batch)
-        if create_graph or not self._should_compile_forces(positions):
+        if not self._should_compile_forces(positions):
             forces = self._compute_forces_from_positions(positions)
         else:
             forces = self._compute_forces_compiled(positions)
-
-        if create_graph:
-            return forces
         return forces.detach()
 
     def _should_compile_forces(self, positions: torch.Tensor) -> bool:
@@ -234,54 +212,13 @@ class LennardJonesEnergy(torch.nn.Module):
             -1, self.n_particles, self.n_spatial_dim
         )
 
-    def compute_hessian_autograd(
-        self,
-        batch,
-        create_graph: bool = False,
-    ) -> torch.Tensor:
-        """Compute per-system Hessians of the LJ energy wrt particle positions."""
-        with torch.enable_grad():
-            positions = self._batched_positions(batch)
-            positions = positions.detach().requires_grad_(True)
-            energy = self._energy_from_positions(positions)
-            grad = torch.autograd.grad(
-                energy.sum(),
-                positions,
-                create_graph=True,
-            )[0]
-
-            n_systems = positions.shape[0]
-            flat_grad = grad.reshape(n_systems, self.dim)
-            hessian_rows = []
-            for dim_i in range(self.dim):
-                grad_i = flat_grad[:, dim_i].sum()
-                row_i = torch.autograd.grad(
-                    grad_i,
-                    positions,
-                    retain_graph=create_graph or dim_i < self.dim - 1,
-                    create_graph=create_graph,
-                )[0].reshape(n_systems, self.dim)
-                hessian_rows.append(row_i)
-            hessian = torch.stack(hessian_rows, dim=1)
-
-        if create_graph:
-            return hessian
-        return hessian.detach()
-
-    def compute_hessian(
-        self,
-        batch,
-        create_graph: bool = False,
-    ) -> torch.Tensor:
+    def compute_hessian(self, batch) -> torch.Tensor:
         """Compute per-system analytical Hessians of the LJ energy."""
         positions = self._batched_positions(batch)
-        if create_graph or not self._should_compile_hessian(positions):
+        if not self._should_compile_hessian(positions):
             hessian = self._compute_hessian_from_positions(positions)
         else:
             hessian = self._compute_hessian_compiled(positions)
-
-        if create_graph:
-            return hessian
         return hessian.detach()
 
     def _should_compile_hessian(self, positions: torch.Tensor) -> bool:
