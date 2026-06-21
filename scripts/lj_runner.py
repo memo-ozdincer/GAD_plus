@@ -53,19 +53,37 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--start-from",
-        choices=["minimum", "minimum_noised", "random", "expanded_minimum"],
+        choices=["minimum", "minimum_noised", "random", "expanded_minimum", "gaussian_origin"],
         default="minimum_noised",
     )
     parser.add_argument("--n-atoms", type=int, default=7)
     parser.add_argument("--n-samples", type=int, default=24)
     parser.add_argument("--n-steps", type=int, default=1000)
     parser.add_argument("--noise", type=float, default=0.05)
+    parser.add_argument(
+        "--gaussian-origin-sigma",
+        type=float,
+        default=1.0,
+        help="Per-coordinate stddev for --start-from gaussian_origin.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=Path("runs/lj"))
     parser.add_argument("--save-traj", action=argparse.BooleanOptionalAction, default=True)
 
     parser.add_argument("--epsilon", type=float, default=1.0)
     parser.add_argument("--sigma", type=float, default=1.0)
+    parser.add_argument(
+        "--lj-backend",
+        choices=["autograd", "analytical"],
+        default="autograd",
+        help="LJ evaluator: autograd (lennard_jones_old) or analytical derivatives.",
+    )
+    parser.add_argument(
+        "--lj-compile",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable torch.compile for the analytical LJ backend on CUDA.",
+    )
     parser.add_argument(
         "--atomic-number",
         type=int,
@@ -120,10 +138,18 @@ def make_starting_geometry(
     sigma: float,
     generator: torch.Generator,
     noise: float,
+    gaussian_origin_sigma: float = 1.0,
 ) -> tuple[torch.Tensor, str]:
     """Build one labelled LJ starting geometry plus optional Cartesian noise."""
 
-    if n_atoms == 7 and start_from in {"minimum", "minimum_noised", "expanded_minimum"}:
+    if start_from == "gaussian_origin":
+        coords = gaussian_origin_sigma * torch.randn(
+            (n_atoms, 3),
+            generator=generator,
+            dtype=torch.float64,
+        )
+        start_label = f"gaussian_origin_sigma{gaussian_origin_sigma:g}"
+    elif n_atoms == 7 and start_from in {"minimum", "minimum_noised", "expanded_minimum"}:
         coords = pentagonal_bipyramid_geometry(sigma)
         start_label = "lj7_pentagonal_bipyramid"
     else:
@@ -176,14 +202,18 @@ def info_scalar(info: dict, key: str, default=None) -> float | None:
 
 
 def method_tag(args: argparse.Namespace) -> str:
+    backend_tag = "" if args.lj_backend == "autograd" else f"_{args.lj_backend}"
     if args.method == "gad":
-        tag = f"lj{args.n_atoms}_gad_dt{args.dt:g}_eps{args.epsilon:g}_sig{args.sigma:g}"
+        tag = (
+            f"lj{args.n_atoms}{backend_tag}_gad_dt{args.dt:g}"
+            f"_eps{args.epsilon:g}_sig{args.sigma:g}"
+        )
         if args.high_index_descent != "gad":
             tag = f"{tag}_hi{args.high_index_descent}"
         return tag
     switch = "swEIG" if args.switch_by_eig == "true" else "swFORCE"
     return (
-        f"lj{args.n_atoms}_{args.method}_{switch}_sf{args.switch_force:g}"
+        f"lj{args.n_atoms}{backend_tag}_{args.method}_{switch}_sf{args.switch_force:g}"
         f"_dt{args.gad_dt:g}_tr{args.trust_radius:g}_eps{args.epsilon:g}_sig{args.sigma:g}"
     )
 
@@ -236,6 +266,7 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
             args.sigma,
             generator,
             args.noise,
+            args.gaussian_origin_sigma,
         )
         t0 = time.time()
         result = run_gad_search(predict_fn, coords0, atomic_nums, cfg)
@@ -257,7 +288,9 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
                 "dt": args.dt,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
+                "lj_backend": args.lj_backend,
                 "noise": args.noise,
+                "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
                 "start_method": start_label,
                 "converged": converged,
@@ -301,6 +334,7 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
             args.sigma,
             generator,
             args.noise,
+            args.gaussian_origin_sigma,
         )
         coords = coords.double()
         traj_rows = []
@@ -451,7 +485,9 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
                 "switch_force": args.switch_force,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
+                "lj_backend": args.lj_backend,
                 "noise": args.noise,
+                "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
                 "start_method": start_label,
                 "converged": converged,
@@ -492,6 +528,8 @@ def main() -> None:
     args = parse_args()
     if args.n_atoms < 2:
         sys.exit("--n-atoms must be at least 2")
+    if args.gaussian_origin_sigma <= 0:
+        sys.exit("--gaussian-origin-sigma must be positive")
     if args.method == "gad" and args.high_index_descent not in {"gad", "gradient"}:
         sys.exit("--method gad supports --high-index-descent gad or gradient")
     if args.method not in {"gad", "hybrid_damped_eckart"} and args.high_index_descent != "gad":
@@ -501,11 +539,17 @@ def main() -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     params = LennardJonesParams(epsilon=args.epsilon, sigma=args.sigma)
-    predict_fn = make_lj_predict_fn(params)
+    predict_fn = make_lj_predict_fn(
+        params,
+        n_atoms=args.n_atoms,
+        backend=args.lj_backend,
+        compile_forces=args.lj_compile,
+        compile_hessian=args.lj_compile,
+    )
     atomic_nums = lj_atomic_nums(args.n_atoms, atomic_number=args.atomic_number)
     run_id = uuid.uuid4().hex[:8]
     print(
-        f"LJ benchmark | method={args.method} start={args.start_from} "
+        f"LJ benchmark | method={args.method} backend={args.lj_backend} start={args.start_from} "
         f"n_atoms={args.n_atoms} epsilon={args.epsilon:g} sigma={args.sigma:g} "
         f"samples={args.n_samples} run_id={run_id}",
         flush=True,

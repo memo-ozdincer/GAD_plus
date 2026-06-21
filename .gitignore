@@ -9,6 +9,9 @@ mlruns/
 logs/
 outputs/
 baseline_outputs/
+orca_wb97x_631gd_glycine_pt_nh_oh_scan_80/
+*.tar.gz
+*.run
 
 *.pdf
 *.csv
