@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--start-from",
         choices=["minimum", "minimum_noised", "random", "expanded_minimum", "gaussian_origin"],
-        default="minimum_noised",
+        default="gaussian_origin",
     )
     parser.add_argument("--n-atoms", type=int, default=7)
     parser.add_argument("--n-samples", type=int, default=24)
@@ -73,16 +73,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epsilon", type=float, default=1.0)
     parser.add_argument("--sigma", type=float, default=1.0)
     parser.add_argument(
-        "--lj-backend",
-        choices=["autograd", "analytical"],
-        default="autograd",
-        help="LJ evaluator: autograd (lennard_jones_old) or analytical derivatives.",
-    )
-    parser.add_argument(
         "--lj-compile",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Enable torch.compile for the analytical LJ backend on CUDA.",
+        help="Enable torch.compile for LJ force and Hessian kernels on CUDA.",
     )
     parser.add_argument(
         "--atomic-number",
@@ -202,10 +196,9 @@ def info_scalar(info: dict, key: str, default=None) -> float | None:
 
 
 def method_tag(args: argparse.Namespace) -> str:
-    backend_tag = "" if args.lj_backend == "autograd" else f"_{args.lj_backend}"
     if args.method == "gad":
         tag = (
-            f"lj{args.n_atoms}{backend_tag}_gad_dt{args.dt:g}"
+            f"lj{args.n_atoms}_gad_dt{args.dt:g}"
             f"_eps{args.epsilon:g}_sig{args.sigma:g}"
         )
         if args.high_index_descent != "gad":
@@ -213,7 +206,7 @@ def method_tag(args: argparse.Namespace) -> str:
         return tag
     switch = "swEIG" if args.switch_by_eig == "true" else "swFORCE"
     return (
-        f"lj{args.n_atoms}{backend_tag}_{args.method}_{switch}_sf{args.switch_force:g}"
+        f"lj{args.n_atoms}_{args.method}_{switch}_sf{args.switch_force:g}"
         f"_dt{args.gad_dt:g}_tr{args.trust_radius:g}_eps{args.epsilon:g}_sig{args.sigma:g}"
     )
 
@@ -288,7 +281,6 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
                 "dt": args.dt,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
-                "lj_backend": args.lj_backend,
                 "noise": args.noise,
                 "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
@@ -485,7 +477,6 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
                 "switch_force": args.switch_force,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
-                "lj_backend": args.lj_backend,
                 "noise": args.noise,
                 "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
@@ -542,14 +533,13 @@ def main() -> None:
     predict_fn = make_lj_predict_fn(
         params,
         n_atoms=args.n_atoms,
-        backend=args.lj_backend,
         compile_forces=args.lj_compile,
         compile_hessian=args.lj_compile,
     )
     atomic_nums = lj_atomic_nums(args.n_atoms, atomic_number=args.atomic_number)
     run_id = uuid.uuid4().hex[:8]
     print(
-        f"LJ benchmark | method={args.method} backend={args.lj_backend} start={args.start_from} "
+        f"LJ benchmark | method={args.method} start={args.start_from} "
         f"n_atoms={args.n_atoms} epsilon={args.epsilon:g} sigma={args.sigma:g} "
         f"samples={args.n_samples} run_id={run_id}",
         flush=True,
