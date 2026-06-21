@@ -2,7 +2,15 @@ import pytest
 import torch
 
 from gadplus.core.convergence import count_negative_eigenvalues
-from gadplus.projection import atomic_nums_to_symbols, gad_dynamics_projected, vib_eig
+from gadplus.projection import (
+    atomic_nums_to_symbols,
+    batched_gad_dynamics_projected,
+    batched_project_vector_to_vibrational,
+    batched_vib_eig,
+    gad_dynamics_projected,
+    project_vector_to_vibrational,
+    vib_eig,
+)
 from gadplus.search.hybrid_gad_damped_eigfollownewton_eckart import (
     eckart_internal_basis,
     _internal_mass_weighted_state,
@@ -132,6 +140,148 @@ def test_projected_gad_returns_unweighted_step_direction_by_default():
         atol=1e-12,
         rtol=1e-12,
     )
+
+
+def test_batched_vib_eig_matches_scalar_for_multiple_geometries():
+    atomic_nums = torch.tensor([6, 8, 7, 1])
+    atomsymbols = atomic_nums_to_symbols(atomic_nums)
+    coords_batch = torch.tensor(
+        [
+            [
+                [0.0000, 0.0000, 0.0000],
+                [1.2300, 0.1100, -0.0200],
+                [-0.5200, 1.0700, 0.2600],
+                [-0.6100, -0.9400, 0.1900],
+            ],
+            [
+                [0.1000, -0.1200, 0.0900],
+                [1.0400, 0.4200, -0.3300],
+                [-0.6700, 0.8900, 0.5100],
+                [-0.4700, -1.1900, -0.2700],
+            ],
+            [
+                [-0.2100, 0.0700, -0.1400],
+                [1.3900, -0.1800, 0.2300],
+                [-0.8100, 1.2100, -0.3600],
+                [-0.3700, -1.1000, 0.2700],
+            ],
+        ],
+        dtype=torch.float64,
+    )
+    generator = torch.Generator(device=coords_batch.device)
+    generator.manual_seed(12)
+    dim = coords_batch.shape[1] * 3
+    raw_hessians = torch.randn(
+        coords_batch.shape[0],
+        dim,
+        dim,
+        generator=generator,
+        dtype=torch.float64,
+    )
+    hessians = 0.5 * (raw_hessians + raw_hessians.transpose(-1, -2))
+
+    evals_batch, evecs_batch, q_batch = batched_vib_eig(hessians, coords_batch, atomsymbols)
+
+    for idx, coords in enumerate(coords_batch):
+        evals_scalar, evecs_scalar, q_scalar = vib_eig(hessians[idx], coords, atomsymbols)
+        torch.testing.assert_close(evals_batch[idx], evals_scalar, atol=1e-12, rtol=1e-12)
+        torch.testing.assert_close(
+            q_batch[idx] @ q_batch[idx].T,
+            q_scalar @ q_scalar.T,
+            atol=1e-12,
+            rtol=1e-12,
+        )
+        torch.testing.assert_close(
+            evecs_batch[idx] @ evecs_batch[idx].T,
+            evecs_scalar @ evecs_scalar.T,
+            atol=1e-12,
+            rtol=1e-12,
+        )
+
+
+def test_batched_projected_gad_matches_scalar_for_multiple_geometries():
+    atomic_nums = torch.tensor([6, 8, 7, 1])
+    atomsymbols = atomic_nums_to_symbols(atomic_nums)
+    coords_batch = torch.tensor(
+        [
+            [
+                [0.0000, 0.0000, 0.0000],
+                [1.2300, 0.1100, -0.0200],
+                [-0.5200, 1.0700, 0.2600],
+                [-0.6100, -0.9400, 0.1900],
+            ],
+            [
+                [0.1000, -0.1200, 0.0900],
+                [1.0400, 0.4200, -0.3300],
+                [-0.6700, 0.8900, 0.5100],
+                [-0.4700, -1.1900, -0.2700],
+            ],
+            [
+                [-0.2100, 0.0700, -0.1400],
+                [1.3900, -0.1800, 0.2300],
+                [-0.8100, 1.2100, -0.3600],
+                [-0.3700, -1.1000, 0.2700],
+            ],
+        ],
+        dtype=torch.float64,
+    )
+    forces_batch = torch.tensor(
+        [
+            [[0.30, -0.20, 0.10], [-0.40, 0.50, -0.10], [0.20, 0.10, -0.30], [-0.10, -0.40, 0.20]],
+            [[-0.20, 0.10, 0.40], [0.30, -0.60, 0.20], [0.50, 0.20, -0.10], [-0.60, 0.30, -0.50]],
+            [[0.70, -0.10, -0.20], [-0.30, 0.20, 0.60], [-0.20, -0.50, 0.30], [-0.20, 0.40, -0.70]],
+        ],
+        dtype=torch.float64,
+    )
+    guide_vectors = torch.stack(
+        [
+            torch.arange(1, coords_batch[0].numel() + 1, dtype=torch.float64),
+            torch.linspace(-2.0, 1.0, coords_batch[0].numel(), dtype=torch.float64),
+            torch.linspace(0.5, 3.0, coords_batch[0].numel(), dtype=torch.float64),
+        ]
+    )
+    blend_weights = torch.tensor([1.0, 0.0, 0.35], dtype=torch.float64)
+
+    gad_batch, v_proj_batch, info_batch = batched_gad_dynamics_projected(
+        coords=coords_batch,
+        forces=forces_batch,
+        v=guide_vectors,
+        atomsymbols=atomsymbols,
+        gad_blend_weight=blend_weights,
+    )
+    vec_proj_batch = batched_project_vector_to_vibrational(
+        guide_vectors.reshape(coords_batch.shape),
+        coords_batch,
+        atomsymbols,
+    )
+
+    for idx, coords in enumerate(coords_batch):
+        gad_scalar, v_proj_scalar, info_scalar = gad_dynamics_projected(
+            coords=coords,
+            forces=forces_batch[idx],
+            v=guide_vectors[idx],
+            atomsymbols=atomsymbols,
+            gad_blend_weight=blend_weights[idx],
+        )
+        torch.testing.assert_close(gad_batch[idx], gad_scalar, atol=1e-12, rtol=1e-12)
+        torch.testing.assert_close(
+            torch.outer(v_proj_batch[idx], v_proj_batch[idx]),
+            torch.outer(v_proj_scalar, v_proj_scalar),
+            atol=1e-12,
+            rtol=1e-12,
+        )
+        torch.testing.assert_close(
+            info_batch["v_dot_grad"][idx],
+            torch.tensor(info_scalar["v_dot_grad"], dtype=torch.float64),
+            atol=1e-12,
+            rtol=1e-12,
+        )
+        vec_proj_scalar = project_vector_to_vibrational(
+            guide_vectors[idx],
+            coords,
+            atomsymbols,
+        )
+        torch.testing.assert_close(vec_proj_batch[idx], vec_proj_scalar, atol=1e-12, rtol=1e-12)
 
 
 def test_hybrid_damped_eckart_inertia_uses_hip_frequency_cutoff():
