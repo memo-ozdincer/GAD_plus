@@ -5,8 +5,11 @@ import torch
 
 from gadplus.calculator.lennard_jones import (
     LennardJonesParams,
+    is_lj_dissociated,
     lj_atomic_nums,
+    lj_dissociation_distance_threshold,
     make_lj_predict_fn,
+    pair_distances,
     params_to_analytical_rm,
     pentagonal_bipyramid_geometry,
     random_cluster_geometry,
@@ -45,7 +48,7 @@ def test_lennard_jones_rejects_require_grad_true():
     coords = random_cluster_geometry(5, sigma=1.0, generator=torch.Generator().manual_seed(0))
     atomic_nums = lj_atomic_nums(5)
 
-    with pytest.raises(NotImplementedError, match="require_grad=False"):
+    with pytest.raises(NotImplementedError, match="require_grad=True"):
         predict_fn(coords, atomic_nums, require_grad=True)
 
 
@@ -116,3 +119,23 @@ def test_lennard_jones_requires_matching_atom_count():
 
 def test_params_to_analytical_rm_uses_equilibrium_distance():
     assert params_to_analytical_rm(1.0) == pytest.approx(2.0 ** (1.0 / 6.0))
+
+
+def test_lj_dissociation_threshold_scales_with_n_and_sigma():
+    assert lj_dissociation_distance_threshold(7, 1.0) == pytest.approx(
+        2.0 * (2.0 ** (1.0 / 6.0)) * (7 ** (1.0 / 3.0)),
+        rel=1e-12,
+    )
+    assert lj_dissociation_distance_threshold(7, 2.0) == pytest.approx(
+        2.0 * lj_dissociation_distance_threshold(7, 1.0),
+        rel=1e-12,
+    )
+
+
+def test_lj_dissociation_flag_for_compact_lj7():
+    coords = pentagonal_bipyramid_geometry(sigma=1.0)
+    d_max = float(pair_distances(coords).max().item())
+    assert not is_lj_dissociated(d_max, n_atoms=7, sigma=1.0)
+    threshold = lj_dissociation_distance_threshold(7, 1.0)
+    assert not is_lj_dissociated(threshold, n_atoms=7, sigma=1.0)
+    assert is_lj_dissociated(threshold + 1.0e-6, n_atoms=7, sigma=1.0)

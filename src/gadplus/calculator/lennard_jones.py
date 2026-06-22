@@ -66,6 +66,24 @@ def params_to_analytical_rm(sigma: float) -> float:
     return LJ_RM_FACTOR * sigma
 
 
+def lj_dissociation_distance_threshold(n_atoms: int, sigma: float = 1.0) -> float:
+    """Max-pair cutoff above which a final LJ cluster is flagged dissociated.
+
+    Uses ``d_max > 2 * r_eq * N^(1/3)`` with ``r_eq = 2^(1/6) * sigma``.
+    """
+
+    if n_atoms < 2:
+        raise ValueError("LJ dissociation threshold requires at least two atoms.")
+    r_eq = LJ_RM_FACTOR * sigma
+    return 2.0 * r_eq * (n_atoms ** (1.0 / 3.0))
+
+
+def is_lj_dissociated(d_max: float, n_atoms: int, sigma: float = 1.0) -> bool:
+    """Return True when the largest pair distance exceeds the LJ dissociation cutoff."""
+
+    return d_max > lj_dissociation_distance_threshold(n_atoms, sigma)
+
+
 class LennardJonesAnalyticalPredictor(PredictFn):
     """PredictFn adapter around the vectorized analytical LJ implementation."""
 
@@ -101,7 +119,12 @@ class LennardJonesAnalyticalPredictor(PredictFn):
         do_hessian: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        del atomic_nums
+        if kwargs.pop("require_grad", False):
+            raise NotImplementedError(
+                "LennardJonesAnalyticalPredictor does not support require_grad=True"
+            )
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {sorted(kwargs)}")
 
         positions, is_batched = self._positions_from_coords(coords)
         positions = positions.detach()
@@ -267,7 +290,9 @@ __all__ = [
     "LennardJonesAnalyticalPredictor",
     "LennardJonesParams",
     "center_geometry",
+    "is_lj_dissociated",
     "lj_atomic_nums",
+    "lj_dissociation_distance_threshold",
     "make_lj_predict_fn",
     "pair_distances",
     "pair_indices",

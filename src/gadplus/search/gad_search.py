@@ -29,7 +29,12 @@ from gadplus.core.convergence import (
     force_value_from_criterion,
     count_negative_eigenvalues,
 )
-from gadplus.core.adaptive_dt import compute_adaptive_dt, cap_displacement, min_interatomic_distance
+from gadplus.core.adaptive_dt import (
+    compute_adaptive_dt,
+    cap_displacement,
+    interatomic_distance_stats,
+    min_interatomic_distance,
+)
 from gadplus.projection import vib_eig
 from gadplus.projection import gad_dynamics_projected
 from gadplus.projection import multimode_gad_dynamics_projected
@@ -83,7 +88,43 @@ class SearchResult:
     final_force_max: float
     final_eig0: float
     wall_time_s: float
+    final_min_interatomic_dist: float = float("nan")
+    final_mean_interatomic_dist: float = float("nan")
+    final_max_interatomic_dist: float = float("nan")
     failure_type: Optional[str] = None
+
+
+def _search_result(
+    *,
+    converged: bool,
+    converged_step: Optional[int],
+    total_steps: int,
+    coords: torch.Tensor,
+    final_energy: float,
+    final_n_neg: int,
+    final_force_norm: float,
+    final_force_max: float,
+    final_eig0: float,
+    wall_time_s: float,
+    failure_type: Optional[str] = None,
+) -> SearchResult:
+    d_min, d_mean, d_max = interatomic_distance_stats(coords)
+    return SearchResult(
+        converged=converged,
+        converged_step=converged_step,
+        total_steps=total_steps,
+        final_coords=coords.detach().cpu(),
+        final_energy=final_energy,
+        final_n_neg=final_n_neg,
+        final_force_norm=final_force_norm,
+        final_force_max=final_force_max,
+        final_eig0=final_eig0,
+        wall_time_s=wall_time_s,
+        final_min_interatomic_dist=d_min,
+        final_mean_interatomic_dist=d_mean,
+        final_max_interatomic_dist=d_max,
+        failure_type=failure_type,
+    )
 
 
 def run_gad_search(
@@ -189,11 +230,11 @@ def run_gad_search(
             wall_time = time.time() - t_start
             if logger is not None:
                 logger.flush()
-            return SearchResult(
+            return _search_result(
                 converged=True,
                 converged_step=step,
                 total_steps=step + 1,
-                final_coords=coords.detach().cpu(),
+                coords=coords,
                 final_energy=energy,
                 final_n_neg=n_neg,
                 final_force_norm=fn,
@@ -305,11 +346,11 @@ def run_gad_search(
     if logger is not None:
         logger.flush()
 
-    return SearchResult(
+    return _search_result(
         converged=False,
         converged_step=None,
         total_steps=cfg.n_steps,
-        final_coords=coords.detach().cpu(),
+        coords=coords,
         final_energy=last_energy,
         final_n_neg=last_n_neg,
         final_force_norm=last_force_norm,

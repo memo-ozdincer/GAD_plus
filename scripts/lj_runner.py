@@ -16,14 +16,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from gadplus.calculator.lennard_jones import (
     LennardJonesParams,
+    is_lj_dissociated,
     lj_atomic_nums,
+    lj_dissociation_distance_threshold,
     make_lj_predict_fn,
     pair_distances,
     pentagonal_bipyramid_geometry,
     random_cluster_geometry,
     shortest_pair_label,
 )
-from gadplus.core.adaptive_dt import cap_displacement, min_interatomic_distance
+from gadplus.core.adaptive_dt import cap_displacement, interatomic_distance_stats, min_interatomic_distance
 from gadplus.core.convergence import (
     count_negative_eigenvalues,
     force_max,
@@ -206,6 +208,14 @@ def info_scalar(info: dict, key: str, default=None) -> float | None:
     return float(value)
 
 
+def lj_dissociation_summary(d_max: float, n_atoms: int, sigma: float) -> dict[str, float | bool]:
+    threshold = lj_dissociation_distance_threshold(n_atoms, sigma)
+    return {
+        "final_dissociation_threshold": threshold,
+        "final_dissociated": is_lj_dissociated(d_max, n_atoms, sigma),
+    }
+
+
 def method_tag(args: argparse.Namespace) -> str:
     if args.method == "gad":
         tag = (
@@ -306,8 +316,15 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
                 "final_force_norm": final["force_norm"],
                 "final_energy": final["energy"],
                 "final_short_pair": shortest_pair_label(result.final_coords),
-                "final_min_distance": min(distances),
+                "final_min_distance": result.final_min_interatomic_dist,
+                "final_mean_distance": result.final_mean_interatomic_dist,
+                "final_max_distance": result.final_max_interatomic_dist,
                 "final_distances": distances,
+                **lj_dissociation_summary(
+                    result.final_max_interatomic_dist,
+                    args.n_atoms,
+                    args.sigma,
+                ),
                 "coords_flat": result.final_coords.reshape(-1).detach().cpu().tolist(),
                 "atomic_nums": atomic_nums.detach().cpu().tolist(),
                 "wall_time_s": wall,
@@ -477,6 +494,7 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
 
         wall = time.time() - t0
         distances = pair_distances(coords).detach().cpu().tolist()
+        d_min, d_mean, d_max = interatomic_distance_stats(coords)
         rows.append(
             {
                 "sample_id": sample_id,
@@ -508,8 +526,11 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
                 "final_target_force_coupling": final["target_force_coupling"],
                 "last_step_method": final["last_step_method"],
                 "final_short_pair": shortest_pair_label(coords),
-                "final_min_distance": min(distances),
+                "final_min_distance": d_min,
+                "final_mean_distance": d_mean,
+                "final_max_distance": d_max,
                 "final_distances": distances,
+                **lj_dissociation_summary(d_max, args.n_atoms, args.sigma),
                 "coords_flat": coords.reshape(-1).detach().cpu().tolist(),
                 "atomic_nums": atomic_nums.detach().cpu().tolist(),
                 "wall_time_s": wall,

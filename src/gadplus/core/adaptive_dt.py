@@ -69,6 +69,26 @@ def cap_displacement(
     return disp_3d.reshape(step_disp.shape)
 
 
+def interatomic_distance_stats(coords: torch.Tensor) -> tuple[float, float, float]:
+    """Return (min, mean, max) pairwise interatomic distance in Angstrom.
+
+    Args:
+        coords: (N, 3) atomic coordinates.
+
+    Returns:
+        Stats over unique atom pairs, or (inf, inf, inf) for single-atom systems.
+    """
+    c = coords.reshape(-1, 3)
+    n = c.shape[0]
+    if n < 2:
+        return float("inf"), float("inf"), float("inf")
+
+    diff = c.unsqueeze(0) - c.unsqueeze(1)
+    dist = diff.norm(dim=2)
+    pairs = dist[torch.triu(torch.ones(n, n, dtype=torch.bool, device=c.device), diagonal=1)]
+    return float(pairs.min().item()), float(pairs.mean().item()), float(pairs.max().item())
+
+
 def min_interatomic_distance(coords: torch.Tensor) -> float:
     """Compute minimum interatomic distance (Angstrom).
 
@@ -78,10 +98,4 @@ def min_interatomic_distance(coords: torch.Tensor) -> float:
     Returns:
         Minimum pairwise distance, or inf for single-atom systems.
     """
-    c = coords.reshape(-1, 3)
-    n = c.shape[0]
-    if n < 2:
-        return float("inf")
-    diff = c.unsqueeze(0) - c.unsqueeze(1)
-    dist = diff.norm(dim=2) + torch.eye(n, device=c.device, dtype=c.dtype) * 1e10
-    return float(dist.min().item())
+    return interatomic_distance_stats(coords)[0]
