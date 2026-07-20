@@ -194,7 +194,7 @@ class TrajectoryLogger:
         force_rms = _force_rms(forces)
 
         # ── Eigenvalue basics ────────────────────────────────────────
-        n_neg = int((evals < 0).sum().item())
+        n_neg = int((evals < -1e-4).sum().item())
         eig0 = float(evals[0].item()) if evals.numel() > 0 else 0.0
         eig1 = float(evals[1].item()) if evals.numel() > 1 else 0.0
         # Product of the two lowest eigenvalues — large negative means

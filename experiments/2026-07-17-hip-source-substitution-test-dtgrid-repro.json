@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-17-hip-source-substitution-test-dtgrid-repro",
+  "status": "submitted",
+  "parent": "2026-07-17-hip-source-substitution-test-dtgrid",
+  "question": "Does the source-substitution harness reproduce historical HIP GAD behavior when it uses the exact gad_dt007_fmax search settings?",
+  "design": "Run predicted HIP curvature only for test_dtgrid IDs 2 and 3 from the exact sequential seed-42 0.15 A starts. Use 5,000 steps, dt=0.007, k_track=0, max_atom_disp=0.35 A, and min_interatomic_dist=0.4 A, matching the historical method configuration. Sella is retained as a paired check.",
+  "decision_rule": "Do not use force-Jacobian outcomes unless the predicted-Hessian GAD control reproduces the historical success class or identifies a documented remaining mismatch.",
+  "artifacts": {
+    "script": "scripts/hip_hessian_source_substitution_smoke.py",
+    "historical_configuration": "experiments/method_single.py:gad_dt007_fmax"
+  },
+  "resources": {
+    "slurm_job_ids": ["65824431"],
+    "allocation": "def-aspuru: one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, one hour"
+  },
+  "next_action": "Check the predicted-Hessian control, then launch alternate-curvature tasks only if it passes."
+}

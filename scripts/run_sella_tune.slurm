@@ -17,7 +17,9 @@
 # Configs:
 #   carteck_default : delta0=0.048, gamma=0.0  (current "tuned" setting)
 #   carteck_libdef  : delta0=0.1,   gamma=0.4
-#   carteck_lson    : delta0=0.048, gamma=0.4  (line search ON, current trust)
+#   carteck_lson    : delta0=0.048, gamma=0.4 (historical tag)
+# gamma controls the iterative eigensolver in Sella 2.3.4, not line search,
+# and is bypassed when the external full Hessian is refreshed.
 
 set -euo pipefail
 module purge

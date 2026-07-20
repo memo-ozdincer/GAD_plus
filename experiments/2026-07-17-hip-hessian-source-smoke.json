@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-17-hip-hessian-source-smoke",
+  "status": "submitted",
+  "parent": "2026-07-16-hip-field-consistency",
+  "question": "How do HIP's separately predicted Hessian, direct-force Jacobian, and energy-head Hessian differ at the same T1x geometry?",
+  "hypothesis": "HIP's direct Hessian is close to neither the force Jacobian nor the energy Hessian, while its low mode may remain more similar to one source than its full matrix does. This could explain optimizer-specific behavior.",
+  "design": "At one T1x test geometry, evaluate all three curvature sources with the same checkpoint and coordinates. Compare full relative errors, force-Jacobian antisymmetry, projected n_neg/eig0, and lowest-mode overlaps.",
+  "decision_rule": "If sources differ materially, expand to a representative geometry/noise panel and run a Hessian-substitution optimizer smoke. If they agree, deprioritize non-integrability as the main causal explanation.",
+  "resources": {
+    "slurm_job_ids": ["65802142"],
+    "allocation": "def-aspuru: one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/hip-hessian-source-65802142"
+  },
+  "next_action": "Inspect source decomposition after job 65802142, then choose a representative expansion and optimizer substitution test."
+}

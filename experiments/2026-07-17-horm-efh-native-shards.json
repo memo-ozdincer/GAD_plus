@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-17-horm-efh-native-shards",
+  "status": "submitted",
+  "parent": "2026-07-17-horm-native-irc-validation",
+  "question": "Can HORM E-F-H yield multiple tightly stationary calculator-native candidate saddles across disjoint T1x endpoint-pair ranges?",
+  "hypothesis": "The first accepted HORM candidate was chemically unintended, but additional tight candidates can supply a valid IRC_TOPO set without using either optimizer for construction.",
+  "design": "Four def-aspuru 3g.20gb array shards examine disjoint sample ranges [0,25), [25,50), [50,75), [75,100). Each relaxes endpoints and runs climbing NEB with endpoint fmax 0.005 and NEB/candidate fmax 0.01; it stops after one index-one candidate or 25 examined pairs.",
+  "decision_rule": "Submit full-Hessian IRC_TOPO validation separately for every candidate. Do not run GAD/Sella until at least one candidate passes chemical endpoint validation.",
+  "resources": {
+    "slurm_job_ids": ["65797012_0-3"],
+    "allocation": "def-aspuru: four concurrent A100 3g.20gb MIG slices, 4 CPU cores and 20G each, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/horm-native-shards-65797012"
+  },
+  "next_action": "For every constructed candidate, submit a separate full-Hessian IRC_TOPO validator before optimizer runs."
+}

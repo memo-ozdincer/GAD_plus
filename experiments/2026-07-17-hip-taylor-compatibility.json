@@ -1,0 +1,37 @@
+{
+  "id": "2026-07-17-hip-taylor-compatibility",
+  "status": "documented_not_run",
+  "question": "Does the HIP GAD/Sella crossover arise because HIP's lowest mode remains useful where its energy, direct force, and direct Hessian no longer form a sufficiently predictive finite-step Taylor model for Sella's trust-ratio globalization?",
+  "hypothesis": "HIP failed-Sella trajectories will show persistent first- or second-order Taylor incompatibility along observed Sella directions, especially near departure and trust collapse. Exact LJ and SCINE DFTB0 controls should show coherent small-step scaling.",
+  "parent": "2026-07-17-hip-paired-outcome-diagnostics",
+  "design": {
+    "hip_panel": "At 0.15 A, select three sample IDs from each of both, GAD-only, Sella-only, and neither using NumPy RNG seed 20260717. Use stored Sella directions at initial, departure, and trust-floor phases.",
+    "probe_max_atom_displacements_A": [0.08, 0.04, 0.02, 0.01, 0.005],
+    "hessian_treatment": "Report both the raw Hessian and the Eckart-cleaned, un-mass-weighted Cartesian Hessian supplied to Sella. The applied-Eckart result is primary; raw is an artifact control.",
+    "metrics": [
+      "first-order energy residual |DeltaE - g_F.s| and fitted order",
+      "second-order energy residual |DeltaE - g_F.s - 0.5 s.H.s| and fitted order",
+      "force/Hessian residual ||DeltaF + H.s|| and fitted order",
+      "actual/predicted energy ratio and normalized model error",
+      "raw observed-step model ratio"
+    ],
+    "controls": [
+      "analytic reduced-unit LJ with exact autograd-consistent energy, force, and Hessian",
+      "SCINE DFTB0 if the existing calculator can expose the same products without changing its scientific settings"
+    ]
+  },
+  "decision_rule": "Support requires worse pre-outcome model agreement in HIP GAD-only/neither than both/Sella-only, coherent Taylor orders for exact LJ, and rescue by a compact globalization intervention tied to the diagnosed inconsistency. If residuals do not distinguish outcomes and the intervention does not rescue failures, reject the mechanism.",
+  "resources": {
+    "pilot": "One MIG slice, 2-4 CPU cores, <=20 minutes",
+    "full_panel": "One MIG slice; batch probes within one process rather than a job array",
+    "slurm_job_ids": [65832564, 65832565, 65832635, 65832639]
+  },
+  "artifacts": {
+    "output_root": "/lustre07/scratch/memoozd/gadplus/runs/hip-taylor-compatibility-${SLURM_JOB_ID}"
+  },
+  "result": {
+    "lj_local_smoke": "Passed at /lustre07/scratch/memoozd/gadplus/runs/lj-taylor-local-smoke-20260717b. Median fitted orders across phases were approximately 2.00-2.03 for first-order energy residual, 2.87-3.05 for second-order energy residual, and 1.99-2.05 for force/Hessian residual.",
+    "cancelled_smokes": "Jobs 65832564 and 65832565 were cancelled while pending, before any scientific evaluation, after noticing that the first implementation scored only the raw Hessian rather than also scoring the applied Eckart-cleaned Hessian. Replacement jobs 65832635 and 65832639 were also cancelled while pending at the user's request to wrap the project. No HIP or SCINE Taylor-panel result was produced."
+  },
+  "next_action": "Project wrapped. If resumed, run the already designed one-case-per-outcome HIP and SCINE smokes before any full panel; do not describe the Taylor-compatibility mechanism as established."
+}

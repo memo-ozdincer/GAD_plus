@@ -1,0 +1,33 @@
+{
+  "id": "2026-07-16-painn-native-set-smoke",
+  "status": "passed",
+  "parent": "2026-07-16-painn-efh-smoke",
+  "question": "Can a method-independent, PaiNN-native index-one saddle set be constructed from Transition1x endpoint labels?",
+  "hypothesis": "A subset of relaxed T1x endpoint pairs will yield short PaiNN NEB paths whose maximum image is stationary enough and has one projected negative mode.",
+  "decision_rule": "A candidate is accepted only when both PaiNN endpoint relaxations converge at fmax <= 0.02 eV/A, the PaiNN NEB converges at fmax <= 0.05 eV/A, the maximum image has fmax <= 0.05 eV/A, and the full mass-weighted Eckart-projected Hessian has n_neg = 1. Candidate inclusion does not depend on GAD or Sella.",
+  "backend": {
+    "name": "neuralneb-painn",
+    "checkpoint": "/lustre07/scratch/memoozd/gadplus/models/neuralneb-t1x-8d9598b/models/painn0.sd",
+    "reference_builder": "PaiNN endpoint BFGS plus seven-image climbing NEB"
+  },
+  "resources": {
+    "slurm_job_ids": [65759953, 65760844, 65760845],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 45 minutes",
+    "scope": "three accepted native-saddle candidates maximum"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-native-set-65759953",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_native_set_65759953.out"
+  },
+  "implementation_history": {
+    "65759953": "Failed at startup: ASE 3.29 does not re-export NEBOptimizer from ase.mep; no chemistry ran.",
+    "65760844": "Cancelled before execution after the attempted ase.neb compatibility import failed in local preflight.",
+    "65760845": "Completed: three coarse PaiNN-native projected index-one candidates accepted from five examined test structures."
+  },
+  "result": {
+    "accepted_sample_ids": [1, 2, 4],
+    "accepted_force_max_eV_per_A": [0.0254694633, 0.01516362, 0.0471075885],
+    "interpretation": "Pipeline smoke passed at the predeclared 0.05 eV/A NEB threshold. These are not yet tight enough for the paired optimizer benchmark."
+  },
+  "next_action": "Build a separate tight PaiNN-native set with endpoint fmax <= 0.005 eV/A and NEB-max fmax <= 0.01 eV/A, then apply two-sided native endpoint validation before paired GAD/Sella perturbation searches."
+}

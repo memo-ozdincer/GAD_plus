@@ -1,0 +1,18 @@
+{
+  "id": "2026-07-17-horm-leftdf-smoke",
+  "status": "completed",
+  "parent": "2026-07-17-horm-efh-native-shards",
+  "question": "Does the HORM LEFTNet-df E-F-H checkpoint expose a numerically usable direct force field and full force-Jacobian curvature for a HIP-like control?",
+  "hypothesis": "LEFTNet-df supplies direct non-energy-derived forces whose negative Jacobian is finite-difference consistent but can be asymmetric, making it a useful contrast to HIP's independently predicted E/F/H heads.",
+  "design": "One T1x geometry on a def-aspuru MIG slice: load the official left-df E-F-H checkpoint, form the direct-force Jacobian row by row, report raw antisymmetry, and check directional finite differences at three epsilons.",
+  "decision_rule": "Proceed to native-saddle construction only if direct forces and their Jacobian are finite and the directional finite-difference error has a stable numerical regime. Preserve raw asymmetry as a field diagnostic and symmetrize only for vibrational/optimizer use.",
+  "resources": {
+    "slurm_job_ids": ["65797250"],
+    "allocation": "def-aspuru: one A100 3g.20gb MIG slice, 4 CPU cores, 16G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/horm_leftdf_65797250.out"
+  },
+  "result": "The direct E-F-H field is operational: at a 0.01 A directional finite-difference step, the force-Jacobian relative RMS error is 0.0686. The raw Jacobian is strongly asymmetric (max antisymmetric entry 6.54 eV/A^2), so it is a valid nonconservative direct-force contrast but requires symmetrization for vibrational and optimizer use.",
+  "next_action": "Use this model only after a PES-native saddle passes endpoint/IRC validation; retain raw asymmetry as a mechanistic diagnostic."
+}

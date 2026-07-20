@@ -1,0 +1,19 @@
+{
+  "id": "2026-07-17-hip-hessian-source-panel",
+  "status": "completed",
+  "parent": "2026-07-17-hip-hessian-source-smoke",
+  "question": "Is HIP's one-sample curvature-source mismatch systematic across a fixed T1x test panel?",
+  "hypothesis": "HIP's predicted Hessian will remain closer in lowest mode to the direct-force Jacobian than to the energy Hessian, while the full matrices and their implied indices disagree substantially.",
+  "design": "Evaluate 12 fixed T1x test transition geometries. For each, compare predicted Hessian, negative direct-force Jacobian, and energy Hessian; record full-matrix disagreement, force-Jacobian antisymmetry, projected index, and v1 overlaps.",
+  "decision_rule": "If the signature is systematic, run a HIP Hessian-substitution optimizer smoke. If it is not, inspect geometry class and training-overlap dependence before causal claims.",
+  "resources": {
+    "slurm_job_ids": ["65808305", "65808717", "65808803", "65808875"],
+    "allocation": "def-aspuru: one full A100, 8 CPU cores, 40G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/hip-hessian-panel-65808305"
+  },
+  "note": "Job 65808305 was cancelled after confirming that the generic dataset wrapper was traversing the full HDF5 archive. Job 65808717 was cancelled while pending. Job 65808803 was replaced while pending after an unsuccessful explicit-backfill request. Job 65808875 uses a direct final-structure reader with identical filtered test ordering on one full A100.",
+  "result": "Across 12 fixed entries from the T1x test HDF5 group, HIP's predicted Hessian is index one in 12/12, versus 0/12 for both the symmetric direct-force Jacobian and energy Hessian. Median predicted-vs-force-Jacobian lowest-mode overlap is 0.9903, but median full-matrix relative disagreement is 0.4735. The force Jacobian is nonconservative (median relative antisymmetry 0.2631); the energy Hessian has near-zero minimum-mode agreement with the predicted Hessian (median overlap 0.0116). These direct-HDF5 indices are not assumed to match the historical Transition1xDataset sample IDs used in benchmark outcome tables.",
+  "next_action": "Run the predeclared Hessian-substitution optimizer smoke, keeping direct energy/forces and starts fixed."
+}

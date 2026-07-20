@@ -52,7 +52,7 @@ def main():
                     help="Used as filename prefix")
     ap.add_argument("--delta0", type=float, default=0.048)
     ap.add_argument("--gamma", type=float, default=0.0,
-                    help="Sella line-search gamma (0 disables line search)")
+                    help="Sella iterative eigensolver tolerance; bypassed on external-Hessian refreshes")
     ap.add_argument("--output-dir", type=str, required=True)
     args = ap.parse_args()
 
@@ -174,7 +174,7 @@ def main():
             final_force_norm = float(np.mean(np.linalg.norm(forces_final, axis=1)))
             atomsymbols = atomic_nums_to_symbols(z)
             evals_vib, _, _ = vib_eig(out["hessian"], final_coords, atomsymbols)
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = int((evals_vib < -1e-4).sum().item())
         except Exception:
             final_fmax = 999.0; final_force_norm = 999.0; n_neg = 0
 

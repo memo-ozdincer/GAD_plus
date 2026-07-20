@@ -78,7 +78,7 @@ Each is a separate Hydra config, benchmarked independently:
 
 ## Canonical methods for 5-method comparison (2026-04-20)
 
-The current `IRC_COMPREHENSIVE_2026-04-20.pdf` report uses these five
+The archived `legacy/reports/IRC_COMPREHENSIVE_2026-04-20.pdf` report uses these five
 methods × six noise levels × 300 samples × 2000 outer steps × HIP analytic
 Hessian every step:
 
@@ -94,8 +94,9 @@ The historical `gad_dt003` data in `runs/round2`/`runs/round3` uses the
 **looser** `force_norm<0.01` criterion. Kept for record and figures that
 explicitly contrast the two. New work should use `gad_dt003_fmax`.
 
-See `scripts/README.md` for the inventory of which slurm runs which
-method, and `STATUS_2026_04_20.md` for the latest dataset / IRC inventory.
+See `scripts/README.md` for the inventory of which Slurm script runs which
+method. Historical dataset inventories are under `legacy/notes/`; current
+results and research direction are linked from `README.md`.
 
 ## Dataset
 

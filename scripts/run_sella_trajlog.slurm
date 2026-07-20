@@ -12,7 +12,9 @@
 # Sella with per-step trajectory logging at one noise level (100pm),
 # n=50 samples. Three configs in array: (1) cart+Eckart current,
 # (2) cart+Eckart, delta0=0.10, gamma=0.40, (3) cart+Eckart
-# with line search ON (gamma=0.4). Used for step-size-vs-step figure
+# with gamma=0.4. In Sella 2.3.4 gamma is an iterative eigensolver
+# tolerance, not a line-search switch, and is bypassed on exact external
+# Hessian refreshes. Used for the historical step-size-vs-step figure
 # and for the tuning comparison.
 
 set -euo pipefail

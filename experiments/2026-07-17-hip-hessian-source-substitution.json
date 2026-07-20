@@ -1,0 +1,21 @@
+{
+  "id": "2026-07-17-hip-hessian-source-substitution",
+  "status": "completed",
+  "parent": "2026-07-17-hip-hessian-source-panel",
+  "question": "Does HIP's high-noise GAD/Sella ordering change when their identical direct energy and force heads are paired with predicted, direct-force-Jacobian, or energy-derived curvature?",
+  "hypothesis": "If HIP's supplied Hessian is selectively useful in its minimum mode but inconsistent in the full curvature model, the GAD/Sella outcomes will depend materially on the substituted Hessian source while direct E/F and starts remain fixed.",
+  "design": "One fixed T1x test start (sample 2) at 0.15 A Cartesian noise; plain projected GAD (dt=0.007) and Cartesian-Eckart Sella with an exact Hessian at every step; three symmetric curvature sources in separate full-A100 jobs; direct HIP E/F heads held fixed. Record independent fmax/n_neg terminal metrics under the curvature source used by the optimizer.",
+  "decision_rule": "Treat this only as a causal smoke. Escalate to a paired panel if the source changes the relative method outcome reproducibly; otherwise reject curvature-source inconsistency as the main explanation.",
+  "resources": {
+    "slurm_job_ids": ["65809302", "65809303", "65809304", "65809594", "65809595", "65809596", "65809728", "65809729", "65809730"],
+    "allocation": "def-aspuru: three independent A100 3g.20gb MIG slices, 4 CPU cores and 20G memory each, 60 minutes"
+  },
+  "note": "Jobs 65809302--65809304 were cancelled after the initial adapter check found that the alternate-autograd path did not return the public calculator E/F values. Jobs 65809594--65809596 were cancelled while pending because the single-geometry serial traces fit the 3g slices and those are more appropriate allocations. Jobs 65809728--65809730 use calculator.predict(do_hessian=True) for E/F in every condition, matching the historical public path, and use autograd only for the alternate curvature source.",
+  "result": "At the one fixed 0.15 A-noise start, the predicted-Hessian condition gave strict Sella convergence in 12 steps (fmax 0.00303, n_neg 1), while GAD remained at fmax 0.0868 after the smoke's 80-step budget. With either alternate curvature source, both methods failed and ended high-index within 80 steps. This proves material curvature-source sensitivity but cannot compare GAD against Sella: the completed historical HIP GAD benchmark allowed up to 2,000 steps. Repeated public calculator evaluations show small non-bitwise GPU variation (up to 0.00699 eV/A in force), so the next causal panel must use the frozen long budget and report replicate variability rather than claim bitwise E/F identity.",
+  "artifacts": {
+    "script": "scripts/hip_hessian_source_substitution_smoke.py",
+    "slurm_script": "scripts/run_hip_hessian_source_substitution_smoke.slurm",
+    "combined_summary": "/lustre07/scratch/memoozd/gadplus/runs/hip-hessian-sub-analysis-658097/summary.json"
+  },
+  "next_action": "Run a replicated, paired substitution panel and compare source-induced outcome changes against repeated-public-evaluation variability."
+}

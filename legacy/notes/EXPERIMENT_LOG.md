@@ -156,7 +156,7 @@ This section is intentionally redundant. It is the "everything we've done that c
 
 ### Methods tested:
 
-**gad_small_dt** — Eckart-projected GAD with fixed dt=0.005, 1000 steps. Same as gad_projected but half the timestep. The GAD force F_GAD = F + 2(F·v₁)v₁ is computed in the Eckart-projected mass-weighted vibrational subspace. Forces, guide vector, and output are all projected through the Eckart projector to prevent translational/rotational leakage. Euler step: x += dt · F_GAD.
+**gad_small_dt** — Eckart-projected GAD with fixed dt=0.005, 1000 steps. Same as gad_projected but half the timestep. The GAD force F_GAD = F + 2(F·v₁)v₁ is constructed using the Eckart-projected mass-weighted vibrational subspace, then un-mass-weighted back to Cartesian coordinates before the displacement is applied. Euler step: x += dt · F_GAD.
 
 **gad_projected** — Same algorithm, dt=0.01. The baseline from Round 1.
 
@@ -216,7 +216,7 @@ This section is intentionally redundant. It is the "everything we've done that c
 
 **SLURM:** 58885855 | **Data:** `precond_gad/` | **Status:** Complete (30/30 jobs, all 300/300 samples)
 
-**Method:** Preconditioned GAD: Δx = dt · |H|⁻¹ · F_GAD. After computing the standard GAD direction F_GAD in Eckart-projected mass-weighted space, decompose it into vibrational eigenvector components: c_i = F_GAD · v_i. Scale each component by 1/max(|λᵢ|, eig_floor). Reconstruct: Δx = dt · Σ (c_i / max(|λᵢ|, floor)) · v_i. This gives Newton-like step sizing: large steps along flat modes (small |λ|), small steps along steep modes (large |λ|).
+**Method:** Preconditioned GAD: Δx = dt · |H|⁻¹ · F_GAD. After computing the standard GAD direction F_GAD in the Eckart-projected mass-weighted vibrational subspace, decompose it into vibrational eigenvector components: c_i = F_GAD · v_i. Scale each component by 1/max(|λᵢ|, eig_floor), reconstruct, and un-mass-weight the result back to Cartesian coordinates before applying the displacement. This gives Newton-like step sizing: large steps along flat modes (small |λ|), small steps along steep modes (large |λ|).
 
 The key difference from plain GAD: plain GAD applies the same dt to every mode. Preconditioning applies dt/|λᵢ| per mode, creating step-size ratios up to 100:1.
 
@@ -414,6 +414,13 @@ dt=0.005, eig_floor=0.01 for both.
 - `use_exact_hessian=True` with `diag_every_n=1` (fresh HIP Hessian every step)
 - `gamma=0.0` (tightest eigensolver convergence)
 - Trust radius: `delta0=0.048`, `rho_inc=1.035`, `rho_dec=5.0`, `sigma_inc=1.15`, `sigma_dec=0.65`
+
+**2026-07-17 provenance correction.** In Sella 2.3.4, `gamma` controls the
+iterative eigensolver and is bypassed when `hessian_function` supplies a full
+Hessian; it is not a line-search setting. The later headline test trajectory
+artifact under `test_sella_trajlog/carteck_libdef` records `delta0=0.1` and
+`gamma=0.4`, rather than the Round 3 values above. Keep the rounds separate
+and obtain configuration provenance from each Parquet/job script.
 - `max_steps=200`
 
 **Four configurations tested:**
@@ -1277,3 +1284,44 @@ Round 4 descent→GAD: /lustre07/scratch/memoozd/gadplus/runs/round4/
 | Round 5 sella_hip IRC round2 | 59456280 | Complete (tasks 0/1/2) + 3/4 cancelled (Lustre hang, refixed) |
 | Round 5 sella_hip IRC round3 | 59456595 | Complete (100/150/200pm) |
 | Round 5 rigorous IRC full | 59464202 | Running (6 tasks, ETA ~11h) |
+
+---
+
+## Final Research Wrap: 2026-07-17
+
+This historical log predates the final cross-PES audit. Use these documents
+as the canonical current record:
+
+- `HIP_GAD_SELLA_SYNTHESIS_2026_07_17.md`: concise scientific synthesis,
+  evidence status, paper framing, and straight-line resumption path.
+- `HIP_GAD_SELLA_THEORY_AUDIT_2026_07_17.md`: mathematical derivation,
+  literature audit, competing hypotheses, caveats, and falsification rules.
+- `BENCHMARK_RESULTS_2026_07_16.md`: cross-benchmark best-GAD versus Sella
+  result ledger.
+- `LJ_FINDINGS_2026_07_09.md`: LJ implementation checks, tuning effects, and
+  high-index failure diagnosis.
+- `experiments/2026-07-17-hip-taylor-compatibility.json`: predeclared but
+  unrun HIP/SCINE causal diagnostic.
+
+Final status:
+
+- The general claim that GAD beats Sella is rejected.
+- HIP shows a real noise-dependent crossover: Sella wins close to the labelled
+  TS and plain GAD wins at the largest perturbations.
+- Stored GAD-only HIP cases show Sella departure followed by a median `97.9%`
+  of rows at the minimum trust radius.
+- The strongest unproven mechanism is a reliability gap between HIP's useful
+  low-mode projector and the finite-step Taylor compatibility of its
+  separately learned energy, direct force, and direct Hessian.
+- Exact LJ instead exposes ordinary single-mode GAD's stiff, high-index
+  globalization limitation; an index-aware descent gate nearly removes strict
+  failures. SCINE DFTB0 favors Sella on the coherent `n_neg/fmax` comparison.
+- Masses were used for Eckart/vibrational construction and removed by
+  un-mass-weighting before Cartesian GAD displacement. The still-weighted
+  implementation produced no benchmark data.
+- The headline Sella benchmark receives the current full HIP Hessian at every
+  optimization step.
+- The Taylor diagnostic passed an analytic LJ numerical smoke, but all HIP and
+  SCINE jobs were cancelled before scientific evaluation. No causal
+  Taylor-compatibility result is claimed.
+- The Slurm queue was empty at closure.

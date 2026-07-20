@@ -1,0 +1,32 @@
+{
+  "id": "2026-07-16-painn-efh-smoke",
+  "status": "passed",
+  "parent": null,
+  "question": "Can published NeuralNEB PaiNN supply internally consistent conservative energy, force, and full autograd-Hessian evaluations to the shared GAD/Sella interfaces?",
+  "hypothesis": "Because PaiNN forces are -grad(E), directional energy-force and force-Hessian checks should pass within finite-difference tolerance.",
+  "decision_rule": "Proceed to the 3-5 structure native-saddle smoke only if all tensor shapes are correct, force directional error is below 2e-4 eV/A, Hessian directional relative error is below 2e-3, and Hessian relative antisymmetry is below 1e-7.",
+  "backend": {
+    "name": "neuralneb-painn",
+    "repository_commit": "8d9598b781cae1d74e4ce27cfce465e4e7db1922",
+    "checkpoint": "/lustre07/scratch/memoozd/gadplus/models/neuralneb-t1x-8d9598b/models/painn0.sd",
+    "hessian": "full autograd Hessian of the model energy"
+  },
+  "resources": {
+    "slurm_job_ids": [65759511],
+    "allocation": "one A100 1g.5gb MIG slice, 4 CPU cores, 12G memory, 15 minutes",
+    "purpose": "backend validation only; no production throughput inference"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-efh-smoke-65759511",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_efh_smoke_65759511.out",
+    "smoke_result": {
+      "wall_time_s": 21,
+      "force_fd_abs_error_eV_per_A": 0.0001507,
+      "hessian_direction_rel_error": 0.00001713,
+      "hessian_relative_antisymmetry": 0.0,
+      "translation_force_abs_eV_per_A": 2.235e-08,
+      "translation_hessian_abs_eV_per_A2": 3.852e-06
+    }
+  },
+  "next_action": "Read the smoke result, record pass/fail and timing, then construct the 3-5 structure PaiNN native-saddle smoke if it passes."
+}

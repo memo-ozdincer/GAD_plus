@@ -1,0 +1,28 @@
+{
+  "id": "2026-07-17-hip-paired-outcome-diagnostics",
+  "status": "completed",
+  "question": "Which measurable properties distinguish matched high-noise HIP starts on which only GAD succeeds from those on which only Sella succeeds?",
+  "design": "Use the existing matched test-split 0.15 A trajectories: GAD dt=0.007 and Cartesian Eckart Sella. Partition all 287 starts into both, GAD-only, Sella-only, and neither. Compare stored GAD initial index, first two eigenvalues, eigengap, fmax, first step, time to index one, early mode continuity, and early closest approach to the labelled reference TS.",
+  "decision_rule": "A useful mechanism must distinguish GAD-only from Sella-only starts, not merely successful from failed starts. This is descriptive evidence; a later controlled start-type or curvature intervention is needed for causality.",
+  "resources": {
+    "slurm_job_ids": ["65828024"],
+    "allocation": "def-aspuru: 4 CPU cores, 8G memory, 15 minutes"
+  },
+  "artifacts": {
+    "analysis": "scripts/analyze_hip_paired_outcomes.py",
+    "slurm_script": "scripts/run_hip_paired_outcomes.slurm"
+  },
+  "result": {
+    "counts": {
+      "both": 133,
+      "gad_only": 34,
+      "sella_only": 22,
+      "neither": 98
+    },
+    "initial_descriptors": "Initial index, fmax, eigengap, first GAD step, time to index one, and consecutive v1 overlap do not cleanly distinguish GAD-only from Sella-only starts.",
+    "common_step_reanalysis": "Using a common maximum-atom displacement computed from stored coordinates, median first steps are 0.088 A for GAD and 0.100 A for Sella in both the GAD-only and Sella-only groups. The original logger columns were not directly comparable because GAD stored RMSD and Sella stored a flattened Euclidean norm.",
+    "sella_failure_signature": "In GAD-only cases, Sella's median minimum/final distances to the labelled TS are 0.226/0.447 A, versus 0.117/0.128 A in Sella-only cases. Its median final trust radius is 1e-4 A and 97.9% of stored rows are at the trust floor. This supports a departure-plus-trust-collapse hypothesis but is not causal without the model ratio and path/destination diagnostics.",
+    "artifact": "/lustre07/scratch/memoozd/gadplus/runs/hip-paired-outcomes-65828024/summary.json"
+  },
+  "next_action": "Instrument a small predeclared paired panel with Sella predicted/actual energy changes, rho, applied step projections, and path/destination diagnostics. Do not treat first-step magnitude or consecutive v1 overlap as the established mechanism."
+}

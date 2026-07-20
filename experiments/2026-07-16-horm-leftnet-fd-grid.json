@@ -1,0 +1,18 @@
+{
+  "id": "2026-07-16-horm-leftnet-fd-grid",
+  "status": "passed",
+  "parent": "2026-07-16-horm-leftnet-matched-smoke",
+  "question": "Are the matched HORM LEFTNet E-F and E-F-H full-autograd Hessian directional residuals stable over a finite-difference epsilon sweep?",
+  "hypothesis": "The residuals should show a finite precision/truncation minimum rather than a persistent order-one inconsistency; otherwise HORM cannot support a full-Hessian optimizer comparison.",
+  "design": "Same T1x geometry and centered direction for `left.ckpt` and `left_orig.ckpt`; one analytic force-Jacobian Hessian per checkpoint, with force finite differences at 1e-2, 3e-3, 1e-3, and 3e-4 A.",
+  "decision_rule": "Proceed to HORM-native saddle construction only if both checkpoints load and the directional relative error has a small, stable numerical minimum. A large epsilon-independent residual invalidates the adapter for this experiment.",
+  "resources": {
+    "slurm_job_ids": [65765153],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 16G memory, 30 minutes"
+  },
+  "artifacts": {
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/horm_leftnet_fd_65765153.out"
+  },
+  "result": "Job 65765153 completed. At epsilon=0.01 A, the matched E-F-H `left.ckpt` relative directional RMS error was 1.29% and E-F `left_orig.ckpt` was 0.548%. Both degraded monotonically at 0.003, 0.001, and 0.0003 A, consistent with float32 finite-difference cancellation rather than a persistent mismatch. Use epsilon=0.01 A for this adapter's future FD checks.",
+  "next_action": "Build a HORM-native saddle set using the passed matched adapters; retain the old four labelled T1x structures only as an invalid/non-native exploratory screen."
+}

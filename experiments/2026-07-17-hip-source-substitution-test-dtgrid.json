@@ -1,0 +1,20 @@
+{
+  "id": "2026-07-17-hip-source-substitution-test-dtgrid",
+  "status": "implementation_failed",
+  "parent": "2026-07-17-hip-hessian-source-substitution",
+  "question": "On exact starts from the test_dtgrid headline HIP GAD run, does replacing HIP's predicted Hessian by the symmetric direct-force Jacobian change paired GAD/Sella behavior?",
+  "hypothesis": "The long-budget GAD success on the headline test starts depends on HIP's supplied curvature if, with the same public energy/force path and identical historical coordinates, it changes after Hessian replacement.",
+  "design": "Test-dtgrid sample IDs 2 and 3 at 0.15 A. Direct HDF5 ordering plus sequential CPU seed 42 reproduces the original sample-2 step-0 coordinates exactly. Predicted-Hessian GAD/Sella use the historical 5,000-step ceiling in one task; force-Jacobian GAD/Sella use a 1,000-step diagnostic ceiling in one task per start. All conditions return E/F through calculator.predict(do_hessian=True).",
+  "decision_rule": "First require reproduction of predicted-Hessian GAD convergence on both known starts. A force-Jacobian failure within 1,000 steps is a source-sensitivity signal, not a long-budget rate estimate; only a resulting paired stratified panel can generalize it.",
+  "resources": {
+    "slurm_job_ids": ["65815876", "65815877", "65815878"],
+    "allocation": "def-aspuru: three A100 3g.20gb MIG slices, 4 CPU cores and 20G memory each, up to one hour"
+  },
+  "artifacts": {
+    "script": "scripts/hip_hessian_source_substitution_smoke.py",
+    "slurm_script": "scripts/run_hip_hessian_source_substitution_smoke.slurm",
+    "start_reproduction": "sample 2 max coordinate difference 0.0 A against test_dtgrid trajectory"
+  },
+  "result": "The exact coordinates were reproduced, but the source-substitution wrapper used k_track=8, max_atom_disp=infinity, and min_interatomic_dist=0.0 rather than the historical gad_dt007_fmax settings k_track=0, max_atom_disp=0.35, and the default distance guard. Sample 2 was near its historical endpoint; sample 3 did not reproduce. The alternate-curvature results are therefore not interpretable as a controlled comparison.",
+  "next_action": "Repeat the predicted-Hessian control with the historical GAD settings. Only after it reproduces both starts should the force-Jacobian conditions be rerun and interpreted."
+}

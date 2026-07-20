@@ -119,7 +119,7 @@ def main():
     t0 = time.time()
     evals, evecs, Q_vib = vib_eig(hessian, coords, atomsymbols)
     proj_time = time.time() - t0
-    n_neg = int((evals < 0).sum().item())
+    n_neg = int((evals < -1e-4).sum().item())
     n_vib = evals.shape[0]
     expected_vib = 3 * n_atoms - 6  # nonlinear
     print(f"  Vibrational modes: {n_vib} (expected {expected_vib})")

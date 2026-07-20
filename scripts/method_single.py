@@ -338,15 +338,18 @@ def main():
     parser.add_argument(
         "--force-threshold",
         type=float,
-        default=0.01,
-        help="Convergence threshold for selected force criterion",
+        default=None,
+        help="Convergence threshold for selected force criterion. "
+             "When provided, OVERRIDES the per-method default in METHOD_CONFIGS. "
+             "When omitted, falls back to mcfg['force_threshold'] then 0.01.",
     )
     parser.add_argument(
         "--force-criterion",
         type=str,
-        default="fmax",
+        default=None,
         choices=["fmax", "force_norm"],
-        help="Force criterion for convergence gating",
+        help="Force criterion for convergence gating. CLI overrides "
+             "mcfg['force_criterion'] when provided; defaults to fmax.",
     )
     parser.add_argument(
         "--save-ts-xyz",
@@ -355,16 +358,32 @@ def main():
         help="Write converged TS geometries to a multi-frame XYZ file",
     )
     parser.add_argument("--start-from", type=str, default="ts_noised",
-                        choices=["ts_noised", "reactant", "product", "midpoint"],
-                        help="Initial geometry: noised TS (default), reactant, product, or linear midpoint.")
+                        choices=["ts_noised", "reactant", "product", "midpoint", "geodesic"],
+                        help="Initial geometry: noised TS (default), reactant, product, "
+                             "linear midpoint, or geodesic interpolation midpoint.")
+    parser.add_argument("--geodesic-n-images", type=int, default=11,
+                        help="Number of images on the geodesic path (endpoints incl.)")
+    parser.add_argument("--geodesic-fraction", type=float, default=0.5,
+                        help="Fractional position on the geodesic path (0=reactant, 1=product)")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     noise_pm = int(round(args.noise * 1000))
     mcfg = METHOD_CONFIGS[args.method]
-    force_threshold = mcfg.get("force_threshold", args.force_threshold)
-    force_criterion = mcfg.get("force_criterion", args.force_criterion)
+    # CLI > method config > hard default.  The earlier mcfg.get(..., args.x)
+    # silently let mcfg win over an explicit CLI override, which made
+    # --force-threshold a no-op for any method that pinned a value in mcfg.
+    force_threshold = (
+        args.force_threshold
+        if args.force_threshold is not None
+        else mcfg.get("force_threshold", 0.01)
+    )
+    force_criterion = (
+        args.force_criterion
+        if args.force_criterion is not None
+        else mcfg.get("force_criterion", "fmax")
+    )
     print(
         f"Device: {device} | method={args.method} | noise={noise_pm}pm | "
         f"samples={args.n_samples} | steps={args.n_steps} | dt={mcfg['dt']} "
@@ -544,6 +563,24 @@ def main():
                 continue
             coords_start = 0.5 * (pos_r + pos_p)
             start_method_str = "midpoint"
+        elif args.start_from == "geodesic":
+            if not hasattr(sample, "pos_reactant") or not hasattr(sample, "pos_product"):
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: geodesic needs reactant+product")
+                continue
+            pos_r = sample.pos_reactant.to(device)
+            pos_p = sample.pos_product.to(device)
+            if pos_p.abs().sum() < 1e-6:
+                print(f"  [{i:3d}] {formula:>12s} | SKIP: pos_product missing")
+                continue
+            from gadplus.geometry.interpolation import geodesic_interpolation
+            images = geodesic_interpolation(
+                pos_r, pos_p,
+                n_images=args.geodesic_n_images,
+                atomic_nums=z,
+            )
+            idx = int(round(args.geodesic_fraction * (args.geodesic_n_images - 1)))
+            coords_start = images[idx]
+            start_method_str = f"geodesic_f{args.geodesic_fraction:.2f}"
 
         logger = TrajectoryLogger(
             output_dir=output_dir,

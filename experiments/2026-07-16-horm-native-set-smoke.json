@@ -1,0 +1,19 @@
+{
+  "id": "2026-07-16-horm-native-set-smoke",
+  "status": "completed",
+  "parent": "2026-07-16-horm-leftnet-fd-grid",
+  "question": "Can the HORM E-F-H LEFTNet surface supply a calculator-native, stationary index-one saddle before any GAD/Sella comparison?",
+  "hypothesis": "At least one T1x endpoint pair will relax and yield a converged climbing-NEB maximum with fmax <= 0.02 eV/A and one projected negative mode on the HORM surface.",
+  "design": "One full-A100 smoke: relax endpoints on HORM LEFTNet E-F-H, use climbing IDPP-NEB, then check exact autograd Hessian stationarity and projected index. No optimizer is used to construct the candidate.",
+  "decision_rule": "Proceed to full-Hessian IRC validation only if an independent calculator-native candidate is produced. Otherwise inspect endpoint/NEB failures before allocating more GPU time.",
+  "resources": {
+    "slurm_job_ids": ["65765365 (cancelled before start: oversized request)", "65765493"],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/horm-native-smoke-65765493",
+    "candidate": "/lustre07/scratch/memoozd/gadplus/runs/horm-native-smoke-65765493/candidate_000_sample_0014.npz"
+  },
+  "result": "One HORM E-F-H candidate was constructed from 15 examined endpoint pairs (sample 14); it passed NEB, fmax <= 0.02 eV/A, and projected n_neg=1 construction gates.",
+  "next_action": "Validate candidate_000_sample_0014.npz by full-Hessian IRC_TOPO job 65793787 before benchmarking optimizers."
+}

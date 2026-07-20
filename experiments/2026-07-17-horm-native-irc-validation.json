@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-17-horm-native-irc-validation",
+  "status": "submitted",
+  "parent": "2026-07-16-horm-native-set-smoke",
+  "question": "Does the HORM E-F-H native candidate connect its two HORM-native endpoint minima under full-autograd-Hessian IRC?",
+  "hypothesis": "The lone HORM construction candidate may be a valid index-one stationary point but still be chemically unintended; IRC_TOPO and endpoint-minimum checks are decisive.",
+  "design": "From the independently constructed HORM candidate, trace both directions with exact autograd Hessians, relax endpoints, then apply topology for distinct endpoint graphs and RMSD only for same-graph endpoint pairs.",
+  "decision_rule": "Benchmark GAD/Sella on HORM only if the candidate has two endpoint minima and intended connectivity under the stated criterion.",
+  "resources": {
+    "slurm_job_ids": ["65793787 (cancelled before start: rrg queue)", "65794139"],
+    "allocation": "def-aspuru: one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/horm-native-irc-65794139"
+  },
+  "next_action": "Inspect endpoint topology and vibrational-minimum gates after def-aspuru job 65794139 completes."
+}

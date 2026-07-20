@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-16-horm-ef-native-set-smoke",
+  "status": "planned",
+  "parent": "2026-07-16-horm-native-set-smoke",
+  "question": "Does the matched HORM LEFTNet E-F checkpoint independently admit calculator-native index-one saddles?",
+  "hypothesis": "The E-F and E-F-H checkpoints can have different stationary-point locations despite shared architecture and data, so each requires independent endpoint relaxation, NEB construction, and IRC_TOPO validation.",
+  "design": "Repeat the bounded native-saddle construction and validation workflow with left_orig.ckpt only after the E-F-H smoke establishes the execution path. Do not reuse an E-F-H saddle as an E-F benchmark target.",
+  "decision_rule": "A matched optimizer comparison proceeds only on checkpoint-specific accepted native saddles, with benchmark tables reporting PES identity explicitly.",
+  "resources": {
+    "slurm_job_ids": [],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/horm-ef-native-smoke-PENDING"
+  },
+  "next_action": "Submit only after checking the E-F-H native construction result."
+}

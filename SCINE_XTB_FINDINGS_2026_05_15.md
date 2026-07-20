@@ -1,6 +1,6 @@
 # SCINE / xTB Findings — 2026-05-15 (IRC TOPO debug + PES disagreement)
 
-Updates `SCINE_XTB_FINDINGS_2026_05_12.md`. The 05-12 doc closed the
+Updates `legacy/notes/SCINE_XTB_FINDINGS_2026_05_12.md`. The 05-12 doc closed the
 "GAD strict-conv on SCINE matches HIP" question; this doc closes the
 "why is IRC TOPO still low" question with quantitative evidence that
 DFTB0's saddles are geometrically displaced from T1x's by ~0.4 Å,
@@ -238,6 +238,76 @@ New runs on /lustre07/scratch:
 2. **Re-label R/P per PES** if (1) shows consistent disagreement.
 3. **xTB unblock attempt** — start GAD from midpoint of xTB-relaxed R
    and xTB-relaxed P, not from HIP-noised T1x-TS.
+
+---
+
+## 9. 2026-07-10 correction: DFTB0-native endpoint validation
+
+This section supersedes the IRC-comparison claims above, including the
+10 pm ``12.9% vs 0.0%`` GAD/Sella TOPO row. Those numbers were not a
+valid method comparison with the installed ASE version.
+
+### What was wrong
+
+``sella.IRC.irun`` delegates to ASE's optimizer generator. In the installed
+ASE release, that generator checks a force-only convergence condition directly
+and bypasses Sella's ``IRC.converged()`` override. Consequently, a
+well-converged Sella saddle (``fmax < 0.01``) was accepted at IRC step zero
+without the initial ``v0ts`` displacement, despite a negative Hessian mode.
+GAD points below that same threshold were affected too. The prior Sella-zero
+TOPO result was therefore an IRC-driver artifact, not evidence against Sella.
+
+``run_irc_validation`` now initializes Sella's IRC, forces its first step,
+and continues with Sella's saddle-aware convergence criterion (positive
+endpoint curvature plus force threshold). The validator relaxes both resulting
+endpoints to DFTB0 minima before scoring them.
+
+### Fair native-label protocol
+
+``scripts/scine_native_topo_validate.py`` constructs one shared, cached pair
+of DFTB0-relaxed reactant/product labels per T1x sample (BFGS,
+``fmax <= 0.001 eV/A``). Both GAD and Sella are scored against exactly those
+same labels. A pair is excluded only when DFTB0 does not produce two usable
+reference minima; it is never relabeled per candidate or per method. The
+original T1x-label score is retained in the parquet as a cross-PES metric.
+
+At 10 pm, on all 287 test starts:
+
+| Metric | GAD | Sella |
+|---|---:|---:|
+| Search strict convergence | 258/287 (89.9%) | 252/287 (87.8%) |
+| DFTB0-native topology correct | 42/287 (14.63%) | **55/287 (19.16%)** |
+| DFTB0-native strict geometry correct | 21/287 (7.32%) | 21/287 (7.32%) |
+| Calculator-native reference evaluable among converged candidates | 256/258 | 250/252 |
+
+On the strictly paired subset (229 starts converged for both; 228 native
+reference pairs evaluable), topology is **41 GAD vs 51 Sella**. Strict
+geometry is effectively tied: **21 GAD vs 20 Sella**. Thus this DFTB0 cell
+does **not** support a claim that GAD outperforms Sella in endpoint recovery,
+although GAD retains a modest strict-saddle-convergence advantage.
+
+The Sella IRC trust-region inner loop issued a nonfatal ``keep_going`` warning
+for 17/258 GAD candidates and 8/252 Sella candidates. Their endpoints were
+still displaced from the TS and subsequently minimized before scoring. The
+reported quantity is therefore an IRC-seeded *basin-assignment* metric, not a
+claim that every individual path is an exact numerically converged IRC.
+
+Three DFTB0 reference pairs were intentionally excluded: sample 240 had a
+product that did not reach the requested minimum, and samples 242 (GAD-only)
+and 251 (Sella-only) collapsed to the same DFTB0 R/P minimum. This is the
+expected behavior of the conservative evaluator rather than a method failure.
+
+Artifacts:
+
+- ``src/gadplus/search/irc_validate.py``: forced, saddle-aware Sella IRC loop.
+- ``src/gadplus/search/native_endpoints.py``: atomic shared-cache DFTB0 R/P
+  relaxations.
+- ``scripts/scine_native_topo_validate.py`` and
+  ``scripts/run_scine_native_topo.slurm``: parallel validator.
+- ``/lustre07/scratch/memoozd/gadplus/runs/scine_native_topo_forced_10pm_intersection_20260710/``:
+  paired results.
+- ``/lustre07/scratch/memoozd/gadplus/runs/scine_native_topo_forced_10pm_nonintersection_20260710/``:
+  non-overlap results used for the end-to-end totals.
 4. **Threshold for "right saddle"** — current `n_neg==1 ∧ fmax<0.01`
    strict-conv counts shallow saddles (|λ_0| < 0.01) where IRC can't
    distinguish forward/reverse. Optionally tighten with `|λ_0| > ε`.

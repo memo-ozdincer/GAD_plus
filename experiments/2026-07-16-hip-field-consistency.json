@@ -1,0 +1,25 @@
+{
+  "id": "2026-07-16-hip-field-consistency",
+  "status": "passed",
+  "parent": null,
+  "question": "Are HIP's independently predicted energy, force, and Hessian fields locally mutually consistent on held-out Transition1x structures?",
+  "hypothesis": "Because HIP uses direct force and Hessian heads, its force-Jacobian and energy-curvature residuals may be materially larger than PaiNN's conservative autograd residuals, potentially explaining method sensitivity.",
+  "design": "Five test-split structures, three seeded random Cartesian unit directions each, central differences at 0.01 A. No optimizer trajectory is run.",
+  "decision_rule": "This is diagnostic, not a pass/fail gate. Compare the distributions of F.v + dE/ds, H.v + dF/ds, and v.H.v - d2E/ds2 with the conservative PaiNN control at matched finite-difference settings.",
+  "resources": {
+    "slurm_job_ids": [65761302, 65762421, 65763555, 65764300, 65764422, 65764753],
+    "allocation": "one A100 1g.5gb MIG slice, 4 CPU cores, 12G memory, 15 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/hip-field-check-65764753",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/hip_field_check_65764753.out"
+  },
+  "implementation_history": {
+    "65761302": "Failed before model loading because HIP imports wandb from its training module but the project venv did not include it. No diagnostic evaluations ran.",
+    "65762421": "Submitted after a local HIP import preflight passed using the scratch-side dependency override.",
+    "65764422": "One-structure/one-direction end-to-end smoke passed after resolving the PyG compiled stack in scratch: torch-geometric 2.7.0 plus matching pyg-lib, torch-cluster, and torch-scatter wheels. It measured F/E residual 0.4058 eV/A, H/-dFdx relative residual 0.6699, and H/E-curvature residual 140.99 eV/A^2. These are diagnostic values, not a benchmark conclusion.",
+    "fix": "Installed HIP's missing inference-time Python dependencies with uv under /lustre07/scratch/memoozd/gadplus/python-overrides, keeping project numerical packages unshadowed. The project torch-geometric 2.8 package was incompatible with available Torch 2.7/CUDA 12.6 pyg-lib wheels, so the override pins torch-geometric 2.7.0 and matching compiled extensions."
+  },
+  "result": "Completed fixed 5x3 job 65764753. HIP medians: |F.v + dE/ds|=0.32244 eV/A, relative |H.v + dF/ds|/|dF/ds|=0.07631, and |vHv-d2E/ds2|=27.738 eV/A^2. Matched PaiNN control medians: 5.61e-4 eV/A, 2.34e-4, and 2.23e-2 eV/A^2. HIP's direct fields are materially non-integrable at this finite-difference scale; its reported Hessian was symmetric to printed precision.",
+  "next_action": "Use the paired HIP/PaiNN comparison to motivate causal direct-versus-conservative curvature tests, without claiming causality from this observational diagnostic alone."
+}

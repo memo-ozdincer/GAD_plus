@@ -62,8 +62,11 @@ def get_starting_coords(sample, start_type: str, device, noise: float = 0.01):
             if pos_p.abs().sum() < 1e-6:
                 return None
             from gadplus.geometry.interpolation import geodesic_interpolation
+            z_local = sample.z.to(device)
             # 3 images: reactant, midpoint, product
-            images = geodesic_interpolation(pos_r, pos_p, n_images=3)
+            images = geodesic_interpolation(
+                pos_r, pos_p, n_images=3, atomic_nums=z_local,
+            )
             return images[1]  # midpoint
         return None
 

@@ -4,7 +4,8 @@ Last cleanup: 2026-04-20.
 
 ## Canonical scripts (use these)
 
-These produce the data backing the current `IRC_COMPREHENSIVE_2026-04-20.pdf`.
+These produced the data backing the archived
+`legacy/reports/IRC_COMPREHENSIVE_2026-04-20.pdf`.
 
 ### TS-finding (one method × one noise → summary parquet + traj parquets)
 

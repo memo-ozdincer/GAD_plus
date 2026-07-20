@@ -1,0 +1,18 @@
+{
+  "id": "2026-07-16-painn-native-set-tight",
+  "status": "passed",
+  "parent": "2026-07-16-painn-native-set-smoke",
+  "question": "Can a tight, method-independent PaiNN-native index-one saddle set be built for the paired GAD/Sella benchmark?",
+  "hypothesis": "The coarse native-set smoke establishes that T1x endpoint pairs can yield PaiNN-native index-one maxima; tighter endpoint and NEB tolerances will retain a usable subset.",
+  "decision_rule": "Accept only if both PaiNN endpoint relaxations converge at fmax <= 0.005 eV/A, climbing NEB converges at fmax <= 0.01 eV/A, the maximum image has fmax <= 0.01 eV/A, and the full mass-weighted Eckart-projected Hessian has n_neg = 1. Then require two-sided native endpoint validation before optimization tests.",
+  "resources": {
+    "slurm_job_ids": [65762463],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 90 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-native-tight-65762463",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_native_tight_65762463.out"
+  },
+  "result": "Three of the first three endpoint pairs produced accepted candidates: both endpoint relaxations converged below 0.005 eV/A; climbing NEB converged; maximum-image fmax values were 0.00951, 0.00122, and 0.0000207 eV/A; all had projected n_neg=1. This is not connectivity validation.",
+  "next_action": "Validate all three candidates in both downhill directions against their PaiNN-relaxed endpoint minima, then run the frozen paired GAD/Sella pilot only on validated candidates."
+}

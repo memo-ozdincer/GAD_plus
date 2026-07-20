@@ -77,7 +77,7 @@ def n_neg_eckart(hessian: torch.Tensor, coords: torch.Tensor,
     syms = atomic_nums_to_symbols(atomic_nums)
     evals, _, _ = vib_eig(hessian, coords, syms, purify=False)
     evals_sorted = torch.sort(evals).values
-    n_neg = int((evals_sorted < 0).sum().item())
+    n_neg = int((evals_sorted < -1e-4).sum().item())
     eig0 = float(evals_sorted[0].item()) if evals_sorted.numel() > 0 else 0.0
     eig1 = float(evals_sorted[1].item()) if evals_sorted.numel() > 1 else 0.0
     return n_neg, eig0, eig1

@@ -73,6 +73,20 @@ def _build_predict_fn(cfg: DictConfig):
         )
         return make_xtb_predict_fn(calc), device
 
+    if name == "neuralneb":
+        from gadplus.calculator.neuralneb import (
+            load_neuralneb_painn_calculator,
+            make_neuralneb_predict_fn,
+        )
+
+        print(f"Loading NeuralNEB PaiNN checkpoint: {cfg.calculator.checkpoint}")
+        calc = load_neuralneb_painn_calculator(
+            checkpoint=cfg.calculator.checkpoint,
+            device=device,
+            cutoff=cfg.calculator.get("cutoff", 5.0),
+        )
+        return make_neuralneb_predict_fn(calc), device
+
     raise ValueError(f"Unknown calculator backend: {name!r}")
 
 
@@ -179,6 +193,8 @@ def main(cfg: DictConfig):
                 coords = make_starting_coords(
                     batch, cfg.starting.method,
                     noise_rms=noise_angstrom, seed=seed,
+                    n_images=cfg.starting.get("n_images", 11),
+                    start_fraction=cfg.starting.get("start_fraction", 0.5),
                 )
                 coords = coords.to(calc_device)
                 atomic_nums = batch.z.to(calc_device)

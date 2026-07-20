@@ -1,0 +1,28 @@
+{
+  "id": "2026-07-16-painn-paired-pilot",
+  "status": "completed",
+  "parent": "2026-07-16-painn-native-set-tight",
+  "question": "On a tight PaiNN-native saddle set, does projected pure GAD or exact-full-Hessian Sella more reliably recover an index-one, low-force stationary point from the same perturbed starts?",
+  "hypothesis": "PaiNN's conservative E/F/H fields provide the decisive independent control for determining whether HIP's high-noise GAD advantage generalizes beyond its direct field heads.",
+  "decision_rule": "Use only tight native saddles that pass two-sided endpoint validation. For each identical seeded Cartesian perturbation, score each terminal geometry externally by n_neg = 1 and fmax < 0.01 eV/A. Do not tune method parameters on these pilot structures; use the frozen values in the manifest.",
+  "design": {
+    "noise_pm": [50, 100],
+    "seeds_per_candidate": 3,
+    "max_steps": 300,
+    "gad": "projected pure GAD, dt=0.005, no cap/descent gate/blending/multimode extension",
+    "sella": "Cartesian Sella with a fresh exact full Hessian after every kick, mass-weighted Eckart-projected then un-mass-weighted back to Cartesian"
+  },
+  "resources": {
+    "slurm_job_ids": [65764476],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 2 hours"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-gad-sella-65764476",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_gad_sella_65764476.out",
+    "validation_summary": "/lustre07/scratch/memoozd/gadplus/runs/painn-native-irc-65764388/summary.json",
+    "strict_paired_analysis": "/lustre07/scratch/memoozd/gadplus/runs/painn-gad-sella-65764476/strict_paired_analysis.json"
+  },
+  "implementation_note": "The validator admitted two of three tight candidates. The runner reads the validation summary and refuses every non-accepted candidate; it is not a three-candidate run.",
+  "result": "Strict stationarity only: GAD 0/12 and Sella 5/12 (50 pm: 0/6 vs 4/6; 100 pm: 0/6 vs 1/6). Chemical IRC_TOPO acceptance is not yet known.",
+  "next_action": "Run dependent terminal IRC_TOPO validation job 65765386, then report strict and chemical success separately."
+}

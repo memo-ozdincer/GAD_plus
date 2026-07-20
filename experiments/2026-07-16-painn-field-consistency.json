@@ -1,0 +1,19 @@
+{
+  "id": "2026-07-16-painn-field-consistency",
+  "status": "passed",
+  "parent": "2026-07-16-painn-efh-smoke",
+  "question": "What are the conservative E/F/H directional residuals of PaiNN under the exact finite-difference protocol used for HIP?",
+  "hypothesis": "PaiNN, whose forces and Hessian are autograd derivatives of its energy, will show finite-difference-limited directional residuals, providing a control for HIP's independently predicted fields.",
+  "design": "Five T1x test structures, three seeded random Cartesian directions each, and central differences at 0.01 A. This matches the HIP field-consistency job exactly.",
+  "decision_rule": "This is a mechanistic diagnostic, not an optimizer result. Compare medians and distributions to HIP only after both jobs finish with the same numerical protocol.",
+  "resources": {
+    "slurm_job_ids": [65763764],
+    "allocation": "one A100 1g.5gb MIG slice, 4 CPU cores, 12G memory, 15 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-field-check-65763764",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_field_check_65763764.out"
+  },
+  "result": "Completed as job 65763764 with 15 directions. Median absolute F.v + dE/ds residual: 5.61e-4 eV/A; median H.v versus -dF/ds relative residual: 2.34e-4; median directional energy-curvature residual: 2.23e-2 eV/A^2; Hessian antisymmetry was zero at printed precision.",
+  "next_action": "Compare this conservative control to the repaired HIP diagnostic before attributing any optimizer difference to direct-field inconsistency."
+}

@@ -338,7 +338,7 @@ def main() -> None:
                 atomic_nums_to_symbols(z),
                 purify=False,
             )
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = int((evals_vib < -1e-4).sum().item())
 
             out_row["final_force_norm_recomputed"] = fn
             out_row["final_force_max_recomputed"] = fm

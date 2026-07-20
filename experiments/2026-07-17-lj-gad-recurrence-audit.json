@@ -1,0 +1,17 @@
+{
+  "id": "2026-07-17-lj-gad-recurrence-audit",
+  "status": "completed",
+  "question": "Could the poor pure-GAD LJ result be caused by a discrepancy between the current GAD implementation, the older Andreas branch, and the batched LJ runner?",
+  "design": "Use a deterministic noised LJ7 start with the analytic predictor. Compare five projected GAD updates from the current Cartesian convention with the old/batched mass-weighted convention. Uniform hydrogen mass is 1.008, so compare directions after 1/m scaling and paths after setting dt_old=m*dt_current.",
+  "result": {
+    "max_direction_error_after_scaling": 7.299e-12,
+    "max_coordinate_error_after_five_steps": 8.332e-14,
+    "mass": 1.008,
+    "conclusion": "The implementations are recurrence-equivalent for the uniform-hydrogen LJ benchmark. Their unchanged-dt difference is only the expected 0.8% timestep scaling."
+  },
+  "artifacts": {
+    "smoke": "scripts/smoke_lj_gad_recurrence_equivalence.py",
+    "documentation": "LJ_FINDINGS_2026_07_09.md"
+  },
+  "next_action": "Treat LJ pure-GAD failure as a high-index globalization question; retain explicit runner and mass conventions in all LJ result metadata."
+}

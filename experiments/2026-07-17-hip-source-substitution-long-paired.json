@@ -1,0 +1,19 @@
+{
+  "id": "2026-07-17-hip-source-substitution-long-paired",
+  "status": "invalidated",
+  "parent": "2026-07-17-hip-hessian-source-substitution",
+  "question": "On historically indexed high-noise starts where the completed long Cartesian-Eckart GAD run succeeded, does replacing HIP's supplied Hessian with the symmetric direct-force Jacobian alter paired GAD/Sella outcomes?",
+  "hypothesis": "If HIP's supplied curvature is responsible for the high-noise GAD behavior, the long-budget GAD outcome will change materially when only that curvature is replaced, while the public calculator energy/force path and historical sequential noise are held fixed.",
+  "design": "Historical Transition1xDataset test IDs 0 and 3; 0.15 A noise generated with method_single.py's sequential CPU seed 42 convention; GAD dt=0.007 and Cartesian-Eckart Sella; 2,000-step budget; public calculator.predict(do_hessian=True) returns E/F for every condition. Predicted-Hessian runs share one 3g task; force-Jacobian runs are split by start to retain a one-hour per-task bound.",
+  "decision_rule": "Interpret only paired source changes that survive the frozen long budget. If predicted and force-Jacobian outcomes agree, reject the supplied-Hessian mechanism for those starts; if they differ, repeat on a broader predeclared stratified panel before making population claims.",
+  "resources": {
+    "slurm_job_ids": ["65815457", "65815458", "65815459"],
+    "allocation": "def-aspuru: three A100 3g.20gb MIG slices, 4 CPU cores and 20G memory each, up to one hour"
+  },
+  "artifacts": {
+    "script": "scripts/hip_hessian_source_substitution_smoke.py",
+    "slurm_script": "scripts/run_hip_hessian_source_substitution_smoke.slurm"
+  },
+  "result": "Jobs 65815457--65815459 were cancelled after audit showed that selected IDs 0 and 3 came from a train-split legacy artifact, while the headline dt=0.007 x 5k comparison uses the separate test_dtgrid campaign. No optimizer rows were produced.",
+  "next_action": "Use verified test_dtgrid IDs in a replacement paired curvature experiment."
+}

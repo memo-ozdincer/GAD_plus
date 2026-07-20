@@ -1,4 +1,10 @@
-# Starting from geodesic/linear interpolation between reactant and product
+# Starting from geodesic interpolation between reactant and product.
+#
+# Requires the geodesic-interpolate package
+# (https://github.com/virtualzx-nad/geodesic-interpolate); the wrapper no
+# longer falls back to linear interpolation.
 method: geodesic
-n_images: 10
-start_fraction: 0.5   # which interpolation point to start from (0.5 = midpoint)
+n_images: 11           # geodesic path length (endpoints included)
+start_fraction: 0.5    # 0 = reactant, 0.5 = midpoint, 1.0 = product
+noise_levels_pm: [0]   # extra Gaussian noise (pm) on top of the geodesic point
+seeds_per_level: 1

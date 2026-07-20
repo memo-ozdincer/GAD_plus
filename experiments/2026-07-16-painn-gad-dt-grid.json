@@ -1,0 +1,19 @@
+{
+  "id": "2026-07-16-painn-gad-dt-grid",
+  "status": "completed",
+  "parent": "2026-07-16-painn-paired-pilot",
+  "question": "Does a smaller pure-GAD timestep recover strict convergence on PaiNN-native saddles where dt=0.005 fails?",
+  "hypothesis": "If the PaiNN result is a numerical-stability artifact, one or more dt values in [0.00025, 0.002] will improve strict stationary recovery without displacement caps, descent gating, or smoothing.",
+  "design": "Five array tasks, one dt each, on the two IRC-accepted PaiNN saddles at 50/100 pm and three fixed matched seeds. Pure projected GAD only, 300 steps, no cap/collision guard/descent gate/blending/multimode.",
+  "decision_rule": "Use the best prespecified dt for a later paired GAD/Sella confirmation only if it improves across both candidates/noise levels; report all five dt values and do not select on a single trajectory.",
+  "resources": {
+    "slurm_job_ids": ["65765515_0-4 (cancelled before start: 45-minute request)", "65765550_0-4"],
+    "allocation": "five concurrent A100 3g.20gb MIG slices, 4 CPU cores and 20G each, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-gad-dt-65765550",
+    "analysis": "/lustre07/scratch/memoozd/gadplus/runs/painn-gad-dt-65765550/analysis.json"
+  },
+  "result": "Pure GAD had 0/12 strict successes at every prespecified dt: 0.00025, 0.0005, 0.001, 0.002, and 0.005 eV-independent integration units.",
+  "next_action": "Do not attribute the PaiNN negative result to dt within this tested range; any further change is an algorithmic variant, not pure-GAD retuning."
+}

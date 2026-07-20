@@ -1,0 +1,22 @@
+{
+  "id": "2026-07-16-painn-native-irc-validation",
+  "status": "passed",
+  "parent": "2026-07-16-painn-native-set-tight",
+  "question": "Do the PaiNN-native index-one NEB candidates connect both calculator-native endpoint minima under two-sided full-Hessian IRC?",
+  "hypothesis": "At least one tightly converged PaiNN candidate will pass topology, geometry, and endpoint-minimum checks, making it eligible for an optimizer-neutral paired pilot.",
+  "design": "For every tight candidate, run forward and reverse Sella IRC with PaiNN's conservative full autograd Hessian freshly supplied after every kick. Relax each raw IRC endpoint with PaiNN, then score against the candidate's PaiNN-relaxed reactant/product minima.",
+  "decision_rule": "Accept a candidate only if both IRC directions exist; both endpoint relaxations converge at fmax <= 0.005 eV/A; and both relaxed endpoints have projected n_neg=0. For distinct native endpoint bond graphs, require direction-agnostic IRC_TOPO matching; for identical endpoint graphs, require RMSD identity because topology cannot distinguish the endpoints. The runner validates a candidate; it does not create it with either compared optimizer.",
+  "resources": {
+    "slurm_job_ids": [65763707, 65764388],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-native-irc-65764388",
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/painn_native_irc_65764388.out"
+  },
+  "implementation_history": {
+    "65763707": "Completed. All three candidates reached both native endpoint bond topologies; candidates 0 and 2 also reached two vibrational minima, while candidate 1's reverse branch retained n_neg=1. The first classifier incorrectly required RMSD even when the two reference endpoints had different bond graphs, contradicting the stated IRC_TOPO criterion; its acceptance labels are invalidated and the same calculation is rerun with the corrected criterion."
+  },
+  "result": "Corrected run 65764388 accepted candidates 0 (sample 0) and 2 (sample 2): each reached both distinct native endpoint bond topologies and two relaxed vibrational minima (n_neg=0). Candidate 1 was rejected because its reverse endpoint retained n_neg=1. RMSD mismatch is reported as a conformer diagnostic but is not disqualifying for distinct endpoint bond graphs under IRC_TOPO.",
+  "next_action": "Run the frozen paired pure-GAD versus exact-Hessian-Sella pilot only on candidates 0 and 2."
+}

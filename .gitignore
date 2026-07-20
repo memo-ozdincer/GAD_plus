@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+.venv/
+.claude/scheduled_tasks.lock
+*.aux
+*.log
+*.out
+*.toc

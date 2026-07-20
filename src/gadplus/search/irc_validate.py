@@ -153,7 +153,7 @@ def _endpoint_spectral(
             hess_t = torch.tensor(hess)
         atomsymbols = atomic_nums_to_symbols(atomic_nums)
         evals_vib, _, _ = vib_eig(hess_t, coords_t, atomsymbols, purify=False)
-        n_neg = int((evals_vib < 0).sum().cpu().item())
+        n_neg = int((evals_vib < -1e-4).sum().cpu().item())
         min_eig = float(evals_vib[0].cpu().item())
         return n_neg, min_eig
     except Exception:
@@ -296,6 +296,7 @@ def run_irc_validation(
     product_coords: Optional[torch.Tensor] = None,
     rmsd_threshold: float = 0.3,
     max_steps: int = 100,
+    logfile: Optional[str] = "-",
 ) -> IRCResult:
     """Baseline: vanilla Sella IRC with BFGS-updated Hessian, Cartesian coords.
 
@@ -328,17 +329,35 @@ def run_irc_validation(
     atoms = Atoms(symbols=symbols, positions=coords_np)
     atoms.calc = HipASECalculator(predict_fn=predict_fn, atomic_nums=atomic_nums)
 
-    optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4}
+    optimizer_kwargs = {"dx": 0.1, "eta": 1e-4, "gamma": 0.4, "keep_going": True}
+
+    def run_direction(direction: str) -> None:
+        """Run Sella's IRC loop without ASE's force-only early exit.
+
+        Recent ASE releases implement ``Dynamics.irun`` with
+        ``gradient_converged`` directly, bypassing Sella's ``IRC.converged``
+        override. At a well-converged saddle that reports success before the
+        first IRC kick, despite a negative Hessian mode. Initialize via
+        Sella's ``irun`` then drive its saddle-aware step/convergence methods
+        explicitly so both directions actually leave the TS.
+        """
+        initializer = irc.irun(fmax=0.01, steps=max_steps, direction=direction)
+        next(initializer)
+        for _ in range(max_steps):
+            irc.step()
+            irc.nsteps += 1
+            if irc.converged():
+                break
 
     endpoints = {"forward": None, "reverse": None}
     try:
-        irc = IRC(atoms=atoms, **optimizer_kwargs)
+        irc = IRC(atoms=atoms, logfile=logfile, **optimizer_kwargs)
         # Forward first — computes v0ts and saves it on the instance.
-        irc.run(fmax=0.01, steps=max_steps, direction="forward")
+        run_direction("forward")
         endpoints["forward"] = atoms.positions.copy()
         # Reverse uses the cached v0ts (Sella restores PES state internally),
         # guaranteeing direction = -v0ts of the forward run.
-        irc.run(fmax=0.01, steps=max_steps, direction="reverse")
+        run_direction("reverse")
         endpoints["reverse"] = atoms.positions.copy()
     except Exception:
         pass

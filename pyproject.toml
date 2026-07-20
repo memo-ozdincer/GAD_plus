@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "GAD-based transition state search with HIP neural network potential"
 requires-python = ">=3.11"
 dependencies = [
-    "torch>=2.1",
+    "torch==2.7.0+cu126",
     "torch-geometric>=2.4",
+    "transition1x",
     "numpy>=1.24",
     "scipy>=1.11",
     "pyarrow>=14.0",
@@ -13,6 +14,7 @@ dependencies = [
     "sella>=2.3",
     "hydra-core>=1.3",
     "hydra-submitit-launcher>=1.2",
+    "hip",
     "mlflow>=2.9",
     "duckdb>=0.9",
     "seaborn>=0.13",
@@ -35,3 +37,13 @@ gadplus = "gadplus.orchestration.run:main"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.uv.sources]
+hip = { path = "../hip", editable = true }
+torch = { index = "pytorch-cu126" }
+transition1x = { path = "../transition1x", editable = true }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

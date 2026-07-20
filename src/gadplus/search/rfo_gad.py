@@ -227,7 +227,7 @@ def run_rfo_gad(
         evals_vib, evecs_vib_3N, _ = vib_eig(
             hessian, coords, atomsymbols, purify=cfg.purify_hessian,
         )
-        n_neg = int((evals_vib < 0).sum().item())
+        n_neg = int((evals_vib < -1e-4).sum().item())
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
 
         last_n_neg = n_neg

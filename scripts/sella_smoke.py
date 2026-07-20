@@ -30,21 +30,37 @@ import pyarrow.parquet as pq
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 warnings.filterwarnings("ignore")
 
+_PREDICT_FN_CACHE = {}
+
 
 def _build_predict_fn(backend: str, method: str):
+    key = (backend, method)
+    if key in _PREDICT_FN_CACHE:
+        return _PREDICT_FN_CACHE[key]
     if backend == "scine":
         from gadplus.calculator.scine import (
             load_scine_calculator, make_scine_predict_fn,
         )
-        return make_scine_predict_fn(
+        predict_fn = make_scine_predict_fn(
             load_scine_calculator(functional=method, device="cpu")
         )
-    if backend == "xtb":
+    elif backend == "xtb":
         from gadplus.calculator.xtb import load_xtb_calculator, make_xtb_predict_fn
-        return make_xtb_predict_fn(
+        predict_fn = make_xtb_predict_fn(
             load_xtb_calculator(method=method, device="cpu")
         )
-    raise ValueError(f"Unknown backend: {backend!r}")
+    elif backend == "mace":
+        from gadplus.calculator.mace import load_mace_calculator, make_mace_predict_fn
+        predict_fn = make_mace_predict_fn(
+            load_mace_calculator(model=method, device="cuda")
+        )
+    elif backend == "horm":
+        from gadplus.calculator.horm import load_horm_leftnet_calculator, make_horm_predict_fn
+        predict_fn = make_horm_predict_fn(load_horm_leftnet_calculator(device="cuda"))
+    else:
+        raise ValueError(f"Unknown backend: {backend!r}")
+    _PREDICT_FN_CACHE[key] = predict_fn
+    return predict_fn
 
 
 def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
@@ -142,22 +158,35 @@ def _run_one_sample(args_tuple):
     from ase import Atoms
     from sella import Sella
 
-    from gadplus.data.transition1x import Transition1xDataset, UsePos
-    from gadplus.geometry.starting import make_starting_coords
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
-    ds = Transition1xDataset(
-        h5_path=h5_path, split=split, max_samples=sample_idx + 1,
-        transform=UsePos("pos_transition"),
-    )
-    sample = ds[sample_idx]
-    formula = str(getattr(sample, "formula", f"sample_{sample_idx}"))
-    rxn = str(getattr(sample, "rxn", ""))
+    if backend in {"mace", "horm"}:
+        from gadplus.data.direct_t1x import load_t1x_record
 
-    coords_start = make_starting_coords(
-        sample, "noised_ts", noise_rms=noise_ang, seed=seed,
-    ).to(torch.float64)
-    z = sample.z.to(torch.long)
+        sample = load_t1x_record(h5_path, split, sample_idx)
+        formula = sample.formula or f"sample_{sample_idx}"
+        rxn = sample.rxn
+        ts_coords = torch.as_tensor(sample.transition_state, dtype=torch.float64)
+        generator = torch.Generator(device="cpu").manual_seed(seed)
+        coords_start = ts_coords + noise_ang * torch.randn(
+            ts_coords.shape, generator=generator, dtype=ts_coords.dtype,
+        )
+        z = torch.as_tensor(sample.atomic_nums, dtype=torch.long)
+    else:
+        from gadplus.data.transition1x import Transition1xDataset, UsePos
+        from gadplus.geometry.starting import make_starting_coords
+
+        ds = Transition1xDataset(
+            h5_path=h5_path, split=split, max_samples=sample_idx + 1,
+            transform=UsePos("pos_transition"),
+        )
+        sample = ds[sample_idx]
+        formula = str(getattr(sample, "formula", f"sample_{sample_idx}"))
+        rxn = str(getattr(sample, "rxn", ""))
+        coords_start = make_starting_coords(
+            sample, "noised_ts", noise_rms=noise_ang, seed=seed,
+        ).to(torch.float64)
+        z = sample.z.to(torch.long)
 
     predict_fn = _build_predict_fn(backend, method)
     calc, hessian_fn = _make_calculator_and_hessfn(predict_fn, z, apply_eckart)
@@ -208,7 +237,7 @@ def _run_one_sample(args_tuple):
         )
         atomsymbols = atomic_nums_to_symbols(z)
         evals_vib, _, _ = vib_eig(out_final["hessian"], final_coords, atomsymbols)
-        n_neg = int((evals_vib < 0).sum().item())
+        n_neg = int((evals_vib < -1e-4).sum().item())
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
     except Exception:
         final_fmax = float("nan"); final_force_norm = float("nan")
@@ -243,7 +272,7 @@ def _run_one_sample(args_tuple):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--backend", required=True, choices=["scine", "xtb"])
+    p.add_argument("--backend", required=True, choices=["scine", "xtb", "mace", "horm"])
     p.add_argument("--method", default="DFTB0")
     p.add_argument("--noise", type=float, default=1.0,
                    help="Gaussian RMS noise on TS in Angstrom. 1.0 A = 100 pm.")

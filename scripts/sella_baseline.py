@@ -140,7 +140,7 @@ def main():
     parser.add_argument("--delta0", type=float, default=0.048,
                         help="Sella initial trust radius")
     parser.add_argument("--gamma", type=float, default=0.0,
-                        help="Sella line-search gamma (0 disables line search)")
+                        help="Sella iterative eigensolver tolerance; bypassed on external-Hessian refreshes")
     parser.add_argument("--config-tag", type=str, default="",
                         help="Optional tag appended to config_name (e.g. 'libdef', 'lson')")
     parser.add_argument("--no-hessian", action="store_true", default=False,
@@ -318,7 +318,7 @@ def main():
             # Our convergence check: Eckart-projected n_neg + force_norm
             atomsymbols = atomic_nums_to_symbols(z)
             evals_vib, _, _ = vib_eig(out_final["hessian"], final_coords, atomsymbols)
-            n_neg = int((evals_vib < 0).sum().item())
+            n_neg = int((evals_vib < -1e-4).sum().item())
             eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
             eig1 = float(evals_vib[1].item()) if evals_vib.numel() > 1 else 0.0
         except Exception as e2:
@@ -330,8 +330,12 @@ def main():
             eig0 = 0.0
             eig1 = 0.0
 
-        # Our criterion: n_neg==1 AND force_norm < 0.01
-        our_converged = (n_neg == 1) and (final_force_norm < 0.01)
+        # Our convergence criterion mirrors the runner's --fmax CLI flag:
+        # n_neg==1 AND final_fmax < args.fmax.  The previous form
+        # (force_norm < 0.01) was hardcoded and silently mis-labelled runs
+        # whose CLI fmax differed from 0.01 (and used force_norm rather than
+        # the fmax max-abs criterion).
+        our_converged = (n_neg == 1) and (final_fmax < args.fmax)
 
         status_sella = "CONV" if sella_converged else "FAIL"
         status_ours = "TS" if our_converged else "no"

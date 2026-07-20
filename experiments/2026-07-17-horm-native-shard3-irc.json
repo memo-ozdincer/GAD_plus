@@ -1,0 +1,18 @@
+{
+  "id": "2026-07-17-horm-native-shard3-irc",
+  "status": "invalidated",
+  "parent": "2026-07-17-horm-efh-native-shards",
+  "question": "Does the sole locally converged HORM E-F-H candidate from native-construction shard 3 connect two distinct HORM minima under full-Hessian IRC validation?",
+  "hypothesis": "A locally index-one, low-force candidate is usable only if both downhill branches relax to distinct endpoint minima.",
+  "design": "Run the existing full-Hessian IRC and endpoint-relaxation validator on candidate_000_sample_0080.npz from shard 3 using the conservative HORM LEFTNet E-F-H checkpoint.",
+  "decision_rule": "Use it in a matched GAD/Sella comparison only if both endpoints are converged, distinct, and the candidate is index one. Otherwise mark it invalid for optimizer benchmarking.",
+  "resources": {
+    "slurm_job_ids": ["65808416"],
+    "allocation": "def-aspuru: one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 60 minutes"
+  },
+  "artifacts": {
+    "candidate_dir": "/lustre07/scratch/memoozd/gadplus/runs/horm-native-shards-65797012/shard-3"
+  },
+  "result": "candidate_000_sample_0080.npz is locally converged and index one, but both full-Hessian IRC branches relax to the reactant-side minimum (endpoint minima true; intended connectivity false). It is invalid for an intended-saddle optimizer benchmark.",
+  "next_action": "Do not use this candidate for GAD/Sella rates; retain it only as a stationarity-versus-connectivity diagnostic."
+}

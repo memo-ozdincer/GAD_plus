@@ -1,0 +1,21 @@
+{
+  "id": "2026-07-16-horm-leftnet-matched-smoke",
+  "status": "passed",
+  "parent": null,
+  "question": "Does the newly obtained HORM LEFTNet E-F checkpoint run through the same Cartesian energy/force/full-autograd-Hessian adapter used by the HORM E-F-H checkpoint?",
+  "hypothesis": "Both matched checkpoints will run with finite directional Hessian checks; only after this gate can their optimizer outcomes be attributed to Hessian supervision rather than an adapter defect.",
+  "design": "One T1x geometry, full force-Jacobian Hessian, one centered random directional finite difference. The existing E-F-H LEFTNet smoke is retained as the matched reference.",
+  "decision_rule": "This is a runtime/numerical smoke only. Reject the E-F adapter if loading fails, Hessian construction fails, or the directional check is grossly inconsistent; do not infer optimizer performance from one geometry.",
+  "resources": {
+    "slurm_job_ids": [65764853, 65764926],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 16G memory, 10 minutes"
+  },
+  "artifacts": {
+    "scratch_log": "/lustre07/scratch/memoozd/gadplus/logs/horm_leftnet_65764926.out"
+  },
+  "implementation_history": {
+    "65764853": "Cancelled before starting because it requested a whole A100 for a one-geometry smoke. Replaced with a 3g.20gb slice."
+  },
+  "result": "Job 65764926 completed for official LEFTNet E-F `left_orig.ckpt`: energy=13.4938, fmax=2.8657, raw Hessian absmax=17.369, raw asymmetry absmax=1.45e-3, directional Hessian max error=0.175 and RMS error=0.0700 at epsilon=0.001 A. The existing E-F-H `left.ckpt` smoke at the same sample reported 0.135 max and 0.0518 RMS. Both run through the same Cartesian autograd adapter; the residuals are not zero and require an epsilon/dtype robustness check before mechanism claims.",
+  "next_action": "Run an epsilon/dtype convergence diagnostic for both matched checkpoints, then build a HORM-native saddle set only if the adapter passes its numerical gate."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "2026-07-16-painn-paired-terminal-irc",
+  "status": "completed",
+  "parent": "2026-07-16-painn-paired-pilot",
+  "question": "Do strict stationary-point successes from the paired PaiNN pilot connect the intended PaiNN-native endpoints?",
+  "hypothesis": "A strict n_neg=1/fmax success can still be a wrong saddle, especially for Sella, so terminal IRC_TOPO recovery will be lower than terminal stationary-point recovery.",
+  "design": "For each strict terminal from the frozen paired pilot, run forward/reverse full-autograd-Hessian IRC, relax both endpoints, and compare to the candidate's native endpoints. Use IRC_TOPO for distinct endpoint graphs and RMSD only for same-topology pairs.",
+  "decision_rule": "A terminal is chemically accepted only if both relaxed IRC endpoints are vibrational minima and satisfy the applicable native connectivity criterion. Results are paired by candidate, noise, and seed.",
+  "resources": {
+    "slurm_job_ids": ["65765386"],
+    "allocation": "one A100 3g.20gb MIG slice, 4 CPU cores, 20G memory, 90 minutes"
+  },
+  "artifacts": {
+    "scratch_run_dir": "/lustre07/scratch/memoozd/gadplus/runs/painn-terminal-irc-65765386",
+    "summary": "/lustre07/scratch/memoozd/gadplus/runs/painn-terminal-irc-65765386/summary.json",
+    "paired_terminal_analysis": "/lustre07/scratch/memoozd/gadplus/runs/painn-gad-sella-65764476/paired_terminal_analysis.json"
+  },
+  "result": "All five strict Sella terminals had two relaxed minima but failed intended IRC_TOPO connectivity; chemical terminal success is 0/12 for both GAD and Sella in this pilot.",
+  "next_action": "Treat the PaiNN pilot as chemically negative for both methods and retain strict stationarity as a separate diagnostic."
+}
