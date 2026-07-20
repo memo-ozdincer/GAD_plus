@@ -99,41 +99,41 @@ The strongest current answer is conditional:
 
 ### 2.1 Projected single-mode GAD
 
-For a conservative potential \(E(x)\), force \(F(x)=-\nabla E(x)\), and a
-normalized lowest Hessian eigenvector \(v_1\), the position update used by
+For a conservative potential $E(x)$, force $F(x)=-\nabla E(x)$, and a
+normalized lowest Hessian eigenvector $v_1$, the position update used by
 the repository's plain projected method is proportional to
 
-\[
+$$
 F_{\mathrm{GAD}} =
 F - 2v_1(v_1^\mathsf{T}F)
 = (I-2v_1v_1^\mathsf{T})F.
-\]
+$$
 
 The Hessian enters the position update through the rank-one projector
-\(v_1v_1^\mathsf{T}\). Once \(v_1\) is fixed, the update does not use the
-magnitude of \(\lambda_1\), any stable-subspace eigenvalue, or a predicted
+$v_1v_1^\mathsf{T}$. Once $v_1$ is fixed, the update does not use the
+magnitude of $\lambda_1$, any stable-subspace eigenvalue, or a predicted
 energy change.
 
-Near an index-one saddle \(x^\star\), write \(e=x-x^\star\) and diagonalize
-the Hessian with \(\lambda_1<0<\lambda_2\le\cdots\). The linearized
+Near an index-one saddle $x^\star$, write $e=x-x^\star$ and diagonalize
+the Hessian with $\lambda_1<0<\lambda_2\le\cdots$. The linearized
 continuous position dynamics contract as
 
-\[
+$$
 \dot e_i = -|\lambda_i|e_i.
-\]
+$$
 
 For explicit Euler,
 
-\[
+$$
 e_{k+1,i} = (1-\Delta t|\lambda_i|)e_{k,i}.
-\]
+$$
 
 Thus a fixed timestep must be small enough for the stiffest mode while the
 softest stable mode controls slow contraction. This is the proper local
 explanation for timestep sensitivity; a Newton step does not literally grow
 as the force shrinks.
 
-At an index-\(k>1\) geometry, flipping only \(v_1\) leaves the other negative
+At an index-$k>1$ geometry, flipping only $v_1$ leaves the other negative
 modes unflipped. Their linearized components remain unstable. GAD theory
 therefore supplies a local index-one fixed-point guarantee, not a
 globalization guarantee from stiff, high-index molecular starts
@@ -156,67 +156,67 @@ the lowest eigenvector.
 
 For HIP's learned products,
 
-\[
+$$
 \widehat E(x),\qquad
 \widehat F(x),\qquad
 \widehat H(x),\qquad
 g_F(x)=-\widehat F(x),
-\]
+$$
 
 the local quadratic energy model is
 
-\[
+$$
 m_x(s)=\widehat E(x)+g_F^\mathsf{T}s+
 \frac{1}{2}s^\mathsf{T}\widehat Hs.
-\]
+$$
 
-Let \(g_E=\nabla\widehat E\) and
-\(H_E=\nabla^2\widehat E\). Then
+Let $g_E=\nabla\widehat E$ and
+$H_E=\nabla^2\widehat E$. Then
 
-\[
+$$
 \widehat E(x+s)-m_x(s)
 =
 (g_E-g_F)^\mathsf{T}s
 +\frac{1}{2}s^\mathsf{T}(H_E-\widehat H)s
 +O(\lVert s\rVert^3).
-\]
+$$
 
 This identity separates first-order energy/direct-force disagreement from
 second-order Hessian disagreement.
 
-If Sella evaluates a proposed direction \(s=\delta d\) with the
+If Sella evaluates a proposed direction $s=\delta d$ with the
 actual/predicted energy ratio
 
-\[
+$$
 \rho(\delta d)=
 \frac{\widehat E(x+\delta d)-\widehat E(x)}
 {\delta g_F^\mathsf{T}d+
 \frac{1}{2}\delta^2d^\mathsf{T}\widehat Hd},
-\]
+$$
 
 then, generically,
 
-\[
+$$
 \lim_{\delta\rightarrow 0}\rho(\delta d)
 =\frac{g_E^\mathsf{T}d}{g_F^\mathsf{T}d},
-\]
+$$
 
-not one, when \(g_E\neq g_F\). Shrinking the trust radius therefore need not
+not one, when $g_E\neq g_F$. Shrinking the trust radius therefore need not
 repair an energy-ratio model built from incompatible products. Sella 2.3.4
 also applies the proposed step before adapting the next trust radius; it is
 not a reject-and-roll-back line search in the benchmarked path.
 
 The analogous force/Hessian compatibility residual is
 
-\[
+$$
 r_F(s)=
 \left\|
 \widehat F(x+s)-\widehat F(x)+\widehat H(x)s
 \right\|.
-\]
+$$
 
-For a coherent smooth force/Hessian pair, \(r_F=O(\lVert s\rVert^2)\).
-A persistent \(O(\lVert s\rVert)\) term means that the supplied Hessian is
+For a coherent smooth force/Hessian pair, $r_F=O(\lVert s\rVert^2)$.
+A persistent $O(\lVert s\rVert)$ term means that the supplied Hessian is
 not the local derivative of the force field followed by the optimizer.
 
 These are optimizer-interface statements, not DFT-accuracy statements. A
@@ -246,8 +246,8 @@ the optimizer interface, or both.
 
 **Isolation tests still needed**
 
-1. Compare \(v_1\) with a HIP-native path tangent, not only with the previous
-   iteration's \(v_1\).
+1. Compare $v_1$ with a HIP-native path tangent, not only with the previous
+   iteration's $v_1$.
 2. Measure the Taylor residual orders along actual Sella proposals before
    trust collapse.
 3. Compare isotropic Cartesian noise with GSM/NEB-stage starts matched by
@@ -260,7 +260,7 @@ the optimizer interface, or both.
 
 ### 3.1 Surfaces and model families
 
-| Surface/model | Character of \(E/F/H\) | Role in this study |
+| Surface/model | Character of $E/F/H$ | Role in this study |
 |---|---|---|
 | HIP on Transition1x | Learned energy, direct force, separately DFT-supervised direct Hessian | Primary surface showing the optimizer crossover |
 | SCINE DFTB0/2/3 | Energy, gradient, and Hessian from one semiempirical electronic-structure method | Internally coherent non-ML control with different saddle locations |
@@ -273,22 +273,22 @@ the optimizer interface, or both.
 
 ### 3.2 Starting geometries and the noise-unit correction
 
-The primary HIP set contains \(n=287\) Transition1x test-split labelled
+The primary HIP set contains $n=287$ Transition1x test-split labelled
 transition structures. Independent Gaussian noise was added to each
 Cartesian coordinate with standard deviations
 
-\[
+$$
 \sigma_x \in \{0.01,0.03,0.05,0.10,0.15,0.20\}\ {\rm A}.
-\]
+$$
 
 Historical scripts label these cells as 10, 30, 50, 100, 150, and 200 pm by
 multiplying A by 1000. This is wrong by a factor of ten because
-\(1\ {\rm A}=100\ {\rm pm}\). All manuscript tables use A and retain the
+$1\ {\rm A}=100\ {\rm pm}$. All manuscript tables use A and retain the
 historical label only for artifact lookup.
 
 Equal Cartesian noise does not imply equal optimization difficulty across
 PESs. This is especially important for LJ, where 0.20 in reduced
-\(\sigma\)-units creates near-collisions, and for DFTB0/MACE, where T1x
+$\sigma$-units creates near-collisions, and for DFTB0/MACE, where T1x
 structures are not necessarily stationary on the target PES.
 
 ### 3.3 Coordinate, mass, and projection convention
@@ -300,23 +300,23 @@ Cartesian GAD displacement. The implementation that retained the mass
 weighting errored and produced no benchmark data. Historical notes that
 interpret completed results as still-mass-weighted dynamics are superseded.
 
-For LJ7, all atoms are assigned hydrogen mass (\(m=1.008\)). Hydrogen,
+For LJ7, all atoms are assigned hydrogen mass ($m=1.008$). Hydrogen,
 carbon-like, and argon-like assignments alter the vibrational
 eigendecomposition even though the final displacement is Cartesian.
 
 ### 3.4 Optimizers
 
 **Plain GAD.** Projected single-mode force reflection with fixed timestep;
-the primary HIP grid uses \(\Delta t=0.003,0.005,0.007\).
+the primary HIP grid uses $\Delta t=0.003,0.005,0.007$.
 
 **Index-aware GAD extension.** For LJ, the smooth gate
 
-\[
+$$
 w=\operatorname{sigmoid}(k\lambda_2),\qquad
 F_{\rm step}=F-2w(F^\mathsf{T}v_1)v_1
-\]
+$$
 
-behaves as descent while \(\lambda_2<0\) and approaches ordinary GAD once
+behaves as descent while $\lambda_2<0$ and approaches ordinary GAD once
 the geometry becomes approximately index one. This is explicitly not pure
 GAD.
 
@@ -337,13 +337,13 @@ in Sella 2.3.4 it is an iterative eigensolver tolerance.
 
 The common strict stationary-point criterion is
 
-\[
+$$
 n_{\rm neg}=1
 \quad\land\quad
 F_{\max}<0.01\ {\rm eV/A},
-\]
+$$
 
-where \(n_{\rm neg}\) is recomputed from the Eckart-projected vibrational
+where $n_{\rm neg}$ is recomputed from the Eckart-projected vibrational
 Hessian. LJ uses the analogous reduced force units.
 
 Strict stationarity does not establish reaction identity. Where available,
@@ -370,7 +370,7 @@ noise cell. Sella leads by 6.3-7.3 percentage points at 0.01-0.05 A, the
 methods tie at 0.10 A, and plain GAD leads by 4.2 and 17.4 points at 0.15 and
 0.20 A.
 
-**Table 1. Per-cell best strict success on HIP (\(n=287\)).**
+**Table 1. Per-cell best strict success on HIP ($n=287$).**
 
 | Cartesian noise SD (A) | Historical label | Best plain GAD | Best Sella | GAD - Sella |
 |---:|---:|---:|---:|---:|
@@ -384,7 +384,7 @@ methods tie at 0.10 A, and plain GAD leads by 4.2 and 17.4 points at 0.15 and
 The full fixed-configuration grid shows that the crossover is not caused by
 one isolated GAD timestep.
 
-**Table 2. HIP strict success across principal configurations (\(n=287\)).**
+**Table 2. HIP strict success across principal configurations ($n=287$).**
 
 | Method | 0.01 A | 0.03 A | 0.05 A | 0.10 A | 0.15 A | 0.20 A |
 |---|---:|---:|---:|---:|---:|---:|
@@ -417,7 +417,7 @@ The high-noise advantage survives intended-reaction validation. Table 3 uses
 fixed principal configurations rather than selecting each IRC row
 independently.
 
-**Table 3. HIP intended IRC_TOPO success (\(n=287\)).**
+**Table 3. HIP intended IRC_TOPO success ($n=287$).**
 
 | Method | 0.01 A | 0.03 A | 0.05 A | 0.10 A | 0.15 A | 0.20 A |
 |---|---:|---:|---:|---:|---:|---:|
@@ -472,12 +472,12 @@ The matched 0.15 A cell provides the cleanest descriptive mechanism panel.
 | Neither | 98 | 34.1% |
 
 An exact paired McNemar/binomial test on the 56 discordant strict outcomes
-gives \(p=0.141\). The 0.15 A strict-rate difference is therefore
+gives $p=0.141$. The 0.15 A strict-rate difference is therefore
 descriptive rather than statistically decisive by itself; the larger 0.20 A
 effect and intended-IRC trend motivate the mechanism analysis.
 
-Initial \(n_{\rm neg}\), \(F_{\max}\), eigengap, first GAD step, time to
-index one, and consecutive \(v_1\) overlap do not cleanly distinguish
+Initial $n_{\rm neg}$, $F_{\max}$, eigengap, first GAD step, time to
+index one, and consecutive $v_1$ overlap do not cleanly distinguish
 GAD-only from Sella-only starts. Recomputing a common maximum-atom step from
 stored coordinates gives a median first step of 0.088 A for GAD and 0.100 A
 for Sella in both exclusive-success groups. The simple explanation
@@ -489,7 +489,7 @@ The later trajectory signature is different:
 |---|---:|---:|
 | Median minimum distance to labelled TS (A) | 0.226 | 0.117 |
 | Median final distance to labelled TS (A) | 0.447 | 0.128 |
-| Median final trust radius (A) | \(10^{-4}\) | not the defining signature |
+| Median final trust radius (A) | $10^{-4}$ | not the defining signature |
 | Median fraction of stored rows at trust floor | 97.9% | substantially lower |
 
 This establishes departure followed by trust collapse. It does not establish
@@ -499,11 +499,11 @@ hysteresis causes the departure.
 **Isolation tests still needed**
 
 1. Log proposed and applied steps, predicted and actual energy changes, and
-   \(\rho\) before the first departure.
+   $\rho$ before the first departure.
 2. Evaluate Taylor residuals along the exact applied Sella directions.
 3. Record distance and tangent overlap to a HIP-native path.
 4. Test reject-before-apply globalization on the same 34 GAD-only cases.
-5. Preserve HIP \(v_1\) while replacing only the stable Hessian block.
+5. Preserve HIP $v_1$ while replacing only the stable Hessian block.
 
 ---
 
@@ -511,11 +511,11 @@ hysteresis causes the departure.
 
 ### 5.1 Sensitivity to the force threshold
 
-The headline criterion \(F_{\max}<0.01\) is strict relative to ASE's common
+The headline criterion $F_{\max}<0.01$ is strict relative to ASE's common
 0.05 eV/A setting but looser than the 0.001 eV/A recommendation cited in
 Sella documentation. Table 6 shows the full threshold behavior for one
 representative method from each family. All entries also require
-\(n_{\rm neg}=1\).
+$n_{\rm neg}=1$.
 
 **Table 6. Strict success (%) across force thresholds.**
 
@@ -544,7 +544,7 @@ Plain fixed-timestep GAD has zero successes below 0.005 eV/A throughout
 this grid. A 10,000-step run at 0.05 A confirmed that the result is not
 removed by a fivefold budget increase:
 
-| Threshold (eV/A) | GAD dt=0.005, 10,000 steps, \(n=287\) |
+| Threshold (eV/A) | GAD dt=0.005, 10,000 steps, $n=287$ |
 |---:|---:|
 | 0.05 | 95.5% |
 | 0.023 | 91.6% |
@@ -553,11 +553,11 @@ removed by a fivefold budget increase:
 | 0.001 | 0.0% |
 
 Partial long-budget controls reached 47.2% below 0.005 for the hybrid
-(\(n=72\)) and 77.3% for Sella (\(n=66\)); those rates are biased by timeout
+($n=72$) and 77.3% for Sella ($n=66$); those rates are biased by timeout
 and are included only to show that Newton/RFO refinement can enter the
 sub-0.005 regime.
 
-The correct local interpretation is not that \(H^{-1}F\) grows as \(F\)
+The correct local interpretation is not that $H^{-1}F$ grows as $F$
 shrinks. Rather, a coherent Newton/mode-following step estimates the current
 coordinate error and can contract it quadratically near a stationary point,
 while explicit fixed-timestep GAD has a linearly conditioned recurrence and
@@ -575,13 +575,13 @@ can encounter a learned-force/mode noise floor.
 
 ### 5.2 Newton-polish experiment
 
-A spectral NR-GAD ping-pong experiment at 0.05 A (\(n=80\)) tested whether
+A spectral NR-GAD ping-pong experiment at 0.05 A ($n=80$) tested whether
 explicit Newton refinement can cross the plain-GAD force floor.
 
-| Variant | \(F_{\max}<0.05\) | <0.01 | <0.005 | <0.001 |
+| Variant | $F_{\max}<0.05$ | <0.01 | <0.005 | <0.001 |
 |---|---:|---:|---:|---:|
 | Loose NR-GAD, stops at 0.01 | 70.0% | 46.2% | 0.0% | 0.0% |
-| Strict NR-GAD, target \(10^{-4}\) | 73.8% | 45.0% | **31.2%** | **1.2%** |
+| Strict NR-GAD, target $10^{-4}$ | 73.8% | 45.0% | **31.2%** | **1.2%** |
 | Plain GAD dt=0.007 reference | 94.8% | 85.7% | 0.0% | 0.0% |
 
 Newton polishing can break the force floor, but it trades roughly 40 points
@@ -591,7 +591,7 @@ at 0.001 is one trajectory out of 80 and is not a precise rate.
 **Isolation tests still needed**
 
 1. Trigger refinement using a validated mode-overlap criterion, not only
-   \(n_{\rm neg}=1\).
+   $n_{\rm neg}=1$.
 2. Select the trust cap prospectively and report intended IRC outcomes.
 3. Compare the same terminal refinement applied after both GAD and Sella.
 
@@ -642,8 +642,8 @@ The hybrid is not a general basin finder from reactant minima.
 | Sella Cartesian+Eckart from reactant | 80.8% |
 | Sella from midpoint, zero added noise | 46.7% strict and 46.7% IRC_TOPO |
 
-The partial plain-GAD reactant runs reported 40.1% (\(n=152\)) for
-dt=0.003 and 54.2% (\(n=179\)) for dt=0.005, but timeout ordering biases
+The partial plain-GAD reactant runs reported 40.1% ($n=152$) for
+dt=0.003 and 54.2% ($n=179$) for dt=0.005, but timeout ordering biases
 those rates toward early/smaller systems. The hybrid result supports a
 narrow role: it accelerates refinement after GAD has entered a saddle
 neighborhood; it does not reliably create that neighborhood from a minimum.
@@ -666,7 +666,7 @@ neighborhood; it does not reliably create that neighborhood from a minimum.
 DFTB0 does not reproduce the HIP high-noise GAD advantage. GAD has a small
 2.1-point lead at 0.01 A, after which Sella leads in every cell.
 
-**Table 9. SCINE DFTB0 strict success (\(n=287\)).**
+**Table 9. SCINE DFTB0 strict success ($n=287$).**
 
 | Noise SD (A) | GAD | Sella | GAD - Sella |
 |---:|---:|---:|---:|
@@ -752,36 +752,36 @@ At the HIP-labelled TS, xTB forces were 4-15 eV/A and indices were roughly
 ### 7.1 Implementation validation
 
 The LJ potential is implemented locally and independently of HIP/SCINE.
-For LJ7, the predictor returns a full \(21\times21\) Hessian.
+For LJ7, the predictor returns a full $21\times21$ Hessian.
 
 | Smoke check | Result |
 |---|---:|
-| Hessian finite difference, maximum absolute error | \(6.3\times10^{-4}\) |
-| Hessian finite difference, RMS error | \(6.6\times10^{-5}\) |
-| Batched vs predictor force maximum difference | \(7\times10^{-15}\) |
-| Batched vs predictor Hessian maximum difference | \(1.5\times10^{-11}\) |
+| Hessian finite difference, maximum absolute error | $6.3\times10^{-4}$ |
+| Hessian finite difference, RMS error | $6.6\times10^{-5}$ |
+| Batched vs predictor force maximum difference | $7\times10^{-15}$ |
+| Batched vs predictor Hessian maximum difference | $1.5\times10^{-11}$ |
 | Sella/ASE vs batched energy difference | 0 |
-| Sella/ASE vs batched force maximum difference | \(4.7\times10^{-10}\) |
-| Sella/ASE vs batched raw-Hessian difference | \(3.0\times10^{-8}\) |
-| Checked Eckart vibrational-spectrum difference | \(9\times10^{-8}\) |
+| Sella/ASE vs batched force maximum difference | $4.7\times10^{-10}$ |
+| Sella/ASE vs batched raw-Hessian difference | $3.0\times10^{-8}$ |
+| Checked Eckart vibrational-spectrum difference | $9\times10^{-8}$ |
 
 The uniform-hydrogen branch recurrence smoke gave a maximum direction error
-of \(7.299\times10^{-12}\) after the expected uniform-mass scaling and a
-maximum coordinate difference of \(8.332\times10^{-14}\) A after five
+of $7.299\times10^{-12}$ after the expected uniform-mass scaling and a
+maximum coordinate difference of $8.332\times10^{-14}$ A after five
 steps. No evidence remains that GAD and Sella see different LJ surfaces or
 that a broken GAD recurrence explains the comparison.
 
 The original pentagonal-bipyramid helper was not force-balanced
-(\(F_{\max}=1.95618\)). Replacing it with the relaxed D5h geometry reduced
-\(F_{\max}\) to \(1.06\times10^{-7}\) and gave zero vibrational negative
+($F_{\max}=1.95618$). Replacing it with the relaxed D5h geometry reduced
+$F_{\max}$ to $1.06\times10^{-7}$ and gave zero vibrational negative
 modes. The 0.15-noise pure-GAD rate remained 51.2%, so the reference-geometry
 fix did not explain the high-noise failure.
 
 ### 7.2 Pure GAD, Sella, and index-aware gating
 
-**Table 11. LJ7 strict success (\(n=287\), hydrogen atom type).**
+**Table 11. LJ7 strict success ($n=287$, hydrogen atom type).**
 
-| Noise (fraction of \(\sigma\)) | Pure GAD | Sella | Smooth \(\lambda_2\) gate |
+| Noise (fraction of $\sigma$) | Pure GAD | Sella | Smooth $\lambda_2$ gate |
 |---:|---:|---:|---:|
 | 0.10 | 69.7% | **95.5%** | 100.0% |
 | 0.15 | 51.2% | **83.6%** | 100.0% |
@@ -789,7 +789,7 @@ fix did not explain the high-noise failure.
 
 The gate is not pure GAD, and LJ lacks an intended-saddle classifier.
 At 0.20 noise, only 33 of 104 pure-GAD successes ended at the same energy
-within \(10^{-4}\) as their gated counterpart. Near-perfect strict recovery
+within $10^{-4}$ as their gated counterpart. Near-perfect strict recovery
 must not be presented as intended-saddle recovery.
 
 ### 7.3 Timestep, cap, mass assignment, and replay tests
@@ -804,15 +804,15 @@ must not be presented as intended-saddle recovery.
 | Smaller cap 0.001 | Approximately 34.8% at 0.20 | Safer but too slow |
 | dt sweep 0.002-0.007 with active cap | Approximately 49.8% at 0.15 and 36.6-38.0% at 0.20 | Lower dt alone does not rescue failures |
 | Hydrogen/carbon/argon atom assignment | Roughly 38/28/10% at 0.20 in the comparable capped screen | Hydrogen is best; mass is not the main failure |
-| Hard descent until \(n_{\rm neg}\le1\) | 99.0/97.2/96.5% at 0.10/0.15/0.20 | High-index entry is decisive |
-| Smooth \(\lambda_2\) gate | 100.0/100.0/99.7% | Robust globalization extension |
+| Hard descent until $n_{\rm neg}\le1$ | 99.0/97.2/96.5% at 0.10/0.15/0.20 | High-index entry is decisive |
+| Smooth $\lambda_2$ gate | 100.0/100.0/99.7% | Robust globalization extension |
 
-At 0.20 noise, median initial \(n_{\rm neg}=8\) and median initial reduced
-\(F_{\max}=2.045\times10^3\). Independent Cartesian noise creates an
+At 0.20 noise, median initial $n_{\rm neg}=8$ and median initial reduced
+$F_{\max}=2.045\times10^3$. Independent Cartesian noise creates an
 expected per-atom displacement norm of
-\(\sqrt{3}(0.20)=0.346\sigma\). In a 100,000-start check, 54.93% of
-structures had a closest pair below \(0.75\sigma\), and 20.16% below
-\(0.60\sigma\). The repulsive force scales approximately as \(r^{-13}\),
+$\sqrt{3}(0.20)=0.346\sigma$. In a 100,000-start check, 54.93% of
+structures had a closest pair below $0.75\sigma$, and 20.16% below
+$0.60\sigma$. The repulsive force scales approximately as $r^{-13}$,
 producing an extreme force and curvature tail.
 
 Successful fixed-cap traces had median 217 cap hits, compared with 1021 for
@@ -847,18 +847,18 @@ The LJ result has a comparatively strong diagnosis:
 
 Three of the first three endpoint pairs produced tight PaiNN candidates after
 endpoint relaxation and climbing NEB, with NEB maximum-image
-\(F_{\max}=0.00951,\ 0.00122,\ 0.0000207\) eV/A and projected
-\(n_{\rm neg}=1\). Full-Hessian IRC validation retained two candidates with
+$F_{\max}=0.00951,\ 0.00122,\ 0.0000207$ eV/A and projected
+$n_{\rm neg}=1$. Full-Hessian IRC validation retained two candidates with
 two distinct relaxed endpoint topologies; a third was rejected because one
-endpoint retained \(n_{\rm neg}=1\).
+endpoint retained $n_{\rm neg}=1$.
 
 The conservative field-consistency panel behaved as expected:
 
 | Directional diagnostic, median over 15 directions | PaiNN |
 |---|---:|
-| \(|F\cdot v+dE/ds|\) | \(5.61\times10^{-4}\) eV/A |
-| \(\|Hv+dF/ds\|/\|dF/ds\|\) | \(2.34\times10^{-4}\) |
-| \(|v^\mathsf{T}Hv-d^2E/ds^2|\) | \(2.23\times10^{-2}\) eV/A\(^2\) |
+| $|F\cdot v+dE/ds|$ | $5.61\times10^{-4}$ eV/A |
+| $\|Hv+dF/ds\|/\|dF/ds\|$ | $2.34\times10^{-4}$ |
+| $|v^\mathsf{T}Hv-d^2E/ds^2|$ | $2.23\times10^{-2}$ eV/A$^2$ |
 | Hessian antisymmetry | zero at printed precision |
 
 ### 8.2 Paired optimizer pilot
@@ -876,7 +876,7 @@ and Sella with a fresh exact full Hessian after every step.
 All five strict Sella terminals reached two relaxed minima but failed the
 predeclared intended native IRC connectivity. Chemical success was therefore
 0/12 for both methods. A prespecified GAD timestep grid
-\(\{0.00025,0.0005,0.001,0.002,0.005\}\) gave 0/12 strict successes at
+$\{0.00025,0.0005,0.001,0.002,0.005\}$ gave 0/12 strict successes at
 every value.
 
 This pilot is negative for the claim that pure GAD's HIP advantage transfers
@@ -906,7 +906,7 @@ float32 cancellation rather than an order-one adapter inconsistency.
 
 For LEFTNet-df E-F-H, the direct-force Jacobian was operational but strongly
 asymmetric: directional relative RMS error 0.0686 at 0.01 A and maximum
-antisymmetric entry 6.54 eV/A\(^2\). It is a useful nonconservative contrast
+antisymmetric entry 6.54 eV/A$^2$. It is a useful nonconservative contrast
 but requires a declared symmetrization for vibrational optimization.
 
 ### 9.2 Optimizer screens and native-set status
@@ -917,14 +917,14 @@ starts that were not established HORM-native saddles:
 | Method | Strict result | Terminal details |
 |---|---:|---|
 | Stabilized GAD | 0/4 | Final indices 5, 3, 2, 2 |
-| Sella Cartesian+Eckart | 1/4 | One strict; two index 2; one index 1 with \(F_{\max}=0.0547\) |
+| Sella Cartesian+Eckart | 1/4 | One strict; two index 2; one index 1 with $F_{\max}=0.0547$ |
 
 Pure GAD, smooth gating, and hard gating also failed on the detailed
 sample-2 trace. Because the starts were not HORM-native, this is an
 exploratory negative screen, not a model-family conclusion.
 
 Native construction examined 15 endpoint pairs and produced one candidate
-(sample 14) passing NEB, \(F_{\max}\le0.02\) eV/A, and projected index one.
+(sample 14) passing NEB, $F_{\max}\le0.02$ eV/A, and projected index one.
 Another shard candidate, sample 80, was locally converged and index one but
 both full-Hessian IRC branches relaxed to the reactant-side minimum; it was
 invalidated for an intended-saddle optimizer benchmark. No sufficiently
@@ -1002,9 +1002,9 @@ PaiNN.
 
 | Diagnostic | HIP | PaiNN |
 |---|---:|---:|
-| \(|F\cdot v+dE/ds|\), eV/A | **0.32244** | \(5.61\times10^{-4}\) |
-| \(\|Hv+dF/ds\|/\|dF/ds\|\) | **0.07631** | \(2.34\times10^{-4}\) |
-| \(|v^\mathsf{T}Hv-d^2E/ds^2|\), eV/A\(^2\) | **27.738** | \(2.23\times10^{-2}\) |
+| $|F\cdot v+dE/ds|$, eV/A | **0.32244** | $5.61\times10^{-4}$ |
+| $\|Hv+dF/ds\|/\|dF/ds\|$ | **0.07631** | $2.34\times10^{-4}$ |
+| $|v^\mathsf{T}Hv-d^2E/ds^2|$, eV/A$^2$ | **27.738** | $2.23\times10^{-2}$ |
 
 HIP's energy, direct force, and direct Hessian are observably distinct at
 this finite-difference scale. That is expected for separately supervised
@@ -1021,9 +1021,9 @@ On 12 fixed T1x test HDF5 geometries:
 | HIP predicted Hessian index one | 12/12 |
 | Symmetric direct-force Jacobian index one | 0/12 |
 | Learned-energy Hessian index one | 0/12 |
-| Median predicted-Hessian vs force-Jacobian \(v_1\) overlap | 0.9903 |
+| Median predicted-Hessian vs force-Jacobian $v_1$ overlap | 0.9903 |
 | Median relative full-matrix disagreement | 0.4735 |
-| Median predicted-Hessian vs energy-Hessian \(v_1\) overlap | 0.0116 |
+| Median predicted-Hessian vs energy-Hessian $v_1$ overlap | 0.0116 |
 | Median force-Jacobian relative antisymmetry | 0.2631 |
 
 The predicted Hessian and force Jacobian can share a lowest direction while
@@ -1036,7 +1036,7 @@ A one-start, 80-step substitution smoke found:
 
 | Curvature supplied with HIP direct E/F | GAD | Sella |
 |---|---|---|
-| HIP predicted Hessian | \(F_{\max}=0.0868\) after 80 steps | Strict in 12 steps, \(F_{\max}=0.00303,\ n_{\rm neg}=1\) |
+| HIP predicted Hessian | $F_{\max}=0.0868$ after 80 steps | Strict in 12 steps, $F_{\max}=0.00303,\ n_{\rm neg}=1$ |
 | Symmetric force Jacobian | Failed high-index | Failed high-index |
 | Energy Hessian | Failed high-index | Failed high-index |
 
@@ -1048,27 +1048,27 @@ configuration mismatches. No causal source-substitution claim is retained.
 
 ### 12.3 Predeclared Taylor-compatibility test
 
-For an observed Sella direction \(d\), normalized to one A maximum-atom
-displacement, and probe \(s=\delta d\), the planned diagnostics are
+For an observed Sella direction $d$, normalized to one A maximum-atom
+displacement, and probe $s=\delta d$, the planned diagnostics are
 
-\[
+$$
 \begin{aligned}
 r_{E1} &= |\Delta E-g_F^\mathsf{T}s|,\\
 r_{E2} &= |\Delta E-g_F^\mathsf{T}s-\tfrac12s^\mathsf{T}Hs|,\\
 r_{F2} &= \|\Delta F+Hs\|.
 \end{aligned}
-\]
+$$
 
-A coherent smooth Taylor jet gives orders \(O(\delta^2)\),
-\(O(\delta^3)\), and \(O(\delta^2)\), respectively.
+A coherent smooth Taylor jet gives orders $O(\delta^2)$,
+$O(\delta^3)$, and $O(\delta^2)$, respectively.
 
 The analytic LJ implementation smoke reproduced fitted orders:
 
 | Residual | Fitted order across sampled LJ phases |
 |---|---:|
-| \(r_{E1}\) | 2.00-2.03 |
-| \(r_{E2}\) | 2.87-3.05 |
-| \(r_{F2}\) | 1.99-2.05 |
+| $r_{E1}$ | 2.00-2.03 |
+| $r_{E2}$ | 2.87-3.05 |
+| $r_{F2}$ | 1.99-2.05 |
 
 This validates the diagnostic numerics on an exact potential. All HIP and
 SCINE jobs for the outcome-conditioned panel were cancelled before
@@ -1100,11 +1100,11 @@ rescue Sella, reject the Taylor-compatibility mechanism.
 | Candidate explanation | Status | Evidence |
 |---|---|---|
 | GAD and Sella use different LJ potentials | Rejected | E/F/H and vibrational spectra agree numerically |
-| Missing or malformed full Hessian | Rejected for tested paths | Full \(3N\times3N\) Hessians and FD checks passed |
+| Missing or malformed full Hessian | Rejected for tested paths | Full $3N\times3N$ Hessians and FD checks passed |
 | Sella receives stale HIP Hessians | Rejected by project provenance | Current full HIP Hessian supplied every step |
 | Retained mass weighting causes the benchmark | Rejected | Weighting removed before Cartesian displacement; retained-weighting path produced no data |
 | One huge first Sella step explains exclusive failures | Not supported | 0.100 vs 0.088 A median first max-atom step |
-| Consecutive \(v_1\) continuity explains the split | Not supported | Does not distinguish GAD-only from Sella-only |
+| Consecutive $v_1$ continuity explains the split | Not supported | Does not distinguish GAD-only from Sella-only |
 | LJ failure is just timestep too large | Rejected | dt/cap sweeps plateau; index gate rescues |
 | DFTB0 IRC failure proves bad optimizers | Rejected | PES-native labels and corrected IRC change the interpretation |
 | Sella frequently converges to unintended HIP saddles | Rejected | Four unintended outcomes in 5166 five-tier records |
@@ -1134,9 +1134,9 @@ is not.
 
 | Hypothesis | Distinguishing prediction |
 |---|---|
-| First-order energy/direct-force incompatibility | \(r_{E1}=O(\delta)\); \(\rho\) remains poor as radius shrinks |
-| Second-order force/Hessian incompatibility | \(r_{F2}=O(\delta)\); replacing the stable block improves Sella |
-| Privileged low-mode reliability | HIP \(v_1\) stays aligned with a native path after full-model residuals degrade |
+| First-order energy/direct-force incompatibility | $r_{E1}=O(\delta)$; $\rho$ remains poor as radius shrinks |
+| Second-order force/Hessian incompatibility | $r_{F2}=O(\delta)$; replacing the stable block improves Sella |
+| Privileged low-mode reliability | HIP $v_1$ stays aligned with a native path after full-model residuals degrade |
 | Isotropic-noise distribution shift | Crossover weakens for GSM/NEB starts and tracks OOD/compression descriptors |
 | Basin/partial-IRC semantics | Gap shrinks when candidates are matched by destination basin |
 | Trust-policy hysteresis | Reject-before-apply rescues cases without changing curvature |
@@ -1179,7 +1179,7 @@ is not.
 ### 14.2 What cannot be claimed now
 
 1. We do not yet know that Taylor incompatibility causes the HIP crossover.
-2. We do not know that HIP \(v_1\) remains chemically correct in the
+2. We do not know that HIP $v_1$ remains chemically correct in the
    GAD-only region.
 3. We cannot call the force Jacobian a superior or intended HIP Hessian.
 4. We cannot claim universal GAD superiority, universal Sella weakness, or
@@ -1202,7 +1202,7 @@ A coauthor-compatible and scientifically constructive framing is:
 > consumers that interpolate between force reflection and full RFO.
 
 This treats HIP's independently supervised curvature channel as a feature
-and design opportunity, not a defect. The novelty is not merely that \(v_1\)
+and design opportunity, not a defect. The novelty is not merely that $v_1$
 is useful; learned-leftmost-mode RFO already exists. The potentially novel
 claim is a **measurable reliability-radius gap that predicts which optimizer
 interface will be robust**.
@@ -1210,10 +1210,10 @@ interface will be robust**.
 ### 14.4 Fastest route to a defensible mechanism paper
 
 1. Run the already implemented 12-case outcome-conditioned Taylor panel.
-2. Instrument Sella's \(\rho\), predicted/actual energy change, proposed and
+2. Instrument Sella's $\rho$, predicted/actual energy change, proposed and
    applied step, and path distance before divergence.
 3. Run one reject-before-apply or force-consistent globalization control.
-4. Run one \(v_1\)-preserving, stable-block-replacement control.
+4. Run one $v_1$-preserving, stable-block-replacement control.
 5. Reject the mechanism if diagnostics are not predictive or the tied
    intervention does not rescue failures.
 6. If causal, run matched HIP loss checkpoints.
@@ -1361,5 +1361,5 @@ artifact are not counted as results. The project queue was empty at closure.
 5. Cross-surface strict-success table or heatmap.
 6. LJ initial-index/force distributions and the gate ablation.
 7. HIP versus PaiNN Taylor-interface residuals.
-8. Proposed causal figure: residual order and \(\rho\) before departure,
+8. Proposed causal figure: residual order and $\rho$ before departure,
    followed by intervention rescue.
