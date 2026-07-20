@@ -2,6 +2,9 @@
 
 Quick pointers:
 
+- Focused, full-results draft on why plain GAD wins on HIP at high noise but
+  not on the completed control surfaces:
+  [DRAFT_WHY_GAD_WINS_ON_HIP_2026_07_20.md](DRAFT_WHY_GAD_WINS_ON_HIP_2026_07_20.md)
 - Results-heavy working manuscript covering all paper-relevant potentials,
   optimizer results, mechanism tests, theory, and proposed isolation
   experiments:

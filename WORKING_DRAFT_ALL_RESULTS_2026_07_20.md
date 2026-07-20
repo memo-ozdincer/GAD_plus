@@ -856,9 +856,9 @@ The conservative field-consistency panel behaved as expected:
 
 | Directional diagnostic, median over 15 directions | PaiNN |
 |---|---:|
-| $|F\cdot v+dE/ds|$ | $5.61\times10^{-4}$ eV/A |
+| $\lvert F\cdot v+dE/ds\rvert$ | $5.61\times10^{-4}$ eV/A |
 | $\|Hv+dF/ds\|/\|dF/ds\|$ | $2.34\times10^{-4}$ |
-| $|v^\mathsf{T}Hv-d^2E/ds^2|$ | $2.23\times10^{-2}$ eV/A$^2$ |
+| $\lvert v^\mathsf{T}Hv-d^2E/ds^2\rvert$ | $2.23\times10^{-2}$ eV/A$^2$ |
 | Hessian antisymmetry | zero at printed precision |
 
 ### 8.2 Paired optimizer pilot
@@ -1002,9 +1002,9 @@ PaiNN.
 
 | Diagnostic | HIP | PaiNN |
 |---|---:|---:|
-| $|F\cdot v+dE/ds|$, eV/A | **0.32244** | $5.61\times10^{-4}$ |
+| $\lvert F\cdot v+dE/ds\rvert$, eV/A | **0.32244** | $5.61\times10^{-4}$ |
 | $\|Hv+dF/ds\|/\|dF/ds\|$ | **0.07631** | $2.34\times10^{-4}$ |
-| $|v^\mathsf{T}Hv-d^2E/ds^2|$, eV/A$^2$ | **27.738** | $2.23\times10^{-2}$ |
+| $\lvert v^\mathsf{T}Hv-d^2E/ds^2\rvert$, eV/A$^2$ | **27.738** | $2.23\times10^{-2}$ |
 
 HIP's energy, direct force, and direct Hessian are observably distinct at
 this finite-difference scale. That is expected for separately supervised
