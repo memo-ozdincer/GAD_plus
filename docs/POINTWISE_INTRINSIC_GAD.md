@@ -1,317 +1,700 @@
-# Pointwise intrinsic smooth-index GAD
+# From ordinary GAD to pointwise intrinsic smooth-index GAD
 
-## Status and scope
+This document explains the sequence of ideas that led from ordinary
+one-mode Gentlest Ascent Dynamics (GAD) to the current pointwise intrinsic
+optimizer. The progression is:
 
-`gadplus.search.intrinsic_gad` is an experimental transition-state optimizer
-for analytic Lennard-Jones potentials and calculators that provide a coherent
-energy, gradient, and full Cartesian Hessian. It is separate from the
-historical fixed-step `lambda_2`-gated runner and does not change the maintained
-GAD/Sella contract.
+1. ordinary GAD, which fails on high-index Lennard–Jones starts;
+2. a hard descent-to-GAD gate, which fixes the basic failure mechanism;
+3. a smooth \(\lambda_2\) gate, which removes the hard switch;
+4. the current scale-covariant, degeneracy-safe, closed-form update.
 
-The method is designed to satisfy a strict requirement: the update at `q`
-must be a deterministic function of only `q`, `g(q)`, and `H(q)`. It therefore
-has no line search, rejected trial, adaptive trust-radius state, mode tracking,
-momentum, quasi-Newton history, or global pseudo-potential.
+The Lennard–Jones tests use an artificial cluster of seven identical particles
+(LJ7), not a Transition1x molecule. LJ7 is valuable here because its energy,
+gradient, and Hessian are mutually exact, so optimizer behavior can be studied
+without ML-potential or electronic-structure error.
 
-## 1. Geometry and local spectral data
+## Common geometry and notation
 
-Let
+Let \(q\in\mathbb R^{3N}\) be Cartesian coordinates, with energy \(E(q)\),
+gradient \(g_q=\nabla E(q)\), force \(F_q=-g_q\), Cartesian Hessian
+\(H_q=\nabla^2E(q)\), and diagonal mass matrix \(M\).
 
-\[
-x=M^{1/2}q,\qquad
-g_x=M^{-1/2}g_q,\qquad
+Use mass-weighted coordinates and derivatives:
+
+$$
+x=M^{1/2}q,
+\qquad
+g_x=M^{-1/2}g_q,
+\qquad
 H_x=M^{-1/2}H_qM^{-1/2}.
-\]
+$$
 
 At the current geometry, construct an orthonormal Eckart vibrational basis
-`Q(q)` in mass-weighted space and diagonalize
+\(Q(q)\). It removes translations and rotations in mass-weighted space. The
+projected Hessian is
 
-\[
-K(q)=Q^\top H_xQ=V\Lambda V^\top,
+$$
+K(q)=Q^\top H_xQ.
+$$
+
+Diagonalize it:
+
+$$
+K=V\Lambda V^\top,
 \qquad
-\Lambda=\operatorname{diag}(\lambda_1,\ldots,\lambda_m).
-\]
+\Lambda=\operatorname{diag}(\lambda_1,\ldots,\lambda_m),
+\qquad
+\lambda_1\le\lambda_2\le\cdots\le\lambda_m.
+$$
 
-Here `m=3N-6` for a nonlinear cluster and `m=3N-5` for a linear molecule. The
-gradient coefficients in the instantaneous vibrational eigenbasis are
+Here \(m=3N-6\) for a nonlinear cluster and \(m=3N-5\) for a linear
+molecule. Define the full mass-weighted vibrational modes
 
-\[
-c=V^\top Q^\top g_x.
-\]
+$$
+U=QV
+$$
 
-The reported numerical Morse index uses the maintained tolerance
+and the gradient coefficients in that instantaneous eigenbasis:
 
-\[
-n_{\rm neg}^{(\tau_I)}=\#\{i:\lambda_i<-\tau_I\},
-\qquad \tau_I=10^{-4}\ \text{by default}.
-\]
+$$
+c=U^\top g_x.
+$$
 
-This discrete index is used only for final TS acceptance, not to branch the
-dynamics.
+The numerical projected Morse index is
 
-## 2. Basis-invariant soft lowest-mode operator
+$$
+n_{\mathrm{neg}}^{(\tau_I)}
+=
+\#\left\{i:\lambda_i<-\tau_I\right\},
+$$
 
-Define the local RMS curvature scale
+with \(\tau_I=10^{-4}\) in the current LJ experiments. Final TS acceptance is
+separate from the optimizer dynamics:
 
-\[
-s_H=\left(\frac1m\sum_i\lambda_i^2\right)^{1/2}
-\]
+$$
+n_{\mathrm{neg}}^{(\tau_I)}=1
+\qquad\text{and}\qquad
+\lVert F_q\rVert_\infty<f_{\max}.
+$$
 
-and a dimensionless spectral temperature `tau_s`. The normalized matrix
-soft-min is
+The maintained LJ result uses \(f_{\max}=0.01\).
 
-\[
+## 1. Ordinary one-mode GAD
+
+Physical force descent has eigenbasis coefficients
+
+$$
+d_i^{\mathrm{desc}}=-c_i.
+$$
+
+Ordinary one-mode GAD reverses only the component along the lowest-curvature
+mode:
+
+$$
+d_i^{\mathrm{GAD}}
+=
+\begin{cases}
++c_1, & i=1,\\
+-c_i, & i>1.
+\end{cases}
+$$
+
+Equivalently, define a modified gradient
+
+$$
+b_i^{\mathrm{GAD}}=(1-2\delta_{i1})c_i,
+$$
+
+so that \(d^{\mathrm{GAD}}=-b^{\mathrm{GAD}}\). In vector form,
+
+$$
+d^{\mathrm{GAD}}
+=
+-c+2(c_1)e_1.
+$$
+
+The corresponding Cartesian Euler update is
+
+$$
+q^+
+=
+q+\Delta t\,M^{-1/2}U d^{\mathrm{GAD}}.
+$$
+
+### Why ordinary GAD is locally correct at an index-one saddle
+
+Near a stationary point, let \(y_i\) denote displacement along mode \(i\).
+Then \(c_i\approx\lambda_i y_i\). The linearized GAD flow is
+
+$$
+\dot y_1=+\lambda_1y_1,
+\qquad
+\dot y_i=-\lambda_i y_i\quad(i>1).
+$$
+
+At an index-one saddle,
+
+$$
+\lambda_1<0<\lambda_2\le\cdots,
+$$
+
+so every component contracts:
+
+$$
+\dot y_1=-\lvert\lambda_1\rvert y_1,
+\qquad
+\dot y_i=-\lambda_i y_i\quad(i>1).
+$$
+
+Thus an index-one saddle is a local attractor of one-mode GAD.
+
+### Why ordinary GAD fails on high-index LJ starts
+
+At an index-\(k\) point with \(k>1\), the additional negative modes satisfy
+
+$$
+\lambda_i<0,
+\qquad 2\le i\le k.
+$$
+
+GAD flips only mode 1. Every additional negative mode evolves as
+
+$$
+\dot y_i=-\lambda_i y_i
+=
++\lvert\lambda_i\rvert y_i,
+$$
+
+and is therefore unstable. This is not an implementation bug; it is the
+expected local stability structure of one-mode GAD.
+
+Noised LJ7 starts frequently enter stiff, repulsive regions with five to nine
+negative vibrational modes. Ordinary fixed-step GAD immediately ascends one
+mode while diverging along the remaining negative modes. Reducing the timestep
+or clipping the displacement limits overshoot, but does not remove this
+high-index instability.
+
+## 2. Simplest fix: hard descent, then GAD
+
+The most direct repair is to suppress saddle ascent while the current geometry
+has more than one negative mode. Define the hard gate
+
+$$
+h(q)=\mathbf 1\!\left[\lambda_2(q)\ge0\right].
+$$
+
+Then use
+
+$$
+b_i^{\mathrm{hard}}
+=
+\left(1-2h(q)\delta_{i1}\right)c_i.
+$$
+
+This has two regimes:
+
+$$
+\lambda_2<0
+\quad\Longrightarrow\quad
+h=0,
+\quad
+b^{\mathrm{hard}}=c,
+\quad
+d=-c,
+$$
+
+which is ordinary vibrational force descent, and
+
+$$
+\lambda_2\ge0
+\quad\Longrightarrow\quad
+h=1,
+\quad
+b_1^{\mathrm{hard}}=-c_1,
+$$
+
+which restores one-mode GAD once the local curvature is index-one-like.
+
+The same idea can be written using the numerical index:
+
+$$
+d(q)=
+\begin{cases}
+d^{\mathrm{desc}}(q), & n_{\mathrm{neg}}>1,\\
+d^{\mathrm{GAD}}(q), & n_{\mathrm{neg}}\le1.
+\end{cases}
+$$
+
+This simple intervention established the diagnosis: high-index entry, rather
+than an incorrect LJ Hessian, caused most ordinary-GAD failures. In the
+historical LJ7 study, hard descent until \(n_{\mathrm{neg}}\le1\), followed by
+GAD, raised strict convergence at noise \(0.10/0.15/0.20\,\sigma\) to roughly
+\(99.0/97.2/96.5\%\).
+
+### Limitation of the hard gate
+
+The instantaneous rule is discontinuous at \(\lambda_2=0\). Numerical noise
+can make it chatter across the boundary. A one-way “descent, then permanently
+lock into GAD” rule prevents chatter, but stores whether the switch has already
+occurred and is therefore history-dependent.
+
+The hard gate solves the main dynamical problem, but it is not the cleanest
+pointwise vector field.
+
+## 3. Historical smooth \(\lambda_2\) gate
+
+The next step replaces the hard indicator by a sigmoid:
+
+$$
+w_k(q)
+=
+\sigma\!\left(k\lambda_2(q)\right)
+=
+\frac{1}{1+\exp[-k\lambda_2(q)]}.
+$$
+
+The modified gradient becomes
+
+$$
+b_i^{(\lambda_2)}
+=
+\left(1-2w_k(q)\delta_{i1}\right)c_i,
+$$
+
+and the direction is
+
+$$
+d^{(\lambda_2)}=-b^{(\lambda_2)}.
+$$
+
+Equivalently, in the vibrational mass-weighted space,
+
+$$
+F_{\mathrm{gate}}
+=
+F_{\mathrm{vib}}
+-
+2w_k(q)
+\left(F_{\mathrm{vib}}^\top u_1\right)u_1.
+$$
+
+Its limiting behavior is exactly the desired hard-gate behavior:
+
+$$
+\lambda_2\ll0
+\quad\Longrightarrow\quad
+w_k\approx0
+\quad\Longrightarrow\quad
+d^{(\lambda_2)}\approx d^{\mathrm{desc}},
+$$
+
+and
+
+$$
+\lambda_2\gg0
+\quad\Longrightarrow\quad
+w_k\approx1
+\quad\Longrightarrow\quad
+d^{(\lambda_2)}\approx d^{\mathrm{GAD}}.
+$$
+
+At \(\lambda_2=0\), \(w_k=1/2\), so the lowest-mode component is momentarily
+suppressed rather than abruptly reversed.
+
+The historical implementation used
+
+$$
+k=50,
+\qquad
+\Delta t=0.005,
+\qquad
+d_{\max}=0.005,
+$$
+
+in reduced LJ units. It achieved strict convergence rates of approximately
+\(100.0/100.0/99.7\%\) at noise \(0.10/0.15/0.20\,\sigma\).
+
+This was the first nearly complete LJ recovery and showed that a smooth local
+index gate is sufficient to globalize one-mode GAD on this surface.
+
+### What remained inelegant
+
+The historical method still had four avoidable weaknesses:
+
+1. **Dimensional sharpness.** The product \(k\lambda_2\) must be dimensionless,
+   so the numerical value \(k=50\) is tied to the LJ Hessian scale.
+2. **Rank-one ambiguity.** The projector \(u_1u_1^\top\) is not uniquely
+   defined when the lowest eigenvalue is degenerate.
+3. **Fixed Euler scale.** A fixed \(\Delta t\) is surface-dependent and becomes
+   unsafe near the LJ repulsive wall.
+4. **A posteriori clipping.** The displacement is computed first and then
+   clipped, adding a piecewise boundary rather than regularizing the step at
+   its source.
+
+These limitations motivate the current formulation.
+
+## 4. Current formulation: pointwise intrinsic smooth-index GAD
+
+The current method keeps the successful \(\lambda_2\)-gating mechanism but
+replaces its dimensional, rank-one, and fixed-step components.
+
+### 4.1 Dimensionless local curvature scale
+
+Define the RMS vibrational curvature
+
+$$
+s_H(q)
+=
+\left(
+\frac1m\sum_{i=1}^m\lambda_i(q)^2
+\right)^{1/2}.
+$$
+
+All spectral decisions use normalized eigenvalues \(\lambda_i/s_H\). A
+positive rescaling of the energy therefore does not change the gate or mode
+weights.
+
+The exact scale-covariant construction has the natural domain \(s_H>0\). At
+the completely flat matrix \(K=0\), no nonzero homogeneous curvature scale
+or distinguished spectral direction exists. The implementation uses a
+machine-precision floor solely to return finite numerical diagnostics in that
+singular case; the analytic claims below concern \(s_H>0\).
+
+### 4.2 Basis-invariant soft lowest-mode operator
+
+Instead of selecting one eigenvector, define the normalized matrix soft-min
+
+$$
 \rho_{\tau_s}(K)
 =
-\frac{\exp[-K/(\tau_s s_H)]}
-     {\operatorname{tr}\exp[-K/(\tau_s s_H)]}
-=V\operatorname{diag}(p_i)V^\top,
-\]
+\frac{
+\exp[-K/(\tau_s s_H)]
+}{
+\operatorname{tr}\exp[-K/(\tau_s s_H)]
+}
+=
+V\operatorname{diag}(p_1,\ldots,p_m)V^\top,
+$$
 
 where
 
-\[
-p_i=\frac{\exp[-\lambda_i/(\tau_s s_H)]}
-          {\sum_j\exp[-\lambda_j/(\tau_s s_H)]}.
-\]
+$$
+p_i
+=
+\frac{
+\exp[-\lambda_i/(\tau_s s_H)]
+}{
+\sum_j\exp[-\lambda_j/(\tau_s s_H)]
+}.
+$$
 
-For finite `tau_s`, this matrix function is analytic in `K`. At an exact
-eigenvalue degeneracy, equal eigenvalues receive equal weights, so `rho` is
-invariant under arbitrary rotations of the eigensolver basis. As
-`tau_s -> 0` and the lowest eigenvalue is isolated, `rho` approaches
-`u_1 u_1^T`.
+For finite dimensionless temperature \(\tau_s>0\), \(\rho_{\tau_s}(K)\) is an
+analytic matrix function of \(K\). Equal eigenvalues receive equal weights,
+so the operator is invariant under arbitrary rotations within a degenerate
+eigenspace. When the lowest mode is isolated and \(\tau_s\to0\),
 
-There is no globally smooth, rotation-equivariant rule that selects one vector
-from an exactly degenerate eigenspace without adding symmetry-breaking data.
-The density operator is the non-arbitrary alternative; it does not conceal a
-tracked previous mode.
+$$
+\rho_{\tau_s}(K)\longrightarrow u_1u_1^\top.
+$$
 
-## 3. Smooth `lambda_2` gate
+This is the non-arbitrary replacement for a tracked or discontinuously chosen
+lowest eigenvector.
 
-The gate is
+### 4.3 Scale-covariant \(\lambda_2\) gate
 
-\[
-w(q)=\sigma\!\left(\frac{\lambda_2(q)}{\tau_s s_H(q)}\right).
-\]
+Use the dimensionless gate
 
-The same dimensionless temperature controls the mode resolution and gate
-width. Ordered eigenvalues of a symmetric matrix are continuous under matrix
-perturbations, including at crossings, but they need not be differentiable
-there. Consequently, this gate is continuous and piecewise smooth rather than
-globally `C-infinity`.
+$$
+w(q)
+=
+\sigma\!\left(
+\frac{\lambda_2(q)}{\tau_s s_H(q)}
+\right).
+$$
 
-This is intentional. A finite-temperature surrogate for the second order
-statistic can be made analytic, but introduces dimension-dependent bias away
-from the actual zero crossing. The current construction keeps the meaningful
-boundary `lambda_2=0`, while the density operator removes the dangerous
-eigenvector ambiguity.
+The same \(\tau_s\) controls the resolution of both the soft lowest-mode
+operator and the index gate. In the instantaneous eigenbasis, define
 
-In the eigenbasis, the gated gradient is
+$$
+b_i(q)
+=
+\left(1-2w(q)p_i(q)\right)c_i(q).
+$$
 
-\[
-b_i=(1-2wp_i)c_i.
-\]
+For a separated lowest mode:
 
-For a separated lowest mode and `lambda_2 >> 0`, `p_1 -> 1`, `w -> 1`, and
-`b_1 -> -c_1` while `b_i -> c_i` for `i>1`: ordinary one-mode GAD. For
-`lambda_2 << 0`, `w -> 0` and `b -> c`: vibrational force descent. Unlike a
-projector onto every negative mode, this does not make an index-`k` saddle
-attracting by ascending along all `k` negative modes.
+$$
+\lambda_2\ll0
+\quad\Longrightarrow\quad
+w\approx0
+\quad\Longrightarrow\quad
+b\approx c,
+$$
 
-## 4. Closed-form pointwise regularization
+so the method descends out of a clear high-index region. Conversely,
 
-A conventional adaptive trust region retains a radius based on prior accepted
-or rejected trials. It therefore violates the strict pointwise Markov
-requirement. An energy-decrease acceptance test is also inappropriate because
-valid GAD motion deliberately raises energy along the selected mode.
+$$
+\lambda_2\gg0,
+\quad
+p_1\approx1
+\quad\Longrightarrow\quad
+b_1\approx-c_1,
+\qquad
+b_i\approx c_i\ (i>1),
+$$
 
-Instead, define a current-geometry length
+so it approaches ordinary one-mode GAD near an index-one saddle.
 
-\[
+The method does **not** flip every negative mode. Doing so would make a
+high-index saddle locally attractive, which is the opposite of the intended
+index-one selection.
+
+### 4.4 Geometry-scaled pointwise radius
+
+Define a local length from the current pair distances:
+
+$$
 \ell(q)
 =
 \left[
-\frac{1}{N_p}\sum_{a<b}r_{ab}^{-2}
+\frac1{N_p}
+\sum_{a<b}r_{ab}(q)^{-2}
 \right]^{-1/2},
-\]
+\qquad
+N_p=\frac{N(N-1)}2.
+$$
 
-where `N_p=N(N-1)/2`. This inverse-RMS pair length is permutation and
-rigid-motion invariant, scales linearly with the geometry, and contracts
-smoothly toward zero as any pair collides.
+This inverse-RMS pair length is permutation-invariant, rigid-motion-invariant,
+and homogeneous under coordinate scaling. It also contracts smoothly toward
+zero as any pair approaches collision.
 
-The allowed mass-weighted RMS scale is
+Define the mass-weighted RMS step scale
 
-\[
-R(q)=\eta\,\ell(q)\sqrt{\sum_a m_a},
-\]
+$$
+R(q)
+=
+\eta\,\ell(q)\sqrt{\sum_a m_a},
+$$
 
-with dimensionless locality fraction `eta`. Define the pointwise regularizer
+where \(\eta\) is a dimensionless locality fraction.
 
-\[
-\mu(q)=\frac{\|b(q)\|_2}{R(q)}
-\]
+### 4.5 Closed-form regularized step
 
-and the closed-form step coefficients
+Set
 
-\[
+$$
+\mu(q)
+=
+\frac{\lVert b(q)\rVert_2}{R(q)}.
+$$
+
+Then compute the step coefficients directly:
+
+$$
 a_i(q)
 =
 -\frac{b_i(q)}{\sqrt{\lambda_i(q)^2+\mu(q)^2}}.
-\]
+$$
 
-Finally,
+If \(b(q)=0\), define \(a(q)=0\) directly. This is the stationary-point
+limit used by the implementation and avoids an indeterminate \(0/0\) when a
+zero gradient and zero curvature occur simultaneously.
 
-\[
-q^+=q+M^{-1/2}QV a.
-\]
+The Cartesian update is
 
-This is a pointwise regularized eigenvector-following map, not Euler
-integration and not a minimizer trust-region algorithm.
+$$
+\boxed{
+q^+
+=
+q+M^{-1/2}U(q)a(q)
+}
+$$
 
-### Algebraic step bound
+with \(U=QV\).
 
-Every denominator is at least `mu`, hence
+This is a regularized eigenvector-following map. It is not fixed-step Euler
+integration, an energy-minimizing line search, or a history-dependent adaptive
+trust region.
 
-\[
-\|a\|_2^2
-\le
-\frac{\|b\|_2^2}{\mu^2}
-=R^2.
-\]
+### 4.6 Algebraic step bound
+
+For \(b\ne0\), every denominator satisfies
+
+$$
+\sqrt{\lambda_i^2+\mu^2}\ge\mu.
+$$
 
 Therefore
 
-\[
-\frac{\|M^{1/2}\delta q\|_2}{\sqrt{\sum_a m_a}}
-\le \eta\ell(q).
-\]
+$$
+\lVert a\rVert_2^2
+=
+\sum_i
+\frac{b_i^2}{\lambda_i^2+\mu^2}
+\le
+\frac{\lVert b\rVert_2^2}{\mu^2}
+=
+R^2.
+$$
 
-No step is computed and then clipped. Curvature and the current gradient
-regularize the step before it is formed.
+Equivalently, the mass-weighted Cartesian RMS displacement obeys
 
-### Scale covariance
+$$
+\boxed{
+\frac{
+\lVert M^{1/2}(q^+-q)\rVert_2
+}{
+\sqrt{\sum_a m_a}
+}
+\le
+\eta\,\ell(q)
+}.
+$$
 
-Under a positive energy rescaling `E -> alpha E`, the quantities `c`,
-`lambda`, `s_H`, and `mu` all multiply by `alpha`; `p`, `w`, and `a` are
-unchanged. Under a uniform mass rescaling `M -> gamma M`, the mass-weighted
-step coefficients scale by `sqrt(gamma)` and the Cartesian back-transform by
-`1/sqrt(gamma)`, so the Cartesian update is again unchanged.
+The step is bounded when it is formed; it is never computed and then clipped.
 
-## 5. Audit against the four strict criteria
+### 4.7 Scale covariance
 
-### Pointwise Markov property
+Under a positive energy rescaling
 
-Satisfied. The map is
+$$
+E\longmapsto\alpha E,
+\qquad \alpha>0,
+$$
 
-\[
-q^+=\Psi(q,g(q),H(q)).
-\]
+the quantities \(c\), \(\lambda\), \(s_H\), and \(\mu\) all scale by
+\(\alpha\), while \(p\), \(w\), and \(a\) remain unchanged.
 
-Iteration count, previous coordinates, previous modes, past forces, and past
-radii do not enter `Psi`. Recording a returned diagnostic history does not
-affect the map and can be disabled.
+Under a uniform mass rescaling
 
-### Local evaluability through second order
+$$
+M\longmapsto\gamma M,
+$$
 
-Satisfied. Only the current coordinates, gradient, and Hessian are needed for
-the step. Current energy is queried for reporting, not for step acceptance.
-No minimum, endpoint, reaction path, or reaction coordinate is required.
+the mass-weighted step scales by \(\sqrt\gamma\), while the Cartesian
+back-transform scales by \(1/\sqrt\gamma\). The Cartesian update is unchanged.
 
-### Non-conservative-field tolerance
+### 4.8 Strictly pointwise and non-conservative
 
-Satisfied. The code evaluates the map directly. It never assumes that the
-gated field is the gradient of a global scalar and never performs scalar
-energy minimization, a Metropolis test, or an energy line search.
+The complete map has the form
 
-### Spectral-boundary robustness
+$$
+q^+
+=
+\Psi\!\left(q,g_q(q),H_q(q)\right).
+$$
 
-Satisfied as a `C0`, piecewise-smooth method. There is no hard branch on
-`n_neg`. The soft density is basis-invariant at eigenvector crossings, the
-ordered `lambda_2` gate is continuous, and the pointwise step is algebraically
-bounded. Derivatives of the map can still be nonsmooth where ordered
-eigenvalues meet; the method does not claim otherwise.
+It uses no previous mode, previous geometry, iteration-dependent switch,
+remembered radius, rejected trial, momentum, quasi-Newton history, reaction
+path, or global pseudo-potential. Diagnostic history may be recorded, but it
+does not enter \(\Psi\).
 
-## 6. Target selection and the symmetry limit
+The soft density operator is analytic. The ordered eigenvalue \(\lambda_2\) is
+continuous but can be nondifferentiable when eigenvalues cross. The resulting
+map is therefore continuous and piecewise smooth on its natural domain
+\(s_H>0\) with no coincident atoms; it does not claim global \(C^\infty\)
+smoothness.
 
-A deterministic, symmetry-equivariant pointwise algorithm cannot select one
-of several exactly degenerate exit directions at a perfectly symmetric
-stationary minimum. Moreover, every force-based saddle method has zero step at
-an exact stationary point unless extra information is supplied.
+### 4.9 Compatibility audit
 
-Target selection therefore belongs in initialization:
+The construction satisfies the four requirements for optimization on the
+hybrid GAD field:
 
-1. Relax a starting minimum.
-2. Compute its vibrational modes.
-3. Choose a physical mode and sign.
-4. Scan a small, declared displacement ladder `alpha` along that mode.
-5. Start the pointwise optimizer from the displaced geometry.
+1. **Pointwise Markov property.** The next geometry is a deterministic
+   function of the present \(q\), \(g_q(q)\), and \(H_q(q)\). No trajectory
+   state enters the update.
+2. **Second-order local evaluability.** It requires no endpoint, reaction
+   coordinate, global minimum, or integrated path. Energy is used for
+   reporting, not step acceptance.
+3. **Tolerance of a non-conservative field.** The map is evaluated directly;
+   it never assumes that the reflected field is the gradient of a global
+   scalar potential.
+4. **Spectral-boundary robustness.** There is no hard branch on the Morse
+   index. The density operator is basis-invariant at degeneracies, the
+   ordered-\(\lambda_2\) gate is continuous, and the step is algebraically
+   bounded. Eigenvalue crossings may make derivatives nonsmooth, but do not
+   make the update multivalued.
 
-The mode and displacement are experimental inputs, not hidden optimizer
-memory. For a degenerate subspace, choose a physically interpretable linear
-combination or sample directions uniformly within that subspace.
+## 5. What the LJ7 experiments show
 
-A fixed bias potential `E_bias(q)` remains pointwise if it is a declared
-function of the current geometry. It changes the surface and must be reported
-as a different method. Turning the bias off according to elapsed iterations or
-trajectory events introduces history and violates the strict position-only
-criterion.
+The present benchmark uses one artificial LJ7 cluster with many independently
+noised starting geometries. It is an analytic optimizer-control experiment,
+not a Transition1x molecular benchmark.
 
-Thermal momenta may be used to sample the initial mode and sign. Carrying
-momentum during the search violates a position-only Markov specification,
-although it can be Markovian in an expanded `(q,p)` state. The maintained
-pointwise method does not carry momentum.
+### Main noise sweep
 
-## 7. Validation protocol
+For noise through \(0.50\,\sigma\):
 
-### Mathematical tests
+- \(2880/2880\) trajectories reached the strict index-one and
+  \(f_{\max}<0.01\) gate;
+- \(2870/2880\) also produced two projected-minimum downhill endpoints under
+  the current endpoint relaxation;
+- 11 permutation-invariant saddle families were resolved;
+- at least 8 endpoint-energy-pair families were observed;
+- no accepted candidate was near-flat under \(\lambda_2/s_H<0.01\);
+- no accepted candidate was fragmented under the declared
+  \(1.5\,\sigma\) connectivity cutoff.
 
-- positive energy-rescaling invariance of the policy and step;
-- uniform-mass-rescaling invariance of the Cartesian step;
-- basis invariance inside exact degenerate eigenspaces;
-- algebraic mass-weighted RMS step bound;
-- descent limit for clear index greater than one;
-- one-mode ascent limit for clear index one;
-- deterministic equality of updates from identical local evaluations.
+In the targeted high-noise tail cells at \(0.60\), \(0.75\), and
+\(1.0\,\sigma\), every tested trajectory reached the strict TS gate and two
+valid downhill minima. At \(1.5\,\sigma\), strict convergence fell to
+\(46/48\), and approximately 17–22% of the accepted candidates were near-flat
+or fragmented. Thus physical-quality filters, rather than local optimizer
+convergence, define the useful high-noise boundary.
 
-### Analytic LJ tests
+### Diversity is not failure
 
-- LJ7 pushed-mode deterministic smoke;
-- the historical 287 fixed-seed LJ7 starts at noise `0.10`, `0.15`, and `0.20`;
-- paired comparison against pure GAD, historical `k=50` gating, and Sella;
-- LJ13 and LJ38 mode-push panels stratified by initial index and close-pair
-  distance;
-- final projected index, force threshold, energy family, permutation-aligned
-  structure, and both downhill endpoint basins.
+As noise increases, recovery of the original reference saddle decreases, but
+strict saddle and endpoint validity remain high. For a diffusion-terminal
+application, this is desirable: the optimizer should map dispersed samples to
+nearby valid index-one basins, not collapse every sample to one predetermined
+saddle.
 
-Strict TS convergence remains
+The appropriate metric hierarchy is therefore:
 
-\[
-n_{\rm neg}^{(\tau_I)}=1
-\quad\land\quad
-\|F\|_\infty<f_{\max}.
-\]
+1. strict index-one and force convergence;
+2. two valid downhill endpoint minima;
+3. energy/barrier, spectral-gap, and fragmentation filters;
+4. duplicate-adjusted saddle and event diversity;
+5. recovery of a particular labelled event only when the benchmark supplies
+   one.
 
-Convergence alone is not intended-saddle recovery. LJ comparisons must add an
-endpoint or saddle-family classifier before making selectivity claims.
+The current downhill test displaces both signs of the unstable mode and
+minimizes each branch. It is an IRC-like endpoint screen, not a discretized
+intrinsic reaction-coordinate integration.
 
-### MLIP and DFT tests
+### Comparison with the historical smooth gate
 
-- verify energy/force/Hessian coherence before optimizer comparison;
-- use identical geometries, masses, projection, thresholds, and Hessian
-  refresh policy across methods;
-- report energy, gradient, and Hessian evaluations separately because their
-  costs differ by orders of magnitude;
-- report wall time and calculator failures in addition to iteration count;
-- validate accepted candidates with a higher-level Hessian and two downhill
-  branches when feasible.
+On paired LJ7 cells, both the historical \(k=50\) Euler gate and the current
+pointwise method achieved essentially complete strict convergence. The current
+method typically required roughly an order of magnitude fewer pointwise
+iterations because its step uses local curvature directly rather than a small
+fixed Euler timestep.
 
-The method requests one full local Hessian per pointwise update. It is not
-expected to beat gradient-only dimer methods in raw gradient-equivalent cost
-unless Hessians are inexpensive, batched, or already required by the surface.
+The historical gate supplied the essential dynamical idea. The current method
+makes that idea dimensionless, degeneracy-safe, algebraically bounded, and
+strictly pointwise.
 
-## 8. Current tests
+## 6. Scope and next validation
 
-`tests/test_intrinsic_gad.py` covers energy-scale covariance, degeneracy
-invariance, both gate limits, the closed-form radius proof numerically, and a
-deterministic analytic LJ7 pushed-mode convergence test.
+The LJ7 result establishes optimizer mechanics on an exact many-particle
+surface. It does not establish chemical performance. In particular, LJ7 does
+not test unequal elements, realistic bonding, ML-potential Hessian error,
+labelled reactant/product connectivity, or chemical `IRC_TOPO` recovery.
 
+The next chemically meaningful benchmark is the 287-reaction Transition1x
+test split:
+
+1. noise the labelled Transition1x transition structures to measure local
+   capture basins;
+2. test mode-pushed reactants to measure nonlocal search;
+3. run on actual diffusion outputs;
+4. require the TS gate and two-branch IRC endpoint minima;
+5. report labelled `IRC_TOPO` recovery, valid novel events, barriers,
+   fragmentation, spectral separation, and duplicate-adjusted diversity.
+
+The implementation is in `src/gadplus/search/intrinsic_gad.py`. Mathematical
+and LJ regression tests are in `tests/test_intrinsic_gad.py`, and the complete
+LJ noise-study results are in
+`docs/research/LJ_INTRINSIC_GAD_NOISE_2026_07_26.md`.
