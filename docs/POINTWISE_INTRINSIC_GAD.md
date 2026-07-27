@@ -663,11 +663,18 @@ intrinsic reaction-coordinate integration.
 
 ### Comparison with the historical smooth gate
 
-On paired LJ7 cells, both the historical $k=50$ Euler gate and the current
-pointwise method achieved essentially complete strict convergence. The current
-method typically required roughly an order of magnitude fewer pointwise
-iterations because its step uses local curvature directly rather than a small
-fixed Euler timestep.
+The paired four-method progression sweep used the same starts for ordinary
+GAD, the instantaneous hard gate, the historical $k=50$ smooth gate, and the
+current pointwise method. Across 288 starts at $0.10$, $0.20$, and
+$0.40\,\sigma$, strict-plus-endpoint-valid recovery was respectively
+$115/288$, $283/288$, $283/288$, and $288/288$. The median evaluation counts
+among strict candidates were respectively 494, 240, 240, and 17.
+
+The result supports the current formulation as the strongest method on this
+controlled equal-mass LJ7 benchmark. It does not isolate the effect of mass
+weighting, because equal masses make $M^{-1/2}$ a scalar step rescaling.
+The complete protocol, per-noise outcomes, and limitations are in
+`docs/research/LJ_GAD_METHOD_PROGRESSION_2026_07_27.md`.
 
 The historical gate supplied the essential dynamical idea. The current method
 makes that idea dimensionless, degeneracy-safe, algebraically bounded, and
