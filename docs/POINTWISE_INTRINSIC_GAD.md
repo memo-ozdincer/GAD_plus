@@ -22,61 +22,61 @@ $H_q=\nabla^2E(q)$, and diagonal mass matrix $M$.
 
 Use mass-weighted coordinates and derivatives:
 
-$$
+```math
 x=M^{1/2}q,
 \qquad
 g_x=M^{-1/2}g_q,
 \qquad
 H_x=M^{-1/2}H_qM^{-1/2}.
-$$
+```
 
 At the current geometry, construct an orthonormal Eckart vibrational basis
 $Q(q)$. It removes translations and rotations in mass-weighted space. The
 projected Hessian is
 
-$$
+```math
 K(q)=Q^\top H_xQ.
-$$
+```
 
 Diagonalize it:
 
-$$
+```math
 K=V\Lambda V^\top,
 \qquad
 \Lambda=\mathrm{diag}(\lambda_1,\ldots,\lambda_m),
 \qquad
 \lambda_1\le\lambda_2\le\cdots\le\lambda_m.
-$$
+```
 
 Here $m=3N-6$ for a nonlinear cluster and $m=3N-5$ for a linear
 molecule. Define the full mass-weighted vibrational modes
 
-$$
+```math
 U=QV
-$$
+```
 
 and the gradient coefficients in that instantaneous eigenbasis:
 
-$$
+```math
 c=U^\top g_x.
-$$
+```
 
 The numerical projected Morse index is
 
-$$
+```math
 n_{\mathrm{neg}}^{(\tau_I)}
 =
 \#\left\{i:\lambda_i<-\tau_I\right\},
-$$
+```
 
 with $\tau_I=10^{-4}$ in the current LJ experiments. Final TS acceptance is
 separate from the optimizer dynamics:
 
-$$
+```math
 n_{\mathrm{neg}}^{(\tau_I)}=1
 \qquad\text{and}\qquad
 \lVert F_q\rVert_\infty<f_{\max}.
-$$
+```
 
 The maintained LJ result uses $f_{\max}=0.01$.
 
@@ -84,68 +84,68 @@ The maintained LJ result uses $f_{\max}=0.01$.
 
 Physical force descent has eigenbasis coefficients
 
-$$
+```math
 d_i^{\mathrm{desc}}=-c_i.
-$$
+```
 
 Ordinary one-mode GAD reverses only the component along the lowest-curvature
 mode:
 
-$$
+```math
 d_i^{\mathrm{GAD}}
 =
 \begin{cases}
 +c_1, & i=1,\\
 -c_i, & i>1.
 \end{cases}
-$$
+```
 
 Equivalently, define a modified gradient
 
-$$
+```math
 b_i^{\mathrm{GAD}}=(1-2\delta_{i1})c_i,
-$$
+```
 
 so that $d^{\mathrm{GAD}}=-b^{\mathrm{GAD}}$. In vector form,
 
-$$
+```math
 d^{\mathrm{GAD}}
 =
 -c+2(c_1)e_1.
-$$
+```
 
 The corresponding Cartesian Euler update is
 
-$$
+```math
 q^+
 =
 q+\Delta t\,M^{-1/2}U d^{\mathrm{GAD}}.
-$$
+```
 
 ### Why ordinary GAD is locally correct at an index-one saddle
 
 Near a stationary point, let $y_i$ denote displacement along mode $i$.
 Then $c_i\approx\lambda_i y_i$. The linearized GAD flow is
 
-$$
+```math
 \dot y_1=+\lambda_1y_1,
 \qquad
 \dot y_i=-\lambda_i y_i\quad(i>1).
-$$
+```
 
 At an index-one saddle,
 
-$$
+```math
 \lambda_1<0<\lambda_2\le\cdots,
-$$
+```
 
 so every component contracts:
 
-$$
+```math
 \dot y_1=-\lvert\lambda_1\rvert y_1,
 \qquad
 \dot y_i=-\lambda_i y_i\quad(i>1).
-$$
+```
 
 Thus an index-one saddle is a local attractor of one-mode GAD.
 
@@ -153,18 +153,18 @@ Thus an index-one saddle is a local attractor of one-mode GAD.
 
 At an index-$k$ point with $k>1$, the additional negative modes satisfy
 
-$$
+```math
 \lambda_i<0,
 \qquad 2\le i\le k.
-$$
+```
 
 GAD flips only mode 1. Every additional negative mode evolves as
 
-$$
+```math
 \dot y_i=-\lambda_i y_i
 =
 +\lvert\lambda_i\rvert y_i,
-$$
+```
 
 and is therefore unstable. This is not an implementation bug; it is the
 expected local stability structure of one-mode GAD.
@@ -180,21 +180,21 @@ high-index instability.
 The most direct repair is to suppress saddle ascent while the current geometry
 has more than one negative mode. Define the hard gate
 
-$$
+```math
 h(q)=\mathbf 1\!\left[\lambda_2(q)\ge0\right].
-$$
+```
 
 Then use
 
-$$
+```math
 b_i^{\mathrm{hard}}
 =
 \left(1-2h(q)\delta_{i1}\right)c_i.
-$$
+```
 
 This has two regimes:
 
-$$
+```math
 \lambda_2<0
 \quad\Longrightarrow\quad
 h=0,
@@ -202,29 +202,29 @@ h=0,
 b^{\mathrm{hard}}=c,
 \quad
 d=-c,
-$$
+```
 
 which is ordinary vibrational force descent, and
 
-$$
+```math
 \lambda_2\ge0
 \quad\Longrightarrow\quad
 h=1,
 \quad
 b_1^{\mathrm{hard}}=-c_1,
-$$
+```
 
 which restores one-mode GAD once the local curvature is index-one-like.
 
 The same idea can be written using the numerical index:
 
-$$
+```math
 d(q)=
 \begin{cases}
 d^{\mathrm{desc}}(q), & n_{\mathrm{neg}}>1,\\
 d^{\mathrm{GAD}}(q), & n_{\mathrm{neg}}\le1.
 \end{cases}
-$$
+```
 
 This simple intervention established the diagnosis: high-index entry, rather
 than an incorrect LJ Hessian, caused most ordinary-GAD failures. In the
@@ -242,75 +242,75 @@ occurred and is therefore history-dependent.
 The hard gate solves the main dynamical problem, but it is not the cleanest
 pointwise vector field.
 
-## 3. Historical smooth $\lambda_2$ gate
+## 3. Historical smooth λ₂ gate
 
 The next step replaces the hard indicator by a sigmoid:
 
-$$
+```math
 w_k(q)
 =
 \sigma\!\left(k\lambda_2(q)\right)
 =
 \frac{1}{1+\exp[-k\lambda_2(q)]}.
-$$
+```
 
 The modified gradient becomes
 
-$$
+```math
 b_i^{(\lambda_2)}
 =
 \left(1-2w_k(q)\delta_{i1}\right)c_i,
-$$
+```
 
 and the direction is
 
-$$
+```math
 d^{(\lambda_2)}=-b^{(\lambda_2)}.
-$$
+```
 
 Equivalently, in the vibrational mass-weighted space,
 
-$$
+```math
 F_{\mathrm{gate}}
 =
 F_{\mathrm{vib}}
 -
 2w_k(q)
 \left(F_{\mathrm{vib}}^\top u_1\right)u_1.
-$$
+```
 
 Its limiting behavior is exactly the desired hard-gate behavior:
 
-$$
+```math
 \lambda_2\ll0
 \quad\Longrightarrow\quad
 w_k\approx0
 \quad\Longrightarrow\quad
 d^{(\lambda_2)}\approx d^{\mathrm{desc}},
-$$
+```
 
 and
 
-$$
+```math
 \lambda_2\gg0
 \quad\Longrightarrow\quad
 w_k\approx1
 \quad\Longrightarrow\quad
 d^{(\lambda_2)}\approx d^{\mathrm{GAD}}.
-$$
+```
 
 At $\lambda_2=0$, $w_k=1/2$, so the lowest-mode component is momentarily
 suppressed rather than abruptly reversed.
 
 The historical implementation used
 
-$$
+```math
 k=50,
 \qquad
 \Delta t=0.005,
 \qquad
 d_{\max}=0.005,
-$$
+```
 
 in reduced LJ units. It achieved strict convergence rates of approximately
 $100.0/100.0/99.7\%$ at noise $0.10/0.15/0.20\,\sigma$.
@@ -343,13 +343,13 @@ replaces its dimensional, rank-one, and fixed-step components.
 
 Define the RMS vibrational curvature
 
-$$
+```math
 s_H(q)
 =
 \left(
 \frac1m\sum_{i=1}^m\lambda_i(q)^2
 \right)^{1/2}.
-$$
+```
 
 All spectral decisions use normalized eigenvalues $\lambda_i/s_H$. A
 positive rescaling of the energy therefore does not change the gate or mode
@@ -365,7 +365,7 @@ singular case; the analytic claims below concern $s_H>0$.
 
 Instead of selecting one eigenvector, define the normalized matrix soft-min
 
-$$
+```math
 \rho_{\tau_s}(K)
 =
 \frac{
@@ -375,11 +375,11 @@ $$
 }
 =
 V\mathrm{diag}(p_1,\ldots,p_m)V^\top,
-$$
+```
 
 where
 
-$$
+```math
 p_i
 =
 \frac{
@@ -387,54 +387,54 @@ p_i
 }{
 \sum_j\exp[-\lambda_j/(\tau_s s_H)]
 }.
-$$
+```
 
 For finite dimensionless temperature $\tau_s>0$, $\rho_{\tau_s}(K)$ is an
 analytic matrix function of $K$. Equal eigenvalues receive equal weights,
 so the operator is invariant under arbitrary rotations within a degenerate
 eigenspace. When the lowest mode is isolated and $\tau_s\to0$,
 
-$$
+```math
 \rho_{\tau_s}(K)\longrightarrow u_1u_1^\top.
-$$
+```
 
 This is the non-arbitrary replacement for a tracked or discontinuously chosen
 lowest eigenvector.
 
-### 4.3 Scale-covariant $\lambda_2$ gate
+### 4.3 Scale-covariant λ₂ gate
 
 Use the dimensionless gate
 
-$$
+```math
 w(q)
 =
 \sigma\!\left(
 \frac{\lambda_2(q)}{\tau_s s_H(q)}
 \right).
-$$
+```
 
 The same $\tau_s$ controls the resolution of both the soft lowest-mode
 operator and the index gate. In the instantaneous eigenbasis, define
 
-$$
+```math
 b_i(q)
 =
 \left(1-2w(q)p_i(q)\right)c_i(q).
-$$
+```
 
 For a separated lowest mode:
 
-$$
+```math
 \lambda_2\ll0
 \quad\Longrightarrow\quad
 w\approx0
 \quad\Longrightarrow\quad
 b\approx c,
-$$
+```
 
 so the method descends out of a clear high-index region. Conversely,
 
-$$
+```math
 \lambda_2\gg0,
 \quad
 p_1\approx1
@@ -442,7 +442,7 @@ p_1\approx1
 b_1\approx-c_1,
 \qquad
 b_i\approx c_i\ (i>1),
-$$
+```
 
 so it approaches ordinary one-mode GAD near an index-one saddle.
 
@@ -454,7 +454,7 @@ index-one selection.
 
 Define a local length from the current pair distances:
 
-$$
+```math
 \ell(q)
 =
 \left[
@@ -463,7 +463,7 @@ $$
 \right]^{-1/2},
 \qquad
 N_p=\frac{N(N-1)}2.
-$$
+```
 
 This inverse-RMS pair length is permutation-invariant, rigid-motion-invariant,
 and homogeneous under coordinate scaling. It also contracts smoothly toward
@@ -471,11 +471,11 @@ zero as any pair approaches collision.
 
 Define the mass-weighted RMS step scale
 
-$$
+```math
 R(q)
 =
 \eta\,\ell(q)\sqrt{\sum_a m_a},
-$$
+```
 
 where $\eta$ is a dimensionless locality fraction.
 
@@ -483,19 +483,19 @@ where $\eta$ is a dimensionless locality fraction.
 
 Set
 
-$$
+```math
 \mu(q)
 =
 \frac{\lVert b(q)\rVert_2}{R(q)}.
-$$
+```
 
 Then compute the step coefficients directly:
 
-$$
+```math
 a_i(q)
 =
 -\frac{b_i(q)}{\sqrt{\lambda_i(q)^2+\mu(q)^2}}.
-$$
+```
 
 If $b(q)=0$, define $a(q)=0$ directly. This is the stationary-point
 limit used by the implementation and avoids an indeterminate $0/0$ when a
@@ -503,13 +503,13 @@ zero gradient and zero curvature occur simultaneously.
 
 The Cartesian update is
 
-$$
+```math
 \boxed{
 q^+
 =
 q+M^{-1/2}U(q)a(q)
 }
-$$
+```
 
 with $U=QV$.
 
@@ -521,13 +521,13 @@ trust region.
 
 For $b\ne0$, every denominator satisfies
 
-$$
+```math
 \sqrt{\lambda_i^2+\mu^2}\ge\mu.
-$$
+```
 
 Therefore
 
-$$
+```math
 \lVert a\rVert_2^2
 =
 \sum_i
@@ -536,11 +536,11 @@ $$
 \frac{\lVert b\rVert_2^2}{\mu^2}
 =
 R^2.
-$$
+```
 
 Equivalently, the mass-weighted Cartesian RMS displacement obeys
 
-$$
+```math
 \boxed{
 \frac{
 \lVert M^{1/2}(q^+-q)\rVert_2
@@ -550,7 +550,7 @@ $$
 \le
 \eta\,\ell(q)
 }.
-$$
+```
 
 The step is bounded when it is formed; it is never computed and then clipped.
 
@@ -558,19 +558,19 @@ The step is bounded when it is formed; it is never computed and then clipped.
 
 Under a positive energy rescaling
 
-$$
+```math
 E\longmapsto\alpha E,
 \qquad \alpha>0,
-$$
+```
 
 the quantities $c$, $\lambda$, $s_H$, and $\mu$ all scale by
 $\alpha$, while $p$, $w$, and $a$ remain unchanged.
 
 Under a uniform mass rescaling
 
-$$
+```math
 M\longmapsto\gamma M,
-$$
+```
 
 the mass-weighted step scales by $\sqrt\gamma$, while the Cartesian
 back-transform scales by $1/\sqrt\gamma$. The Cartesian update is unchanged.
@@ -579,11 +579,11 @@ back-transform scales by $1/\sqrt\gamma$. The Cartesian update is unchanged.
 
 The complete map has the form
 
-$$
+```math
 q^+
 =
 \Psi\!\left(q,g_q(q),H_q(q)\right).
-$$
+```
 
 It uses no previous mode, previous geometry, iteration-dependent switch,
 remembered radius, rejected trial, momentum, quasi-Newton history, reaction
