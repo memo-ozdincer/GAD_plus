@@ -82,8 +82,7 @@ The maintained LJ result uses $f_{\max}=0.01$.
 
 ## 1. Ordinary one-mode GAD
 
-In **mass-weighted coordinate space**, natural-gradient descent has
-eigenbasis coefficients
+Physical force descent has eigenbasis coefficients
 
 ```math
 d_i^{\mathrm{desc}}=-c_i.
@@ -115,45 +114,13 @@ d^{\mathrm{GAD}}
 -c+2(c_1)e_1.
 ```
 
-Thus the mass-weighted-coordinate Euler increment and its Cartesian
-back-transform are
+The corresponding Cartesian Euler update is
 
 ```math
-\delta x
-=
-\Delta t\,U d^{\mathrm{GAD}},
-\qquad
 q^+
 =
-q+M^{-1/2}\delta x.
+q+\Delta t\,M^{-1/2}U d^{\mathrm{GAD}}.
 ```
-
-Here the factor $M^{-1/2}$ is a **coordinate conversion**, not an additional
-mass weighting of an already Cartesian vector field. It is required because
-$d^{\mathrm{GAD}}$ was defined from $c=U^\top g_x$ and is therefore a
-mass-weighted-coordinate vector.
-
-The historical fixed-Euler LJ implementation uses a different, Cartesian
-convention. It projects the force and the mass-weighted mode into Cartesian
-space first, constructs
-
-```math
-F_{\mathrm{GAD}}^{(q)}
-=
-F_{\mathrm{vib}}^{(q)}
--
-2\left(F_{\mathrm{vib}}^{(q)\top}v_1^{(q)}\right)v_1^{(q)},
-\qquad
-q^+=q+\Delta t\,F_{\mathrm{GAD}}^{(q)},
-```
-
-and has **no final $M^{-1/2}$ factor**. Mass enters that historical method in
-the Eckart projection, the vibrational Hessian, and the conversion of the
-mode to $v_1^{(q)}$. For the equal-mass LJ7 tests, the two conventions differ
-only by a constant factor that can be absorbed into $\Delta t$; for unequal
-masses they are distinct algorithms. The current intrinsic formulation below
-uses the first convention deliberately, because its closed-form coefficients
-$a$ are mass-weighted and require the same Cartesian back-transform.
 
 ### Why ordinary GAD is locally correct at an index-one saddle
 
@@ -490,12 +457,9 @@ Define a local length from the current pair distances:
 ```math
 \ell(q)
 =
-\left[
-\frac{1}{N_p}
-\sum_{a<b}r_{ab}(q)^{-2}
-\right]^{-1/2},
+[\frac{1}{N_p}\sum_{a<b} r_{ab}(q)^{-2}]^{-1/2},
 \qquad
-N_p=\frac{N(N-1)}2.
+N_p=\frac{N(N-1)}{2}.
 ```
 
 This inverse-RMS pair length is permutation-invariant, rigid-motion-invariant,
