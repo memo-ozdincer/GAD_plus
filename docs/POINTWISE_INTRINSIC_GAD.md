@@ -347,7 +347,7 @@ Define the RMS vibrational curvature
 s_H(q)
 =
 \left(
-\frac1m\sum_{i=1}^m\lambda_i(q)^2
+\frac{1}{m}\sum_{i=1}^m\lambda_i(q)^2
 \right)^{1/2}.
 ```
 
@@ -458,7 +458,7 @@ Define a local length from the current pair distances:
 \ell(q)
 =
 \left[
-\frac1{N_p}
+\frac{1}{N_p}
 \sum_{a<b}r_{ab}(q)^{-2}
 \right]^{-1/2},
 \qquad
