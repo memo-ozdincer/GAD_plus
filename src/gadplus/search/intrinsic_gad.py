@@ -1,0 +1,432 @@
+"""Strictly pointwise, scale-covariant smooth ``lambda_2`` GAD.
+
+This module implements a closed-form map that uses only the coordinates,
+gradient, and Hessian at the current point.  It has no line search, adaptive
+radius, rejected trial, mode-tracking state, accumulated quasi-Newton model,
+or global pseudo-potential.
+
+Two spectral objects define the map:
+
+``rho_beta(H)``
+    A normalized matrix soft-min.  It approaches the projector onto the
+    lowest eigendirection but is basis-invariant at a degeneracy.
+
+``w(H)``
+    A dimensionless sigmoid gate on the exact second ordered vibrational
+    eigenvalue.  The ordered eigenvalue is continuous at crossings, although
+    generally not differentiable there.  Thus the complete field is C0 at
+    the remaining spectral boundaries; it never needs an arbitrary choice of
+    eigenvector inside a degenerate subspace.
+
+A pointwise Levenberg regularizer supplies an intrinsic step bound in closed
+form.  It is not an adaptive trust-region algorithm: its radius is recomputed
+from the current geometry and never carried between iterations.
+"""
+
+from __future__ import annotations
+
+import math
+import time
+from dataclasses import dataclass, field
+
+import torch
+
+from gadplus.core.convergence import (
+    force_max,
+    force_mean,
+    force_value_from_criterion,
+    is_ts_converged,
+)
+from gadplus.core.types import PredictFn
+from gadplus.projection import atomic_nums_to_symbols, get_mass_weights, vib_eig
+
+
+@dataclass(frozen=True)
+class IntrinsicGADConfig:
+    """Configuration for the pointwise smooth-index GAD map.
+
+    Only two dimensionless algorithmic scales remain:
+
+    ``spectral_temperature``
+        Resolution of the soft lowest-mode density and ``lambda_2`` gate.
+        The Hessian is normalized by its RMS vibrational eigenvalue, so this
+        parameter is invariant to energy-unit or energy-scale changes.
+
+    ``step_fraction``
+        Maximum mass-weighted RMS step as a fraction of the current inverse-
+        RMS pair distance.  This geometric length contracts smoothly near a
+        pair collision and scales with a uniform rescaling of the geometry.
+    """
+
+    max_steps: int = 1000
+    force_threshold: float = 0.01
+    force_criterion: str = "fmax"
+    index_threshold: float = 1.0e-4
+    spectral_temperature: float = 0.01
+    step_fraction: float = 0.05
+    purify_hessian: bool = False
+    record_history: bool = True
+
+    def __post_init__(self) -> None:
+        if self.max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if self.force_threshold <= 0:
+            raise ValueError("force_threshold must be positive")
+        if self.index_threshold < 0:
+            raise ValueError("index_threshold must be nonnegative")
+        if self.spectral_temperature <= 0:
+            raise ValueError("spectral_temperature must be positive")
+        if self.step_fraction <= 0:
+            raise ValueError("step_fraction must be positive")
+
+
+@dataclass(frozen=True)
+class IntrinsicGADStep:
+    """Diagnostics for one pointwise evaluation and its closed-form step."""
+
+    iteration: int
+    energy: float
+    force_max: float
+    n_neg: int
+    eig0: float
+    eig1: float
+    gate_weight: float
+    spectral_scale: float
+    geometric_length: float
+    local_radius: float
+    regularizer: float
+    step_rms: float
+
+
+@dataclass(frozen=True)
+class IntrinsicGADResult:
+    """Result and pointwise diagnostics from :func:`run_intrinsic_gad`."""
+
+    converged: bool
+    converged_step: int | None
+    total_steps: int
+    n_evaluations: int
+    final_coords: torch.Tensor
+    final_energy: float
+    final_n_neg: int
+    final_force_norm: float
+    final_force_max: float
+    final_eig0: float
+    final_eig1: float
+    final_gate_weight: float
+    wall_time_s: float
+    failure_type: str | None = None
+    history: tuple[IntrinsicGADStep, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class SpectralPolicy:
+    """Dimensionless spectral quantities defining the gated reflection."""
+
+    scale: torch.Tensor
+    gate: torch.Tensor
+    low_mode_weights: torch.Tensor
+
+
+@dataclass(frozen=True)
+class _State:
+    coords: torch.Tensor
+    energy: torch.Tensor
+    forces: torch.Tensor
+    evals: torch.Tensor
+    modes_mw: torch.Tensor
+    gradient_mw: torch.Tensor
+    policy: SpectralPolicy
+    n_neg: int
+    force_norm: float
+    force_max: float
+
+
+def smooth_spectral_policy(
+    eigenvalues: torch.Tensor,
+    temperature: float,
+) -> SpectralPolicy:
+    r"""Return the basis-invariant low-mode density and ``lambda_2`` gate.
+
+    For RMS spectral scale ``s`` and dimensionless temperature ``tau``,
+
+    .. math::
+
+        p_i = \frac{\exp[-\lambda_i/(\tau s)]}
+                    {\sum_j\exp[-\lambda_j/(\tau s)]},
+        \qquad
+        w = \sigma\!\left(\frac{\lambda_2}{\tau s}\right).
+
+    In matrix form the soft projector is
+    ``rho = V diag(p) V.T = exp(-H/(tau*s)) / tr(exp(...))``.  It is analytic
+    in ``H`` for finite ``tau`` and invariant under rotations within a
+    degenerate eigenspace.  ``lambda_2`` itself is continuous but only
+    piecewise differentiable when ordered eigenvalues meet.
+    """
+
+    evals = eigenvalues.to(torch.float64).reshape(-1)
+    if evals.numel() == 0:
+        raise ValueError("at least one vibrational eigenvalue is required")
+    if temperature <= 0:
+        raise ValueError("temperature must be positive")
+
+    scale = torch.sqrt(torch.mean(evals.square()))
+    numerical_floor = torch.finfo(evals.dtype).eps * torch.maximum(
+        evals.abs().amax(),
+        torch.ones((), dtype=evals.dtype, device=evals.device),
+    )
+    scale = torch.maximum(scale, numerical_floor)
+    normalized = evals / scale
+    low_weights = torch.softmax(-normalized / temperature, dim=0)
+    lambda2 = normalized[1] if normalized.numel() > 1 else normalized[0]
+    gate = torch.sigmoid(lambda2 / temperature)
+    return SpectralPolicy(
+        scale=scale,
+        gate=gate,
+        low_mode_weights=low_weights,
+    )
+
+
+def inverse_rms_pair_length(coords: torch.Tensor) -> torch.Tensor:
+    r"""Return ``(mean_{i<j} r_ij^-2)^-1/2`` at the current geometry.
+
+    Unlike a hard minimum-distance guard, this length is smooth wherever no
+    atoms coincide.  It is permutation and rigid-motion invariant, scales
+    linearly with the coordinates, and tends to zero at a pair collision.
+    """
+
+    xyz = coords.reshape(-1, 3).to(torch.float64)
+    if xyz.shape[0] < 2:
+        raise ValueError("intrinsic GAD requires at least two atoms")
+    distances = torch.pdist(xyz)
+    if bool((distances <= 0).any().item()):
+        raise ValueError("intrinsic GAD is undefined for coincident atoms")
+    return torch.rsqrt(torch.mean(distances.reciprocal().square()))
+
+
+def pointwise_step_coefficients(
+    gradient_coefficients: torch.Tensor,
+    eigenvalues: torch.Tensor,
+    policy: SpectralPolicy,
+    radius_mw: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    r"""Compute the closed-form gated step in the Hessian eigenbasis.
+
+    With ``b_i = (1 - 2 w p_i) g_i`` and
+    ``mu = ||b|| / R``, the step is
+
+    .. math::
+
+        a_i = -\frac{b_i}{\sqrt{\lambda_i^2 + \mu^2}}.
+
+    Since every denominator is at least ``mu``, ``||a|| <= R``.  This is an
+    algebraic consequence, not an a posteriori cap.  Multiplying the PES by a
+    positive constant multiplies ``b``, ``lambda``, and ``mu`` equally and
+    therefore leaves the step unchanged.
+    """
+
+    if radius_mw <= 0:
+        raise ValueError("radius_mw must be positive")
+    coeffs = gradient_coefficients.to(torch.float64).reshape(-1)
+    evals = eigenvalues.to(dtype=coeffs.dtype, device=coeffs.device).reshape(-1)
+    if coeffs.shape != evals.shape or coeffs.shape != policy.low_mode_weights.shape:
+        raise ValueError("gradient, eigenvalue, and spectral-weight shapes must agree")
+
+    reflection = 1.0 - 2.0 * policy.gate * policy.low_mode_weights
+    modified_gradient = reflection * coeffs
+    modified_norm = torch.linalg.vector_norm(modified_gradient)
+    if float(modified_norm.item()) == 0.0:
+        return torch.zeros_like(modified_gradient), torch.zeros_like(modified_norm)
+
+    regularizer = modified_norm / radius_mw
+    denominator = torch.sqrt(evals.square() + regularizer.square())
+    step = -modified_gradient / denominator
+    return step, regularizer
+
+
+def _evaluate(
+    predict_fn: PredictFn,
+    coords: torch.Tensor,
+    atomic_nums: torch.Tensor,
+    atomsymbols: list[str],
+    cfg: IntrinsicGADConfig,
+) -> _State:
+    out = predict_fn(coords, atomic_nums, do_hessian=True, require_grad=False)
+    energy = torch.as_tensor(
+        out["energy"],
+        dtype=torch.float64,
+        device=coords.device,
+    ).reshape(())
+    forces = torch.as_tensor(
+        out["forces"],
+        dtype=torch.float64,
+        device=coords.device,
+    ).reshape(-1, 3)
+    hessian = torch.as_tensor(
+        out["hessian"],
+        dtype=torch.float64,
+        device=coords.device,
+    ).reshape(coords.numel(), coords.numel())
+    hessian = 0.5 * (hessian + hessian.T)
+    if not (
+        bool(torch.isfinite(energy).item())
+        and bool(torch.isfinite(forces).all().item())
+        and bool(torch.isfinite(hessian).all().item())
+    ):
+        raise FloatingPointError("calculator returned a non-finite local evaluation")
+
+    evals, modes_mw, _ = vib_eig(
+        hessian,
+        coords,
+        atomsymbols,
+        purify=cfg.purify_hessian,
+    )
+    _, _, _, inv_sqrt_mass = get_mass_weights(
+        atomsymbols,
+        device=coords.device,
+    )
+    gradient_cart = -forces.reshape(-1)
+    gradient_mw = inv_sqrt_mass * gradient_cart
+    return _State(
+        coords=coords,
+        energy=energy,
+        forces=forces,
+        evals=evals,
+        modes_mw=modes_mw,
+        gradient_mw=gradient_mw,
+        policy=smooth_spectral_policy(evals, cfg.spectral_temperature),
+        n_neg=int((evals < -cfg.index_threshold).sum().item()),
+        force_norm=force_mean(forces),
+        force_max=force_max(forces),
+    )
+
+
+def _make_result(
+    state: _State,
+    *,
+    converged: bool,
+    steps: int,
+    started: float,
+    failure_type: str | None,
+    history: list[IntrinsicGADStep],
+) -> IntrinsicGADResult:
+    return IntrinsicGADResult(
+        converged=converged,
+        converged_step=steps if converged else None,
+        total_steps=steps,
+        n_evaluations=steps + 1,
+        final_coords=state.coords.detach().cpu(),
+        final_energy=float(state.energy.item()),
+        final_n_neg=state.n_neg,
+        final_force_norm=state.force_norm,
+        final_force_max=state.force_max,
+        final_eig0=float(state.evals[0].item()),
+        final_eig1=(float(state.evals[1].item()) if state.evals.numel() > 1 else math.nan),
+        final_gate_weight=float(state.policy.gate.item()),
+        wall_time_s=time.time() - started,
+        failure_type=failure_type,
+        history=tuple(history),
+    )
+
+
+def run_intrinsic_gad(
+    predict_fn: PredictFn,
+    coords0: torch.Tensor,
+    atomic_nums: torch.Tensor,
+    cfg: IntrinsicGADConfig | None = None,
+) -> IntrinsicGADResult:
+    r"""Iterate the strictly pointwise smooth-index GAD map.
+
+    In mass-weighted vibrational coordinates, each iteration is
+
+    .. math::
+
+        g_i &= v_i^T M^{-1/2} g,\\
+        b_i &= (1 - 2 w p_i)g_i,\\
+        R(q) &= \eta\,\ell(q)\sqrt{\sum_a m_a},\\
+        \mu(q) &= \|b\|/R(q),\\
+        a_i &= -b_i/\sqrt{\lambda_i^2+\mu(q)^2},\\
+        q^+ &= q + M^{-1/2}Va.
+
+    Every quantity on the right is evaluated at the same current point.  The
+    returned history is diagnostic output only and never affects the map.
+    """
+
+    cfg = cfg or IntrinsicGADConfig()
+    started = time.time()
+    coords = coords0.detach().clone().to(torch.float64).reshape(-1, 3)
+    atomic_nums = atomic_nums.to(device=coords.device)
+    atomsymbols = atomic_nums_to_symbols(atomic_nums)
+    masses, _, _, inv_sqrt_mass = get_mass_weights(
+        atomsymbols,
+        device=coords.device,
+    )
+    mass_total = float(masses.sum().item())
+    history: list[IntrinsicGADStep] = []
+
+    for iteration in range(cfg.max_steps + 1):
+        state = _evaluate(predict_fn, coords, atomic_nums, atomsymbols, cfg)
+
+        force_value = force_value_from_criterion(
+            state.forces,
+            cfg.force_criterion,
+        )
+        if is_ts_converged(
+            state.n_neg,
+            force_value,
+            cfg.force_threshold,
+            criterion=cfg.force_criterion,
+        ):
+            return _make_result(
+                state,
+                converged=True,
+                steps=iteration,
+                started=started,
+                failure_type=None,
+                history=history,
+            )
+        if iteration == cfg.max_steps:
+            return _make_result(
+                state,
+                converged=False,
+                steps=iteration,
+                started=started,
+                failure_type="max_steps",
+                history=history,
+            )
+
+        geometric_length = inverse_rms_pair_length(state.coords)
+        local_radius = cfg.step_fraction * float(geometric_length.item())
+        radius_mw = local_radius * math.sqrt(mass_total)
+        gradient_coeffs = state.modes_mw.T @ state.gradient_mw
+        step_coeffs, regularizer = pointwise_step_coefficients(
+            gradient_coeffs,
+            state.evals,
+            state.policy,
+            radius_mw,
+        )
+        step_mw = state.modes_mw @ step_coeffs
+        step_cart = inv_sqrt_mass * step_mw
+        step_rms = float(torch.linalg.vector_norm(step_mw).item()) / math.sqrt(mass_total)
+
+        if cfg.record_history:
+            history.append(
+                IntrinsicGADStep(
+                    iteration=iteration,
+                    energy=float(state.energy.item()),
+                    force_max=state.force_max,
+                    n_neg=state.n_neg,
+                    eig0=float(state.evals[0].item()),
+                    eig1=(float(state.evals[1].item()) if state.evals.numel() > 1 else math.nan),
+                    gate_weight=float(state.policy.gate.item()),
+                    spectral_scale=float(state.policy.scale.item()),
+                    geometric_length=float(geometric_length.item()),
+                    local_radius=local_radius,
+                    regularizer=float(regularizer.item()),
+                    step_rms=step_rms,
+                )
+            )
+
+        coords = (state.coords + step_cart.reshape_as(state.coords)).detach()
+
+    raise AssertionError("unreachable")

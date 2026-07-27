@@ -1,0 +1,92 @@
+{
+  "id": "2026-07-26-pointwise-intrinsic-lj-noise",
+  "status": "completed",
+  "question": "How much Cartesian Gaussian noise can pointwise intrinsic GAD tolerate while recovering the same LJ7 saddle family?",
+  "surface": {
+    "name": "analytic reduced LJ7",
+    "epsilon": 1.0,
+    "sigma": 1.0,
+    "assigned_mass": 1.008
+  },
+  "optimizer": {
+    "name": "pointwise intrinsic smooth-index GAD",
+    "spectral_temperature": 0.01,
+    "step_fraction": 0.05,
+    "max_steps": 200,
+    "strict_gate": "projected n_neg(lambda < -1e-4) == 1 and Cartesian component fmax < 0.01"
+  },
+  "reference": "LJ7 pentagonal-bipyramid minimum pushed by 0.26 in mass-weighted mode 0, then converged by the tested optimizer",
+  "panels": {
+    "saddle": "Gaussian coordinate noise added to the converged reference saddle",
+    "pushed": "the same paired noise realization added to the targeted mode-pushed minimum"
+  },
+  "noise_fractions_sigma": [
+    0.0,
+    0.005,
+    0.01,
+    0.02,
+    0.03,
+    0.05,
+    0.075,
+    0.1,
+    0.125,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.4,
+    0.5
+  ],
+  "samples_per_cell": 96,
+  "seed_rule": "20260726 + sample_id; identical standard-normal perturbation is scaled across noise levels and paired across panels",
+  "primary_outcome": "strict TS convergence followed by valid two-branch downhill relaxation to the same unordered endpoint-basin pair as the reference event",
+  "downhill_validation": {
+    "procedure": "Displace 0.03 sigma in both signs of the final mass-weighted unstable mode, then minimize physical LJ energy with analytic gradients using L-BFGS-B.",
+    "endpoint_gate": "projected n_neg == 0 and Cartesian component fmax < 1e-5",
+    "pair_matching": "unordered endpoint energies within 1e-4 and sorted pair-distance fingerprint RMS within 1e-3",
+    "terminology": "This is two-branch downhill endpoint validation, not a discretized intrinsic-reaction-coordinate integration."
+  },
+  "reference_family_classifier": {
+    "energy_absolute_tolerance": 0.0001,
+    "sorted_pair_distance_rms_tolerance": 0.001,
+    "invariances": [
+      "translation",
+      "rotation",
+      "reflection",
+      "permutation of identical atoms"
+    ],
+    "role": "secondary TS-geometry diagnostic; it does not define the primary correct-event outcome"
+  },
+  "reporting": [
+    "strict convergence rate",
+    "valid two-branch downhill rate",
+    "correct endpoint-event rate with Wilson 95% interval",
+    "same-TS-geometry secondary rate",
+    "other-event count",
+    "exception count",
+    "median correct steps",
+    "initial projected-index distribution"
+  ],
+  "execution": {
+    "cluster": "Trillium",
+    "account": "def-aspuru",
+    "node": "one 192-core CPU node",
+    "packing": "one exclusive full-node Slurm step containing 192 independently bound one-core shard tasks; no nested Python pool",
+    "working_root": "/scratch/memoozd/GAD/GAD_plus",
+    "output_root_template": "/scratch/memoozd/gadplus/runs/lj-intrinsic-noise-${SLURM_JOB_ID}",
+    "completed_jobs": [1940584, 1940586, 1940591, 1940587, 1940594, 1940595]
+  },
+  "result": {
+    "interpretation": "Noise primarily increases saddle/event diversity rather than causing local optimizer failure.",
+    "main_strict_ts": "2880/2880",
+    "main_two_valid_downhill_endpoints": "2870/2880",
+    "main_saddle_families": 11,
+    "main_endpoint_energy_pair_lower_bound": 8,
+    "main_fragmented": 0,
+    "main_near_flat": 0,
+    "strict_through_1p0_sigma": "100%",
+    "strict_at_1p5_sigma": "46/48",
+    "high_noise_boundary": "At 1.5 sigma, near-flat and fragmented fractions rise to 17-22% and barrier q95 exceeds 4 epsilon.",
+    "report": "docs/research/LJ_INTRINSIC_GAD_NOISE_2026_07_26.md"
+  }
+}
