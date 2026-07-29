@@ -576,6 +576,15 @@ had substantially stronger raw local and strict-force convergence, so these
 results do not support a general superiority claim. They motivate reporting
 both local convergence and endpoint topology for every comparison.
 
+The matched 2,000-update \(\sigma=1.00\,\text{\AA}\) stress condition is
+outside the useful recovery regime for both methods.  Severe perturbations
+caused g-xTB Hessian/SCF failure before optimization for 169 competitive and
+142 Sella starts.  Among calculator-valid starts, competitive GAD reached 105
+local saddles from 118 starts and Sella reached 96 from 145, but the two-branch
+endpoint proxy recovered the intended native endpoint pair for neither method
+(0/105 and 0/96).  This is why raw index-one convergence alone is not a valid
+measure of chemically intended TS recovery.
+
 ### 4.5 Geometry-scaled pointwise radius
 
 Define a local length from the current pair distances:
