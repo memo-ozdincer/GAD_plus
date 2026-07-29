@@ -585,6 +585,22 @@ endpoint proxy recovered the intended native endpoint pair for neither method
 (0/105 and 0/96).  This is why raw index-one convergence alone is not a valid
 measure of chemically intended TS recovery.
 
+The following table makes the regular-GAD comparator explicit. A dash means
+that exact matched protocol was not run; it must not be read as zero. The
+available ordinary-GAD point is a separate but directly matched 24-start
+g-xTB diagnostic, not a post-hoc estimate for the 287-start campaigns.
+
+| g-xTB protocol | Regular one-mode GAD | Competitive intrinsic GAD | Sella |
+|---|---:|---:|---:|
+| 24 labelled TS starts, \(0.25\,\text{\AA}\), 300 updates; strict TS gate | 0/24 | not run | 22/24 |
+| Test-287, \(0.20\,\text{\AA}\), 300 updates; local candidates / intended endpoint pairs | not run | 236/281 / 123/281 | 261/277 / 108/277 |
+| Test-287, \(1.00\,\text{\AA}\), 2,000 updates; local candidates / intended endpoint pairs | not run | 105/118 / 0/105 | 96/145 / 0/96 |
+
+The regular-GAD diagnostic at \(0.25\,\text{\AA}\) ended with 12
+minimum-like, 3 higher-index, and 9 index-one-but-force-limited trajectories.
+It establishes the relevant failure mechanism, but a complete three-way
+matched test-287 campaign remains future work.
+
 ### 4.5 Geometry-scaled pointwise radius
 
 Define a local length from the current pair distances:
