@@ -14,6 +14,85 @@ The Lennard–Jones tests use an artificial cluster of seven identical particles
 gradient, and Hessian are mutually exact, so optimizer behavior can be studied
 without ML-potential or electronic-structure error.
 
+## Recommended surface-specific formulations
+
+There is one common pointwise, mass-weighted, closed-form step.  The only
+surface-specific choice is the scalar gate.  This distinction is intentional:
+the g-xTB Transition1x starts repeatedly exposed high-index-to-minimum
+collapse, whereas the analytic LJ7 validation did not require an additional
+escape selector.
+
+Let \(s_H=(m^{-1}\sum_i\lambda_i^2)^{1/2}\), \(\tau_s>0\), and
+
+```math
+p_i=
+\frac{\exp[-\lambda_i/(\tau_s s_H)]}
+     {\sum_j\exp[-\lambda_j/(\tau_s s_H)]},
+\qquad
+w_2=\sigma\!\left(\frac{\lambda_2}{\tau_s s_H}\right).
+```
+
+For either choice below, form \(b_i=(1-2w p_i)c_i\), the local geometric
+scale \(R(q)=\eta\ell(q)\sqrt{\sum_a m_a}\), and
+
+```math
+\mu(q)=\frac{\lVert b\rVert_2}{R(q)},
+\qquad
+a_i=-\frac{b_i}{\sqrt{\lambda_i^2+\mu(q)^2}},
+\qquad
+q^+=q+M^{-1/2}Ua.
+```
+
+Thus every update depends only on the current \(q\), gradient, and Hessian.
+It has no retained trust radius, previous mode, line search, or rejected
+trial.
+
+### Final LJ formulation: the simple \(\lambda_2\) gate
+
+For the analytic LJ7 results, use
+
+```math
+w_{\mathrm{LJ}}=w_2.
+```
+
+That is the scale-normalized, soft-low-mode version of the original
+\(\lambda_2\)-gated one-mode GAD; it is **not** the historical fixed-Euler
+\(\sigma(50\lambda_2)\) runner used only as a progression baseline.  The
+implemented LJ profile is `gate_variant="lambda2"`,
+`spectral_temperature=0.01`, and the default `step_fraction=0.05`.
+
+### Final g-xTB formulation: the competitive gate
+
+For the g-xTB Transition1x campaign, use the same step with
+
+```math
+a_{\mathrm{soft}}=\sum_i p_i c_i^2,
+\qquad
+d_{\mathrm{extra}}=
+\sum_i
+\sigma\!\left(-\frac{\lambda_i}{\tau_s s_H}\right)
+(1-p_i)^2c_i^2,
+```
+
+```math
+w_{\mathrm{g\text{-}xTB}}
+=w_2+(1-w_2)
+\frac{a_{\mathrm{soft}}}
+     {a_{\mathrm{soft}}+d_{\mathrm{extra}}},
+```
+
+where the final quotient is defined as zero when its denominator is zero.
+The extra term counts only activity in *additional negative* directions; it
+does not penalize ordinary stable-mode relaxation.  Hence it reduces to
+\(w_2\) when the \(\lambda_2\) gate is active, but restores one-mode ascent
+when the current force is concentrated in the softest mode inside a
+high-index region.  The g-xTB profile is `gate_variant="competitive"`,
+`spectral_temperature=0.01`, and `step_fraction=0.01`; the 2,000-update
+budget is a benchmark setting, not state carried by the field.
+
+The index-boundary `guard` is not a final method: it was tied on the
+development panel and therefore adds complexity without demonstrated benefit.
+
 ## Common geometry and notation
 
 Let $q\in\mathbb R^{3N}$ be Cartesian coordinates, with energy $E(q)$,
@@ -450,7 +529,54 @@ The method does **not** flip every negative mode. Doing so would make a
 high-index saddle locally attractive, which is the opposite of the intended
 index-one selection.
 
-### 4.4 Geometry-scaled pointwise radius
+### 4.4 Experimental competitive and index-boundary gates
+
+The simple \(\lambda_2\) gate is the maintained analytic-LJ baseline. The
+Transition1x g-xTB campaign additionally tested two strictly pointwise,
+scale-invariant gates for the observed high-index-to-minimum failure mode.
+The competitive gate is the selected g-xTB formulation and is stated in full
+in [Recommended surface-specific formulations](#recommended-surface-specific-formulations).
+
+For completeness, the rejected boundary guard used
+
+```math
+z_1=\frac{\lambda_1}{\tau_s s_H},
+\qquad
+B(z_1)=4\sigma(z_1)[1-\sigma(z_1)]
+=\operatorname{sech}^2(z_1/2),
+```
+
+```math
+w_{\mathrm{guard}}
+=1-(1-w_{\mathrm{comp}})(1-B(z_1)).
+```
+
+It is local, Markovian, and basis-invariant, but cannot guarantee that a
+finite second-order step never enters an index-zero basin: that would require
+third-derivative constraint information or trial-point/rejection logic. On
+the fixed 12-reaction, 24-start g-xTB development panel at \(0.10\) and
+\(0.20\,\text{\AA}\) noise, it tied the competitive gate (13/24 intended
+native endpoint topologies and one index-zero endpoint). It is consequently
+not retained as a final method.
+
+#### g-xTB comparison with Sella
+
+On that 12-reaction development panel, two matched Cartesian-noise starts per
+reaction, \(\eta=\tau_s=0.01\), and 300 updates gave 22/24 local saddle
+candidates and 13/24 intended native endpoint topologies for competitive
+intrinsic GAD. Sella gave 23/24 and 11/24, with more strict-force successes
+(6/24 versus 1/24). This was a development result only.
+
+On the subsequent full Transition1x test-287 campaign at
+\(\sigma=0.20\,\text{\AA}\), competitive GAD gave 236 candidates from 281
+calculator-valid starts; Sella gave 261 from 277. The local two-branch
+endpoint proxy—not a full IRC—recovered the intended native endpoint pair for
+123/281 (43.8%) competitive starts and 108/277 (39.0%) Sella starts. Sella
+had substantially stronger raw local and strict-force convergence, so these
+results do not support a general superiority claim. They motivate reporting
+both local convergence and endpoint topology for every comparison.
+
+### 4.5 Geometry-scaled pointwise radius
 
 Define a local length from the current pair distances:
 
@@ -476,7 +602,7 @@ R(q)
 
 where $\eta$ is a dimensionless locality fraction.
 
-### 4.5 Closed-form regularized step
+### 4.6 Closed-form regularized step
 
 Set
 
@@ -514,7 +640,7 @@ This is a regularized eigenvector-following map. It is not fixed-step Euler
 integration, an energy-minimizing line search, or a history-dependent adaptive
 trust region.
 
-### 4.6 Algebraic step bound
+### 4.7 Algebraic step bound
 
 For $b\ne0$, every denominator satisfies
 
@@ -551,7 +677,7 @@ Equivalently, the mass-weighted Cartesian RMS displacement obeys
 
 The step is bounded when it is formed; it is never computed and then clipped.
 
-### 4.7 Scale covariance
+### 4.8 Scale covariance
 
 Under a positive energy rescaling
 
@@ -572,7 +698,7 @@ M\longmapsto\gamma M,
 the mass-weighted step scales by $\sqrt\gamma$, while the Cartesian
 back-transform scales by $1/\sqrt\gamma$. The Cartesian update is unchanged.
 
-### 4.8 Strictly pointwise and non-conservative
+### 4.9 Strictly pointwise and non-conservative
 
 The complete map has the form
 
@@ -593,7 +719,7 @@ map is therefore continuous and piecewise smooth on its natural domain
 $s_H>0$ with no coincident atoms; it does not claim global $C^\infty$
 smoothness.
 
-### 4.9 Compatibility audit
+### 4.10 Compatibility audit
 
 The construction satisfies the four requirements for optimization on the
 hybrid GAD field:

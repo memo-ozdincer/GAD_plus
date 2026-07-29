@@ -64,6 +64,7 @@ class IntrinsicGADConfig:
     index_threshold: float = 1.0e-4
     spectral_temperature: float = 0.01
     step_fraction: float = 0.05
+    gate_variant: str = "lambda2"
     purify_hessian: bool = False
     record_history: bool = True
 
@@ -78,6 +79,10 @@ class IntrinsicGADConfig:
             raise ValueError("spectral_temperature must be positive")
         if self.step_fraction <= 0:
             raise ValueError("step_fraction must be positive")
+        if self.gate_variant not in {"lambda2", "alignment", "competitive", "guard", "gad"}:
+            raise ValueError(
+                "gate_variant must be 'lambda2', 'alignment', 'competitive', 'guard', or 'gad'"
+            )
 
 
 @dataclass(frozen=True)
@@ -126,6 +131,9 @@ class SpectralPolicy:
     scale: torch.Tensor
     gate: torch.Tensor
     low_mode_weights: torch.Tensor
+    negative_mode_weights: torch.Tensor
+    lowest_normalized_eigenvalue: torch.Tensor
+    temperature: float
 
 
 @dataclass(frozen=True)
@@ -137,6 +145,7 @@ class _State:
     modes_mw: torch.Tensor
     gradient_mw: torch.Tensor
     policy: SpectralPolicy
+    effective_gate: torch.Tensor
     n_neg: int
     force_norm: float
     force_max: float
@@ -178,13 +187,75 @@ def smooth_spectral_policy(
     scale = torch.maximum(scale, numerical_floor)
     normalized = evals / scale
     low_weights = torch.softmax(-normalized / temperature, dim=0)
+    negative_weights = torch.sigmoid(-normalized / temperature)
     lambda2 = normalized[1] if normalized.numel() > 1 else normalized[0]
     gate = torch.sigmoid(lambda2 / temperature)
     return SpectralPolicy(
         scale=scale,
         gate=gate,
         low_mode_weights=low_weights,
+        negative_mode_weights=negative_weights,
+        lowest_normalized_eigenvalue=normalized[0],
+        temperature=float(temperature),
     )
+
+
+def effective_gate_weight(
+    gradient_coefficients: torch.Tensor,
+    policy: SpectralPolicy,
+    variant: str = "lambda2",
+) -> torch.Tensor:
+    r"""Return the local gate for one of the experimental policies.
+
+    ``alignment`` rescues ascent in a high-index region in proportion to the
+    fraction of gradient activity in the soft-low-mode density.  The more
+    selective ``competitive`` policy compares that activity only with
+    activity in additional negative modes; stable-mode gradient components
+    therefore do not suppress a targeted escape.
+
+    ``guard`` applies the competitive gate together with a parameter-free
+    (beyond the existing spectral temperature) bell-shaped activation at
+    ``lambda_1=0``.  It is an experimental index-boundary safeguard, not a
+    guarantee that a finite step cannot enter a convex basin.
+
+    Both extensions reduce exactly to the maintained ``lambda2`` gate when
+    it is fully active, are energy-scale invariant, and use no history.  The
+    quotient is defined as zero at an exactly stationary point, where the
+    step itself is zero and the gate value cannot affect the map.
+    """
+
+    if variant not in {"lambda2", "alignment", "competitive", "guard", "gad"}:
+        raise ValueError(f"unknown gate variant: {variant}")
+    if variant == "gad":
+        return torch.ones_like(policy.gate)
+    if variant == "guard":
+        competitive = effective_gate_weight(
+            gradient_coefficients, policy, "competitive"
+        )
+        z1 = policy.lowest_normalized_eigenvalue / policy.temperature
+        minimum_boundary = torch.sigmoid(z1)
+        boundary_guard = 4.0 * minimum_boundary * (1.0 - minimum_boundary)
+        return 1.0 - (1.0 - competitive) * (1.0 - boundary_guard)
+    base = policy.gate
+    if variant == "lambda2":
+        return base
+    coeffs = gradient_coefficients.to(torch.float64).reshape(-1)
+    activity = coeffs.square()
+    soft = torch.sum(policy.low_mode_weights * activity)
+    if variant == "alignment":
+        denominator = torch.sum(activity)
+    else:
+        extra_negative_weights = (
+            policy.negative_mode_weights
+            * (1.0 - policy.low_mode_weights).square()
+        )
+        denominator = soft + torch.sum(extra_negative_weights * activity)
+    ratio = torch.where(
+        denominator > 0,
+        soft / denominator.clamp_min(torch.finfo(coeffs.dtype).tiny),
+        torch.zeros_like(denominator),
+    )
+    return base + (1.0 - base) * ratio.clamp(0.0, 1.0)
 
 
 def inverse_rms_pair_length(coords: torch.Tensor) -> torch.Tensor:
@@ -209,6 +280,7 @@ def pointwise_step_coefficients(
     eigenvalues: torch.Tensor,
     policy: SpectralPolicy,
     radius_mw: float,
+    gate_variant: str = "lambda2",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""Compute the closed-form gated step in the Hessian eigenbasis.
 
@@ -232,7 +304,8 @@ def pointwise_step_coefficients(
     if coeffs.shape != evals.shape or coeffs.shape != policy.low_mode_weights.shape:
         raise ValueError("gradient, eigenvalue, and spectral-weight shapes must agree")
 
-    reflection = 1.0 - 2.0 * policy.gate * policy.low_mode_weights
+    gate = effective_gate_weight(coeffs, policy, gate_variant)
+    reflection = 1.0 - 2.0 * gate * policy.low_mode_weights
     modified_gradient = reflection * coeffs
     modified_norm = torch.linalg.vector_norm(modified_gradient)
     if float(modified_norm.item()) == 0.0:
@@ -287,6 +360,8 @@ def _evaluate(
     )
     gradient_cart = -forces.reshape(-1)
     gradient_mw = inv_sqrt_mass * gradient_cart
+    policy = smooth_spectral_policy(evals, cfg.spectral_temperature)
+    gradient_coeffs = modes_mw.T @ gradient_mw
     return _State(
         coords=coords,
         energy=energy,
@@ -294,7 +369,10 @@ def _evaluate(
         evals=evals,
         modes_mw=modes_mw,
         gradient_mw=gradient_mw,
-        policy=smooth_spectral_policy(evals, cfg.spectral_temperature),
+        policy=policy,
+        effective_gate=effective_gate_weight(
+            gradient_coeffs, policy, cfg.gate_variant
+        ),
         n_neg=int((evals < -cfg.index_threshold).sum().item()),
         force_norm=force_mean(forces),
         force_max=force_max(forces),
@@ -322,7 +400,7 @@ def _make_result(
         final_force_max=state.force_max,
         final_eig0=float(state.evals[0].item()),
         final_eig1=(float(state.evals[1].item()) if state.evals.numel() > 1 else math.nan),
-        final_gate_weight=float(state.policy.gate.item()),
+        final_gate_weight=float(state.effective_gate.item()),
         wall_time_s=time.time() - started,
         failure_type=failure_type,
         history=tuple(history),
@@ -404,6 +482,7 @@ def run_intrinsic_gad(
             state.evals,
             state.policy,
             radius_mw,
+            cfg.gate_variant,
         )
         step_mw = state.modes_mw @ step_coeffs
         step_cart = inv_sqrt_mass * step_mw
@@ -418,7 +497,7 @@ def run_intrinsic_gad(
                     n_neg=state.n_neg,
                     eig0=float(state.evals[0].item()),
                     eig1=(float(state.evals[1].item()) if state.evals.numel() > 1 else math.nan),
-                    gate_weight=float(state.policy.gate.item()),
+                    gate_weight=float(state.effective_gate.item()),
                     spectral_scale=float(state.policy.scale.item()),
                     geometric_length=float(geometric_length.item()),
                     local_radius=local_radius,

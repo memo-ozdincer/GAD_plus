@@ -19,6 +19,7 @@ from gadplus.projection import (
 )
 from gadplus.search.intrinsic_gad import (
     IntrinsicGADConfig,
+    effective_gate_weight,
     pointwise_step_coefficients,
     run_intrinsic_gad,
     smooth_spectral_policy,
@@ -26,6 +27,42 @@ from gadplus.search.intrinsic_gad import (
 
 
 class SpectralPolicyTests(unittest.TestCase):
+    def test_experimental_gate_variants_are_local_and_selective(self) -> None:
+        evals = torch.tensor([-3.0, -1.0, 2.0, 4.0], dtype=torch.float64)
+        policy = smooth_spectral_policy(evals, temperature=0.01)
+        soft_aligned = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float64)
+        diffuse_negative = torch.tensor([1.0, 4.0, 0.0, 0.0], dtype=torch.float64)
+        stable_contamination = torch.tensor([1.0, 0.0, 10.0, 0.0], dtype=torch.float64)
+
+        base = effective_gate_weight(soft_aligned, policy, "lambda2")
+        pure_gad = effective_gate_weight(diffuse_negative, policy, "gad")
+        aligned = effective_gate_weight(soft_aligned, policy, "alignment")
+        diffuse = effective_gate_weight(diffuse_negative, policy, "competitive")
+        alignment_with_stable = effective_gate_weight(
+            stable_contamination, policy, "alignment"
+        )
+        competitive_with_stable = effective_gate_weight(
+            stable_contamination, policy, "competitive"
+        )
+        boundary_policy = smooth_spectral_policy(
+            torch.tensor([-0.01, -0.005, 2.0], dtype=torch.float64),
+            temperature=0.01,
+        )
+        boundary_competitive = effective_gate_weight(
+            diffuse_negative[:3], boundary_policy, "competitive"
+        )
+        boundary_guard = effective_gate_weight(
+            diffuse_negative[:3], boundary_policy, "guard"
+        )
+
+        self.assertLess(float(base), 1.0e-6)
+        self.assertEqual(float(pure_gad), 1.0)
+        self.assertGreater(float(aligned), 1.0 - 1.0e-6)
+        self.assertLess(float(diffuse), 0.1)
+        self.assertLess(float(alignment_with_stable), 0.02)
+        self.assertGreater(float(competitive_with_stable), 1.0 - 1.0e-6)
+        self.assertGreater(float(boundary_guard), float(boundary_competitive))
+
     def test_positive_energy_rescaling_leaves_policy_and_step_unchanged(self) -> None:
         evals = torch.tensor([-3.0, 1.0, 4.0], dtype=torch.float64)
         gradient = torch.tensor([0.7, -0.2, 1.3], dtype=torch.float64)
