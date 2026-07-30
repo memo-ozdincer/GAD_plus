@@ -23,7 +23,14 @@ def _run_id(parts: tuple[object, ...]) -> str:
 
 
 def _finite(value: object) -> bool:
-    return value is not None and np.isscalar(value) and np.isfinite(value)
+    """Whether a Parquet scalar is safely loggable as a numeric time series."""
+
+    if value is None or isinstance(value, (str, bytes, bool)) or not np.isscalar(value):
+        return False
+    try:
+        return bool(np.isfinite(float(value)))
+    except (TypeError, ValueError):
+        return False
 
 
 def main() -> None:
