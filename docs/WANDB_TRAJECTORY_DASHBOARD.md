@@ -45,6 +45,22 @@ operation after the packed CPU job completes. API credentials are supplied only
 through `WANDB_API_KEY`; they must not appear in code, configuration, Slurm
 arguments, logs, or committed files.
 
+For the completed 12-cell matched grid, run
+
+```bash
+python scripts/export_t1x_gxtb_noise_grid_summary_wandb.py \
+  experiments/t1x_gxtb_matched_noise_grid_manifest.json \
+  --output-dir /scratch/memoozd/gadplus/analysis/t1x-gxtb-matched-noise-grid \
+  --group t1x-gxtb-matched-noise-grid
+```
+
+The exporter refuses a partial cell: it requires exactly 287 raw records and
+287 endpoint-score slots for every method/noise combination. It publishes one
+small W&B Table (the authoritative comparison), standard population histories
+for responsive plots, and a versioned artifact containing the Markdown and
+JSON table. Individual trajectory exporters remain responsible for the
+cockpit and method-mechanism panels.
+
 ## 2. W&B run identity
 
 Create one W&B run for each
