@@ -70,7 +70,7 @@ def _build_predict_fn(backend: str, method: str):
     return predict_fn
 
 
-def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
+def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool, observer=None):
     """Return (ASE Calculator, hessian_function). Captures `predict_fn` and
     caches Hessians within each step.
     """
@@ -94,6 +94,8 @@ def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
             out = self.predict_fn(coords, self.atomic_nums, do_hessian=True, require_grad=False)
             self.n_calls += 1
             self._cache = (coords.clone(), out)
+            if observer is not None:
+                observer(coords, out)
 
             e = out["energy"]
             self.results["energy"] = float(
@@ -115,6 +117,8 @@ def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
             hess = out["hessian"]
             calc._cache = (coords.clone(), out)
             calc.n_calls += 1
+            if observer is not None:
+                observer(coords, out)
 
         h = (
             hess.detach().to(torch.float64)
@@ -230,7 +234,39 @@ def _run_one_sample(args_tuple):
         z = sample.z.to(torch.long)
 
     predict_fn = _build_predict_fn(backend, method)
-    calc, hessian_fn = _make_calculator_and_hessfn(predict_fn, z, apply_eckart)
+    trace_rows: list[dict] = []
+    trace_coords: list[np.ndarray] = []
+    previous_trace_coords: torch.Tensor | None = None
+    trace_started = time.time()
+    atomsymbols = atomic_nums_to_symbols(z)
+
+    def observe(coords, output) -> None:
+        """Record local Sella evaluations without exposing data to Sella."""
+
+        nonlocal previous_trace_coords
+        current = coords.detach().to(torch.float64).reshape(-1, 3).cpu()
+        if previous_trace_coords is not None and torch.equal(current, previous_trace_coords):
+            return
+        eigenvalues, _, _ = vib_eig(output["hessian"], current, atomsymbols)
+        forces = torch.as_tensor(output["forces"], dtype=torch.float64).reshape(-1, 3)
+        energy = torch.as_tensor(output["energy"], dtype=torch.float64).reshape(-1)[0]
+        trace_rows.append(
+            {
+                "evaluation": len(trace_rows),
+                "wall_time_s": time.time() - trace_started,
+                "energy": float(energy.item()),
+                "force_max": float(forces.abs().max().item()),
+                "force_rms": float(torch.sqrt(torch.mean(forces.square())).item()),
+                "n_neg": int((eigenvalues < -1e-4).sum().item()),
+                "lambda1": float(eigenvalues[0].item()),
+                "lambda2": float(eigenvalues[1].item()),
+                "lambda3": float(eigenvalues[2].item()) if eigenvalues.numel() > 2 else float("nan"),
+            }
+        )
+        trace_coords.append(current.numpy().copy())
+        previous_trace_coords = current
+
+    calc, hessian_fn = _make_calculator_and_hessfn(predict_fn, z, apply_eckart, observe)
 
     positions_np = coords_start.detach().cpu().numpy().reshape(-1, 3)
     numbers_np = z.detach().cpu().numpy().flatten().astype(int)
@@ -276,6 +312,13 @@ def _run_one_sample(args_tuple):
     else:
         err = ""
     wall = time.time() - t0
+    trace_path = os.path.join(output_dir, f"sella_trace_{run_id}_{sample_idx:03d}.npz")
+    if trace_rows:
+        np.savez_compressed(
+            trace_path,
+            coordinates=np.stack(trace_coords),
+            **{key: np.asarray([row[key] for row in trace_rows]) for key in trace_rows[0]},
+        )
 
     # Final-state evaluation via the same predict_fn (1 extra Hessian call).
     final_coords = torch.tensor(atoms.positions, dtype=torch.float64, device="cpu")
@@ -330,6 +373,7 @@ def _run_one_sample(args_tuple):
         "failure_type": err,
         "final_eval_error": final_eval_error,
         "trajectory_path": trajectory_path,
+        "sella_trace_path": trace_path if trace_rows else "",
         # Final geometry saved as a flat list so downstream IRC validation
         # can pull TS coords directly from the summary parquet.
         "final_coords_flat": atoms.positions.reshape(-1).astype(float).tolist(),
