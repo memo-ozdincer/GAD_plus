@@ -14,6 +14,7 @@ Usage:
         --noise 1.0 --n-samples 5 --max-steps 500 \\
         --output-dir /lustre07/scratch/memoozd/gadplus/runs/smoke_scine_sella
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,9 +24,6 @@ import time
 import uuid
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 warnings.filterwarnings("ignore")
@@ -39,24 +37,33 @@ def _build_predict_fn(backend: str, method: str):
         return _PREDICT_FN_CACHE[key]
     if backend == "scine":
         from gadplus.calculator.scine import (
-            load_scine_calculator, make_scine_predict_fn,
+            load_scine_calculator,
+            make_scine_predict_fn,
         )
-        predict_fn = make_scine_predict_fn(
-            load_scine_calculator(functional=method, device="cpu")
-        )
+
+        predict_fn = make_scine_predict_fn(load_scine_calculator(functional=method, device="cpu"))
     elif backend == "xtb":
         from gadplus.calculator.xtb import load_xtb_calculator, make_xtb_predict_fn
-        predict_fn = make_xtb_predict_fn(
-            load_xtb_calculator(method=method, device="cpu")
-        )
+
+        predict_fn = make_xtb_predict_fn(load_xtb_calculator(method=method, device="cpu"))
     elif backend == "mace":
         from gadplus.calculator.mace import load_mace_calculator, make_mace_predict_fn
-        predict_fn = make_mace_predict_fn(
-            load_mace_calculator(model=method, device="cuda")
-        )
+
+        predict_fn = make_mace_predict_fn(load_mace_calculator(model=method, device="cuda"))
     elif backend == "horm":
         from gadplus.calculator.horm import load_horm_leftnet_calculator, make_horm_predict_fn
+
         predict_fn = make_horm_predict_fn(load_horm_leftnet_calculator(device="cuda"))
+    elif backend == "gxtb":
+        from gadplus.calculator.gxtb import load_gxtb_calculator, make_gxtb_predict_fn
+
+        predict_fn = make_gxtb_predict_fn(
+            load_gxtb_calculator(
+                executable=os.environ.get("GADPLUS_GXTB_EXE", "g-xtb/xtb-6.7.1/bin/xtb"),
+                n_threads=1,
+                parallel=int(os.environ.get("GADPLUS_GXTB_PARALLEL", "1")),
+            )
+        )
     else:
         raise ValueError(f"Unknown backend: {backend!r}")
     _PREDICT_FN_CACHE[key] = predict_fn
@@ -83,12 +90,8 @@ def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
 
         def calculate(self, atoms=None, properties=None, system_changes=all_changes):
             super().calculate(atoms, properties, system_changes)
-            coords = torch.tensor(
-                self.atoms.positions, dtype=torch.float64, device="cpu"
-            )
-            out = self.predict_fn(
-                coords, self.atomic_nums, do_hessian=True, require_grad=False
-            )
+            coords = torch.tensor(self.atoms.positions, dtype=torch.float64, device="cpu")
+            out = self.predict_fn(coords, self.atomic_nums, do_hessian=True, require_grad=False)
             self.n_calls += 1
             self._cache = (coords.clone(), out)
 
@@ -108,27 +111,29 @@ def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
         if calc._cache is not None and torch.equal(coords, calc._cache[0]):
             hess = calc._cache[1]["hessian"]
         else:
-            out = calc.predict_fn(
-                coords, calc.atomic_nums, do_hessian=True, require_grad=False
-            )
+            out = calc.predict_fn(coords, calc.atomic_nums, do_hessian=True, require_grad=False)
             hess = out["hessian"]
             calc._cache = (coords.clone(), out)
             calc.n_calls += 1
 
-        h = hess.detach().to(torch.float64) if isinstance(hess, torch.Tensor) \
+        h = (
+            hess.detach().to(torch.float64)
+            if isinstance(hess, torch.Tensor)
             else torch.tensor(hess, dtype=torch.float64)
+        )
         n = len(atoms)
         h = h.reshape(3 * n, 3 * n)
 
         if apply_eckart:
             from gadplus.projection.projection import (
-                get_mass_weights, _eckart_projector, atomic_nums_to_symbols,
+                get_mass_weights,
+                _eckart_projector,
+                atomic_nums_to_symbols,
             )
+
             atomsymbols = atomic_nums_to_symbols(calc.atomic_nums)
             coords_3d = coords.reshape(-1, 3)
-            masses, _m3, sqrt_m, sqrt_m_inv = get_mass_weights(
-                atomsymbols, device=h.device
-            )
+            masses, _m3, sqrt_m, sqrt_m_inv = get_mass_weights(atomsymbols, device=h.device)
             diag_inv = torch.diag(sqrt_m_inv)
             diag_m = torch.diag(sqrt_m)
             H_mw = diag_inv @ h @ diag_inv
@@ -144,9 +149,23 @@ def _make_calculator_and_hessfn(predict_fn, atomic_nums, apply_eckart: bool):
 
 def _run_one_sample(args_tuple):
     (
-        sample_idx, h5_path, split, backend, method, noise_ang, seed,
-        max_steps, fmax, apply_eckart, internal_coords,
-        delta0, gamma, diag_every, output_dir, run_id,
+        sample_idx,
+        h5_path,
+        split,
+        backend,
+        method,
+        noise_ang,
+        start_geometry,
+        seed,
+        max_steps,
+        fmax,
+        apply_eckart,
+        internal_coords,
+        delta0,
+        gamma,
+        diag_every,
+        output_dir,
+        run_id,
     ) = args_tuple
 
     os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -154,37 +173,59 @@ def _run_one_sample(args_tuple):
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     import numpy as np
     import torch
+
     torch.set_num_threads(1)
     from ase import Atoms
     from sella import Sella
 
     from gadplus.projection import vib_eig, atomic_nums_to_symbols
 
-    if backend in {"mace", "horm"}:
-        from gadplus.data.direct_t1x import load_t1x_record
+    if backend in {"mace", "horm", "gxtb"}:
+        if backend == "gxtb":
+            from gadplus.data.direct_t1x import load_t1x_records_direct
 
-        sample = load_t1x_record(h5_path, split, sample_idx)
+            sample = load_t1x_records_direct(h5_path, split, [sample_idx])[sample_idx]
+        else:
+            from gadplus.data.direct_t1x import load_t1x_record
+
+            sample = load_t1x_record(h5_path, split, sample_idx)
         formula = sample.formula or f"sample_{sample_idx}"
         rxn = sample.rxn
         ts_coords = torch.as_tensor(sample.transition_state, dtype=torch.float64)
-        generator = torch.Generator(device="cpu").manual_seed(seed)
-        coords_start = ts_coords + noise_ang * torch.randn(
-            ts_coords.shape, generator=generator, dtype=ts_coords.dtype,
-        )
+        if start_geometry == "labelled_ts":
+            coords_start = ts_coords.clone()
+        elif start_geometry == "reactant":
+            coords_start = torch.as_tensor(sample.reactant, dtype=torch.float64)
+        elif start_geometry == "product":
+            if sample.product is None:
+                raise ValueError(f"sample {sample_idx} has no compatible labelled product geometry")
+            coords_start = torch.as_tensor(sample.product, dtype=torch.float64)
+        else:
+            generator = torch.Generator(device="cpu").manual_seed(seed)
+            coords_start = ts_coords + noise_ang * torch.randn(
+                ts_coords.shape,
+                generator=generator,
+                dtype=ts_coords.dtype,
+            )
         z = torch.as_tensor(sample.atomic_nums, dtype=torch.long)
     else:
         from gadplus.data.transition1x import Transition1xDataset, UsePos
         from gadplus.geometry.starting import make_starting_coords
 
         ds = Transition1xDataset(
-            h5_path=h5_path, split=split, max_samples=sample_idx + 1,
+            h5_path=h5_path,
+            split=split,
+            max_samples=sample_idx + 1,
             transform=UsePos("pos_transition"),
         )
         sample = ds[sample_idx]
         formula = str(getattr(sample, "formula", f"sample_{sample_idx}"))
         rxn = str(getattr(sample, "rxn", ""))
         coords_start = make_starting_coords(
-            sample, "noised_ts", noise_rms=noise_ang, seed=seed,
+            sample,
+            "noised_ts",
+            noise_rms=noise_ang,
+            seed=seed,
         ).to(torch.float64)
         z = sample.z.to(torch.long)
 
@@ -195,18 +236,37 @@ def _run_one_sample(args_tuple):
     numbers_np = z.detach().cpu().numpy().flatten().astype(int)
     atoms = Atoms(numbers=numbers_np, positions=positions_np)
     atoms.calc = calc
+    # Persist each accepted Sella geometry for post-run, observational W&B
+    # replay.  This file is not read by Sella and therefore cannot influence
+    # trust-region decisions, accepted steps, or calculator evaluations.
+    trajectory_path = os.path.join(
+        output_dir,
+        f"trajectory_{run_id}_{sample_idx:03d}.traj",
+    )
 
     t0 = time.time()
     try:
         opt = Sella(
-            atoms=atoms, order=1, internal=internal_coords,
-            trajectory=None, logfile=None,
-            delta0=delta0, gamma=gamma,
+            atoms=atoms,
+            order=1,
+            internal=internal_coords,
+            trajectory=trajectory_path,
+            logfile=None,
+            delta0=delta0,
+            gamma=gamma,
             diag_every_n=diag_every,
             hessian_function=hessian_fn,
-            rho_inc=1.035, rho_dec=5.0,
-            sigma_inc=1.15, sigma_dec=0.65,
+            rho_inc=1.035,
+            rho_dec=5.0,
+            sigma_inc=1.15,
+            sigma_dec=0.65,
         )
+        # ``diag_every_n=1`` asks Sella for a Hessian at every optimization
+        # iteration. Refreshing after every kick also prevents BFGS updates
+        # from carrying an old Hessian into the next step.
+        from gadplus.calculator.sella import refresh_hessian_after_kicks
+
+        refresh_hessian_after_kicks(opt.pes)
         sella_converged = opt.run(fmax=fmax, steps=max_steps)
         steps_taken = int(opt.nsteps)
     except Exception as exc:
@@ -218,30 +278,34 @@ def _run_one_sample(args_tuple):
     wall = time.time() - t0
 
     # Final-state evaluation via the same predict_fn (1 extra Hessian call).
-    final_coords = torch.tensor(
-        atoms.positions, dtype=torch.float64, device="cpu"
-    )
+    final_coords = torch.tensor(atoms.positions, dtype=torch.float64, device="cpu")
     try:
         out_final = predict_fn(final_coords, z, do_hessian=True, require_grad=False)
         forces_t = out_final["forces"]
         forces_np = (
-            forces_t.detach().cpu().numpy() if isinstance(forces_t, torch.Tensor)
+            forces_t.detach().cpu().numpy()
+            if isinstance(forces_t, torch.Tensor)
             else np.asarray(forces_t)
         ).reshape(-1, 3)
         final_fmax = float(np.max(np.abs(forces_np)))
         final_force_norm = float(np.mean(np.linalg.norm(forces_np, axis=1)))
         energy_t = out_final["energy"]
         final_energy = float(
-            energy_t.detach().cpu().item() if isinstance(energy_t, torch.Tensor)
-            else energy_t
+            energy_t.detach().cpu().item() if isinstance(energy_t, torch.Tensor) else energy_t
         )
         atomsymbols = atomic_nums_to_symbols(z)
         evals_vib, _, _ = vib_eig(out_final["hessian"], final_coords, atomsymbols)
         n_neg = int((evals_vib < -1e-4).sum().item())
         eig0 = float(evals_vib[0].item()) if evals_vib.numel() > 0 else 0.0
-    except Exception:
-        final_fmax = float("nan"); final_force_norm = float("nan")
-        final_energy = float("nan"); n_neg = -1; eig0 = float("nan")
+    except Exception as exc:
+        final_fmax = float("nan")
+        final_force_norm = float("nan")
+        final_energy = float("nan")
+        n_neg = -1
+        eig0 = float("nan")
+        final_eval_error = repr(exc)
+    else:
+        final_eval_error = ""
 
     our_converged = (n_neg == 1) and (final_fmax < fmax)
 
@@ -251,7 +315,7 @@ def _run_one_sample(args_tuple):
         "rxn": rxn,
         "noise_angstrom": float(noise_ang),
         "search_method": f"sella_{'internal' if internal_coords else 'cart'}"
-                        f"{'_eckart' if apply_eckart else ''}_{backend}_{method}",
+        f"{'_eckart' if apply_eckart else ''}_{backend}_{method}",
         "converged": bool(our_converged),
         "sella_converged": bool(sella_converged),
         "converged_step": int(steps_taken) if our_converged else -1,
@@ -264,6 +328,8 @@ def _run_one_sample(args_tuple):
         "n_calculator_calls": int(getattr(calc, "n_calls", 0)),
         "wall_time_s": float(wall),
         "failure_type": err,
+        "final_eval_error": final_eval_error,
+        "trajectory_path": trajectory_path,
         # Final geometry saved as a flat list so downstream IRC validation
         # can pull TS coords directly from the summary parquet.
         "final_coords_flat": atoms.positions.reshape(-1).astype(float).tolist(),
@@ -272,28 +338,53 @@ def _run_one_sample(args_tuple):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--backend", required=True, choices=["scine", "xtb", "mace", "horm"])
+    p.add_argument("--backend", required=True, choices=["scine", "xtb", "gxtb", "mace", "horm"])
     p.add_argument("--method", default="DFTB0")
-    p.add_argument("--noise", type=float, default=1.0,
-                   help="Gaussian RMS noise on TS in Angstrom. 1.0 A = 100 pm.")
+    p.add_argument(
+        "--noise",
+        type=float,
+        default=1.0,
+        help="Per-Cartesian-component Gaussian sigma on the labelled TS, in Angstrom (not per-atom RMS).",
+    )
+    p.add_argument(
+        "--start-geometry",
+        default="noised_ts",
+        choices=("noised_ts", "labelled_ts", "reactant", "product"),
+        help="Initial T1x geometry; noise is used only for noised_ts.",
+    )
     p.add_argument("--n-samples", type=int, default=5)
-    p.add_argument("--sample-indices", type=str, default=None,
-                   help="Comma-separated 0-indexed sample IDs. Overrides --n-samples.")
+    p.add_argument(
+        "--sample-indices",
+        type=str,
+        default=None,
+        help="Comma-separated 0-indexed sample IDs. Overrides --n-samples.",
+    )
     p.add_argument("--max-steps", type=int, default=500)
     p.add_argument("--fmax", type=float, default=0.01)
-    p.add_argument("--apply-eckart", action="store_true", default=True,
-                   help="Eckart-project Hessian (canonical). On by default.")
+    p.add_argument(
+        "--apply-eckart",
+        action="store_true",
+        default=True,
+        help="Eckart-project Hessian (canonical). On by default.",
+    )
     p.add_argument("--no-eckart", dest="apply_eckart", action="store_false")
-    p.add_argument("--internal", action="store_true", default=False,
-                   help="Use internal coordinates (default: Cartesian).")
+    p.add_argument(
+        "--internal",
+        action="store_true",
+        default=False,
+        help="Use internal coordinates (default: Cartesian).",
+    )
     p.add_argument("--delta0", type=float, default=0.1)
     p.add_argument("--gamma", type=float, default=0.4)
     p.add_argument("--diag-every", type=int, default=1)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--split", default="test")
-    p.add_argument("--h5", default="/lustre06/project/6033559/memoozd/data/transition1x.h5")
-    p.add_argument("--n-workers", type=int,
-                   default=int(os.environ.get("SLURM_CPUS_PER_TASK", "4")))
+    p.add_argument(
+        "--h5",
+        default=os.environ.get("GADPLUS_T1X_H5", "data/transition1x.h5"),
+        help="Transition1x HDF5 path (or set GADPLUS_T1X_H5).",
+    )
+    p.add_argument("--n-workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "4")))
     p.add_argument("--output-dir", required=True)
     args = p.parse_args()
 
@@ -301,47 +392,76 @@ def main():
     run_id = str(uuid.uuid4())[:8]
 
     print(f"Backend: {args.backend} | Method: {args.method}")
-    print(f"Sella: cart={not args.internal} eckart={args.apply_eckart} "
-          f"delta0={args.delta0} gamma={args.gamma} diag_every={args.diag_every}")
-    print(f"Samples: {args.n_samples} | Max steps: {args.max_steps} | fmax: {args.fmax}")
-    print(f"Noise: {args.noise} A | Workers: {args.n_workers}")
+    print(
+        f"Sella: cart={not args.internal} eckart={args.apply_eckart} "
+        f"delta0={args.delta0} gamma={args.gamma} diag_every={args.diag_every}"
+    )
+    print(f"Start: {args.start_geometry} | Noise: {args.noise} A | Workers: {args.n_workers}")
     print(f"Output: {args.output_dir}")
 
     if args.sample_indices:
         indices = [int(x) for x in args.sample_indices.split(",") if x.strip()]
     else:
         indices = list(range(args.n_samples))
+    print(f"Samples: {len(indices)} | Max steps: {args.max_steps} | fmax: {args.fmax}")
     task_args = [
         (
-            i, args.h5, args.split, args.backend, args.method, args.noise,
-            args.seed + 1000 * i, args.max_steps, args.fmax,
-            args.apply_eckart, args.internal,
-            args.delta0, args.gamma, args.diag_every,
-            args.output_dir, run_id,
+            i,
+            args.h5,
+            args.split,
+            args.backend,
+            args.method,
+            args.noise,
+            args.start_geometry,
+            args.seed + 1000 * i,
+            args.max_steps,
+            args.fmax,
+            args.apply_eckart,
+            args.internal,
+            args.delta0,
+            args.gamma,
+            args.diag_every,
+            args.output_dir,
+            run_id,
         )
         for i in indices
     ]
 
     results = []
     t_overall = time.time()
-    with ProcessPoolExecutor(max_workers=args.n_workers) as exe:
+    # Keep one-worker calculations in this interpreter: a fork only adds
+    # shared-filesystem startup latency and provides no calculator parallelism.
+    if args.n_workers == 1:
+        completed = ((ta[0], _run_one_sample, ta) for ta in task_args)
+    else:
+        exe = ProcessPoolExecutor(max_workers=args.n_workers)
         future_to_idx = {exe.submit(_run_one_sample, ta): ta[0] for ta in task_args}
-        for fut in as_completed(future_to_idx):
-            idx = future_to_idx[fut]
+        completed = ((future_to_idx[fut], fut.result, None) for fut in as_completed(future_to_idx))
+    try:
+        for idx, run, task in completed:
             try:
-                r = fut.result()
+                r = run(task) if task is not None else run()
             except Exception as exc:
                 print(f"  [{idx}] FAILED: {exc}")
                 continue
             status = "TS" if r["converged"] else f"no(n_neg={r['final_n_neg']})"
-            print(f"  [{r['sample_id']}] {r['formula']} | {status} | "
-                  f"fmax={r['final_force_max']:.4e} steps={r['total_steps']} "
-                  f"wall={r['wall_time_s']:.1f}s")
+            print(
+                f"  [{r['sample_id']}] {r['formula']} | {status} | "
+                f"fmax={r['final_force_max']:.4e} steps={r['total_steps']} "
+                f"wall={r['wall_time_s']:.1f}s"
+            )
             results.append(r)
+    finally:
+        if args.n_workers != 1:
+            exe.shutdown()
 
     total_wall = time.time() - t_overall
 
     summary_path = os.path.join(args.output_dir, f"summary_{run_id}.parquet")
+    # Defer the heavy Lustre-backed parquet extension until calculation ends.
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
     pq.write_table(pa.Table.from_pylist(results), summary_path)
 
     n_total = len(results)
@@ -349,11 +469,13 @@ def main():
     n_sella = sum(1 for r in results if r["sella_converged"])
     print()
     print("=" * 60)
-    print(f"{args.backend}/{args.method} Sella "
-          f"{'internal' if args.internal else 'cart'}"
-          f"{'+Eckart' if args.apply_eckart else ''}: "
-          f"{n_conv}/{n_total} TS converged (n_neg=1 ∧ fmax<{args.fmax}); "
-          f"sella self-reports {n_sella}/{n_total} | total wall: {total_wall:.1f}s")
+    print(
+        f"{args.backend}/{args.method} Sella "
+        f"{'internal' if args.internal else 'cart'}"
+        f"{'+Eckart' if args.apply_eckart else ''}: "
+        f"{n_conv}/{n_total} TS converged (n_neg=1 ∧ fmax<{args.fmax}); "
+        f"sella self-reports {n_sella}/{n_total} | total wall: {total_wall:.1f}s"
+    )
     print(f"Summary: {summary_path}")
 
 
