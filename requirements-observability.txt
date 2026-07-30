@@ -1,0 +1,5 @@
+# Kept separate because the local HIP package pins an older W&B SDK.
+numpy>=1.24
+pyarrow>=14.0
+wandb>=0.22.3
+wandb-workspaces>=0.1.0

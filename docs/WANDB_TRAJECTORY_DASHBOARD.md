@@ -385,3 +385,55 @@ $$
 for production g-XTB competitive GAD. Export those runs with
 `selection_stage=evaluation`; export the nine development cells with
 `selection_stage=calibration` and a separate group.
+
+## 8. Implemented resources and operation
+
+The deployed private W&B chart presets are:
+
+- `memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v1`;
+- `memo-ozdincer-university-of-toronto/gadplus-competitive-mechanism-v1`.
+
+The saved workspace is
+[`GADplus TS mechanisms v1`](https://wandb.ai/memo-ozdincer-university-of-toronto/gadplus-ts-mechanisms?nw=62vj2ut3mwn).
+The initial
+[`analytic-LJ instrumentation smoke`](https://wandb.ai/memo-ozdincer-university-of-toronto/gadplus-ts-mechanisms/runs/8b8bf77f9b13843df51b)
+is an observability check, not a benchmark result.
+
+Implementation entry points are:
+
+- `IntrinsicGADObservation` and the read-only `observer` argument in
+  `src/gadplus/search/intrinsic_gad.py`;
+- exact local bundles in `src/gadplus/logging/pointwise.py`;
+- hindsight enrichment, event-preserving sampling, Artifacts, and W&B replay
+  in `src/gadplus/logging/wandb_export.py`;
+- versioned Vega specifications in `src/gadplus/logging/vega/`;
+- repository-native packed g-xTB worker in
+  `scripts/t1x_intrinsic_gxtb_pilot.py`;
+- campaign replay in `scripts/export_wandb_campaign.py`;
+- chart and workspace setup in `scripts/register_wandb_charts.py` and
+  `scripts/create_wandb_workspace.py`.
+
+Compute workers use `--record-trajectories` and write below
+`CAMPAIGN_ROOT/trajectories`. They do not source a W&B credential and do not
+import W&B. After a campaign completes, export from a login node:
+
+```bash
+cd /scratch/memoozd/GAD/GAD_plus
+source /scratch/memoozd/GAD/secrets/wandb.env
+PYTHONPATH=src /scratch/memoozd/GAD/.venv-wandb/bin/python \
+  scripts/export_wandb_campaign.py \
+  /scratch/memoozd/gadplus/runs/CAMPAIGN_ROOT \
+  --group CAMPAIGN_GROUP \
+  --entity memo-ozdincer-university-of-toronto
+```
+
+Create the lightweight exporter environment once with
+`scripts/setup_wandb_observability.sh`. It is separate from the optimizer
+environment because the local HIP package pins an older W&B SDK. The exporter
+requires no Torch, HIP, g-xTB, or Transition1x installation; it only replays
+the exact local files.
+
+The exporter is deterministic and uses W&B resume mode, so replaying a bundle
+does not intentionally create a second scientific run. The exact Parquet,
+coordinates, references, and metadata are uploaded as one versioned trajectory
+Artifact per run.

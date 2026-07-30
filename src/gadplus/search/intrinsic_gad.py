@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import torch
@@ -104,6 +105,42 @@ class IntrinsicGADStep:
 
 
 @dataclass(frozen=True)
+class IntrinsicGADObservation:
+    """Read-only snapshot emitted after each coherent local evaluation.
+
+    The callback receiving this object is observational: all tensors are
+    detached CPU clones and no value returned by the callback enters the
+    optimizer map. ``step_cart`` is ``None`` for a terminal evaluation.
+    """
+
+    evaluation: int
+    iteration: int
+    wall_time_s: float
+    energy: float
+    forces: torch.Tensor
+    coords: torch.Tensor
+    eigenvalues: torch.Tensor
+    n_neg: int
+    lambda2_gate: float
+    effective_gate: float
+    spectral_scale: float
+    low_mode_weights: torch.Tensor
+    negative_mode_weights: torch.Tensor
+    gradient_coefficients: torch.Tensor
+    soft_activity: float
+    extra_negative_activity: float
+    activity_fraction: float
+    spectral_entropy: float
+    lowest_reflection: float
+    geometric_length: float | None
+    local_radius: float | None
+    regularizer: float | None
+    step_mw_rms: float | None
+    step_cart: torch.Tensor | None
+    terminal: bool
+
+
+@dataclass(frozen=True)
 class IntrinsicGADResult:
     """Result and pointwise diagnostics from :func:`run_intrinsic_gad`."""
 
@@ -137,6 +174,19 @@ class SpectralPolicy:
 
 
 @dataclass(frozen=True)
+class GateDiagnostics:
+    """Pointwise scalar diagnostics used to interpret a spectral gate."""
+
+    lambda2_gate: torch.Tensor
+    effective_gate: torch.Tensor
+    soft_activity: torch.Tensor
+    extra_negative_activity: torch.Tensor
+    activity_fraction: torch.Tensor
+    spectral_entropy: torch.Tensor
+    lowest_reflection: torch.Tensor
+
+
+@dataclass(frozen=True)
 class _State:
     coords: torch.Tensor
     energy: torch.Tensor
@@ -145,6 +195,8 @@ class _State:
     modes_mw: torch.Tensor
     gradient_mw: torch.Tensor
     policy: SpectralPolicy
+    gradient_coefficients: torch.Tensor
+    gate_diagnostics: GateDiagnostics
     effective_gate: torch.Tensor
     n_neg: int
     force_norm: float
@@ -224,38 +276,74 @@ def effective_gate_weight(
     step itself is zero and the gate value cannot affect the map.
     """
 
+    return gate_diagnostics(gradient_coefficients, policy, variant).effective_gate
+
+
+def gate_diagnostics(
+    gradient_coefficients: torch.Tensor,
+    policy: SpectralPolicy,
+    variant: str = "lambda2",
+) -> GateDiagnostics:
+    """Return the gate and the local activities from the same calculation.
+
+    Keeping these values together prevents observability code from silently
+    reimplementing a policy with slightly different numerical conventions.
+    """
+
     if variant not in {"lambda2", "alignment", "competitive", "guard", "gad"}:
         raise ValueError(f"unknown gate variant: {variant}")
-    if variant == "gad":
-        return torch.ones_like(policy.gate)
-    if variant == "guard":
-        competitive = effective_gate_weight(
-            gradient_coefficients, policy, "competitive"
-        )
-        z1 = policy.lowest_normalized_eigenvalue / policy.temperature
-        minimum_boundary = torch.sigmoid(z1)
-        boundary_guard = 4.0 * minimum_boundary * (1.0 - minimum_boundary)
-        return 1.0 - (1.0 - competitive) * (1.0 - boundary_guard)
-    base = policy.gate
-    if variant == "lambda2":
-        return base
     coeffs = gradient_coefficients.to(torch.float64).reshape(-1)
     activity = coeffs.square()
     soft = torch.sum(policy.low_mode_weights * activity)
-    if variant == "alignment":
-        denominator = torch.sum(activity)
+    extra_negative_weights = policy.negative_mode_weights * (1.0 - policy.low_mode_weights).square()
+    extra_negative = torch.sum(extra_negative_weights * activity)
+    competitive_denominator = soft + extra_negative
+    competitive_fraction = torch.where(
+        competitive_denominator > 0,
+        soft / competitive_denominator.clamp_min(torch.finfo(coeffs.dtype).tiny),
+        torch.zeros_like(competitive_denominator),
+    ).clamp(0.0, 1.0)
+
+    if variant == "gad":
+        effective = torch.ones_like(policy.gate)
+    elif variant == "lambda2":
+        effective = policy.gate
     else:
-        extra_negative_weights = (
-            policy.negative_mode_weights
-            * (1.0 - policy.low_mode_weights).square()
-        )
-        denominator = soft + torch.sum(extra_negative_weights * activity)
-    ratio = torch.where(
-        denominator > 0,
-        soft / denominator.clamp_min(torch.finfo(coeffs.dtype).tiny),
-        torch.zeros_like(denominator),
+        if variant == "alignment":
+            denominator = torch.sum(activity)
+            fraction = torch.where(
+                denominator > 0,
+                soft / denominator.clamp_min(torch.finfo(coeffs.dtype).tiny),
+                torch.zeros_like(denominator),
+            ).clamp(0.0, 1.0)
+        else:
+            fraction = competitive_fraction
+        competitive = policy.gate + (1.0 - policy.gate) * fraction
+        if variant == "guard":
+            z1 = policy.lowest_normalized_eigenvalue / policy.temperature
+            minimum_boundary = torch.sigmoid(z1)
+            boundary_guard = 4.0 * minimum_boundary * (1.0 - minimum_boundary)
+            effective = 1.0 - (1.0 - competitive) * (1.0 - boundary_guard)
+        else:
+            effective = competitive
+
+    weights = policy.low_mode_weights
+    if weights.numel() > 1:
+        entropy = -torch.sum(
+            weights * torch.log(weights.clamp_min(torch.finfo(weights.dtype).tiny))
+        ) / math.log(weights.numel())
+    else:
+        entropy = torch.zeros_like(policy.gate)
+    lowest_reflection = 1.0 - 2.0 * effective * weights[0]
+    return GateDiagnostics(
+        lambda2_gate=policy.gate,
+        effective_gate=effective,
+        soft_activity=soft,
+        extra_negative_activity=extra_negative,
+        activity_fraction=competitive_fraction,
+        spectral_entropy=entropy,
+        lowest_reflection=lowest_reflection,
     )
-    return base + (1.0 - base) * ratio.clamp(0.0, 1.0)
 
 
 def inverse_rms_pair_length(coords: torch.Tensor) -> torch.Tensor:
@@ -362,6 +450,7 @@ def _evaluate(
     gradient_mw = inv_sqrt_mass * gradient_cart
     policy = smooth_spectral_policy(evals, cfg.spectral_temperature)
     gradient_coeffs = modes_mw.T @ gradient_mw
+    diagnostics = gate_diagnostics(gradient_coeffs, policy, cfg.gate_variant)
     return _State(
         coords=coords,
         energy=energy,
@@ -370,9 +459,9 @@ def _evaluate(
         modes_mw=modes_mw,
         gradient_mw=gradient_mw,
         policy=policy,
-        effective_gate=effective_gate_weight(
-            gradient_coeffs, policy, cfg.gate_variant
-        ),
+        gradient_coefficients=gradient_coeffs,
+        gate_diagnostics=diagnostics,
+        effective_gate=diagnostics.effective_gate,
         n_neg=int((evals < -cfg.index_threshold).sum().item()),
         force_norm=force_mean(forces),
         force_max=force_max(forces),
@@ -412,6 +501,7 @@ def run_intrinsic_gad(
     coords0: torch.Tensor,
     atomic_nums: torch.Tensor,
     cfg: IntrinsicGADConfig | None = None,
+    observer: Callable[[IntrinsicGADObservation], None] | None = None,
 ) -> IntrinsicGADResult:
     r"""Iterate the strictly pointwise smooth-index GAD map.
 
@@ -428,6 +518,8 @@ def run_intrinsic_gad(
 
     Every quantity on the right is evaluated at the same current point.  The
     returned history is diagnostic output only and never affects the map.
+    Likewise, ``observer`` receives detached CPU snapshots and has no return
+    channel into the update.
     """
 
     cfg = cfg or IntrinsicGADConfig()
@@ -449,12 +541,47 @@ def run_intrinsic_gad(
             state.forces,
             cfg.force_criterion,
         )
-        if is_ts_converged(
+        converged = is_ts_converged(
             state.n_neg,
             force_value,
             cfg.force_threshold,
             criterion=cfg.force_criterion,
-        ):
+        )
+        terminal = converged or iteration == cfg.max_steps
+        if terminal and observer is not None:
+            diagnostics = state.gate_diagnostics
+            observer(
+                IntrinsicGADObservation(
+                    evaluation=iteration,
+                    iteration=iteration,
+                    wall_time_s=time.time() - started,
+                    energy=float(state.energy.item()),
+                    forces=state.forces.detach().cpu().clone(),
+                    coords=state.coords.detach().cpu().clone(),
+                    eigenvalues=state.evals.detach().cpu().clone(),
+                    n_neg=state.n_neg,
+                    lambda2_gate=float(diagnostics.lambda2_gate.item()),
+                    effective_gate=float(diagnostics.effective_gate.item()),
+                    spectral_scale=float(state.policy.scale.item()),
+                    low_mode_weights=state.policy.low_mode_weights.detach().cpu().clone(),
+                    negative_mode_weights=(
+                        state.policy.negative_mode_weights.detach().cpu().clone()
+                    ),
+                    gradient_coefficients=(state.gradient_coefficients.detach().cpu().clone()),
+                    soft_activity=float(diagnostics.soft_activity.item()),
+                    extra_negative_activity=float(diagnostics.extra_negative_activity.item()),
+                    activity_fraction=float(diagnostics.activity_fraction.item()),
+                    spectral_entropy=float(diagnostics.spectral_entropy.item()),
+                    lowest_reflection=float(diagnostics.lowest_reflection.item()),
+                    geometric_length=None,
+                    local_radius=None,
+                    regularizer=None,
+                    step_mw_rms=None,
+                    step_cart=None,
+                    terminal=True,
+                )
+            )
+        if converged:
             return _make_result(
                 state,
                 converged=True,
@@ -476,7 +603,7 @@ def run_intrinsic_gad(
         geometric_length = inverse_rms_pair_length(state.coords)
         local_radius = cfg.step_fraction * float(geometric_length.item())
         radius_mw = local_radius * math.sqrt(mass_total)
-        gradient_coeffs = state.modes_mw.T @ state.gradient_mw
+        gradient_coeffs = state.gradient_coefficients
         step_coeffs, regularizer = pointwise_step_coefficients(
             gradient_coeffs,
             state.evals,
@@ -487,6 +614,40 @@ def run_intrinsic_gad(
         step_mw = state.modes_mw @ step_coeffs
         step_cart = inv_sqrt_mass * step_mw
         step_rms = float(torch.linalg.vector_norm(step_mw).item()) / math.sqrt(mass_total)
+
+        if observer is not None:
+            diagnostics = state.gate_diagnostics
+            observer(
+                IntrinsicGADObservation(
+                    evaluation=iteration,
+                    iteration=iteration,
+                    wall_time_s=time.time() - started,
+                    energy=float(state.energy.item()),
+                    forces=state.forces.detach().cpu().clone(),
+                    coords=state.coords.detach().cpu().clone(),
+                    eigenvalues=state.evals.detach().cpu().clone(),
+                    n_neg=state.n_neg,
+                    lambda2_gate=float(diagnostics.lambda2_gate.item()),
+                    effective_gate=float(diagnostics.effective_gate.item()),
+                    spectral_scale=float(state.policy.scale.item()),
+                    low_mode_weights=state.policy.low_mode_weights.detach().cpu().clone(),
+                    negative_mode_weights=(
+                        state.policy.negative_mode_weights.detach().cpu().clone()
+                    ),
+                    gradient_coefficients=(state.gradient_coefficients.detach().cpu().clone()),
+                    soft_activity=float(diagnostics.soft_activity.item()),
+                    extra_negative_activity=float(diagnostics.extra_negative_activity.item()),
+                    activity_fraction=float(diagnostics.activity_fraction.item()),
+                    spectral_entropy=float(diagnostics.spectral_entropy.item()),
+                    lowest_reflection=float(diagnostics.lowest_reflection.item()),
+                    geometric_length=float(geometric_length.item()),
+                    local_radius=local_radius,
+                    regularizer=float(regularizer.item()),
+                    step_mw_rms=step_rms,
+                    step_cart=step_cart.reshape_as(state.coords).detach().cpu().clone(),
+                    terminal=False,
+                )
+            )
 
         if cfg.record_history:
             history.append(

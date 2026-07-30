@@ -1,0 +1,189 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "GADplus trajectory cockpit with navigator-filtered y domains.",
+  "data": {"name": "wandb"},
+  "params": [
+    {
+      "name": "hover",
+      "select": {
+        "type": "point",
+        "fields": ["${field:evaluation}"],
+        "nearest": true,
+        "on": "pointerover",
+        "clear": "pointerout"
+      }
+    }
+  ],
+  "vconcat": [
+    {
+      "height": 45,
+      "title": {"text": "Evaluation navigator — drag to zoom; double-click to reset", "anchor": "start"},
+      "params": [
+        {
+          "name": "brush",
+          "select": {"type": "interval", "encodings": ["x"], "clear": "dblclick"}
+        }
+      ],
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "title": null},
+            "y": {"field": "${field:force_ratio_display}", "type": "quantitative", "scale": {"type": "log"}, "axis": null}
+          }
+        },
+        {
+          "mark": {"type": "line", "color": "#222222", "strokeWidth": 0.7, "interpolate": "step-after"},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative"},
+            "y": {"field": "${field:n_neg}", "type": "quantitative", "axis": null}
+          }
+        }
+      ],
+      "resolve": {"scale": {"y": "independent"}}
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Stationarity", "anchor": "start"},
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.6},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}},
+            "y": {"field": "${field:force_ratio_display}", "type": "quantitative", "title": "fmax / tolerance", "scale": {"type": "log"}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:force_max}", "type": "quantitative", "title": "fmax"},
+              {"field": "${field:n_neg}", "type": "quantitative", "title": "Morse index"}
+            ]
+          }
+        },
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}},
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    },
+    {
+      "height": 165,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Projected vibrational spectrum", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [4, 4]}, "encoding": {"y": {"datum": 0}}},
+        {
+          "mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.5},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}},
+            "y": {"field": "${field:lambda1_scaled}", "type": "quantitative", "title": "lambda / sH", "scale": {"type": "symlog", "constant": 0.01}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:lambda1}", "type": "quantitative", "title": "lambda1"},
+              {"field": "${field:lambda2}", "type": "quantitative", "title": "lambda2"},
+              {"field": "${field:lambda3}", "type": "quantitative", "title": "lambda3"},
+              {"field": "${field:spectral_scale}", "type": "quantitative", "title": "sH"}
+            ]
+          }
+        },
+        {"mark": {"type": "line", "color": "#CC79A7", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda2_scaled}", "type": "quantitative", "scale": {"type": "symlog", "constant": 0.01}}}},
+        {"mark": {"type": "line", "color": "#009E73", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda3_scaled}", "type": "quantitative", "scale": {"type": "symlog", "constant": 0.01}}}},
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    },
+    {
+      "height": 75,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Projected Morse index", "anchor": "start"},
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#222222", "interpolate": "step-after", "strokeWidth": 1.6},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}},
+            "y": {"field": "${field:n_neg}", "type": "quantitative", "title": "nneg", "axis": {"tickMinStep": 1}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:n_neg}", "type": "quantitative", "title": "Morse index"},
+              {"field": "${field:lambda2}", "type": "quantitative", "title": "lambda2"},
+              {"field": "${field:terminal}", "type": "nominal", "title": "Terminal"}
+            ]
+          }
+        },
+        {"mark": {"type": "rule", "color": "#777777", "strokeDash": [3, 3]}, "encoding": {"y": {"datum": 1}}},
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    },
+    {
+      "height": 130,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Hindsight geometry (never used by the optimizer)", "anchor": "start"},
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.5},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}},
+            "y": {"field": "${field:distance_to_terminal_display}", "type": "quantitative", "title": "Kabsch RMSD (A)", "scale": {"type": "log"}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:distance_to_terminal}", "type": "quantitative", "title": "RMSD to terminal (A)"},
+              {"field": "${field:distance_to_labelled_ts}", "type": "quantitative", "title": "RMSD to labelled TS (A)"},
+              {"field": "${field:terminal_progress_raw}", "type": "quantitative", "title": "Raw progress"}
+            ]
+          }
+        },
+        {"mark": {"type": "line", "color": "#E69F00", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:distance_to_labelled_ts_display}", "type": "quantitative", "scale": {"type": "log"}}}},
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Intrinsic step utilization", "anchor": "start"},
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.5},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}},
+            "y": {"field": "${field:step_over_radius_display}", "type": "quantitative", "title": "step / local scale", "scale": {"type": "log"}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:step_mw_rms}", "type": "quantitative", "title": "MW RMS step"},
+              {"field": "${field:step_over_radius}", "type": "quantitative", "title": "step / R"},
+              {"field": "${field:step_over_length}", "type": "quantitative", "title": "Cartesian step / ell"},
+              {"field": "${field:max_atom_displacement}", "type": "quantitative", "title": "Max atom displacement (A)"}
+            ]
+          }
+        },
+        {"mark": {"type": "line", "color": "#009E73", "strokeWidth": 1.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:step_over_length_display}", "type": "quantitative", "scale": {"type": "log"}}}},
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}},
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "brush", "empty": true}}],
+      "title": {"text": "Energy relative to start", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [4, 4]}, "encoding": {"y": {"datum": 0}}},
+        {
+          "mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.5},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "title": "Coherent Hessian evaluation"},
+            "y": {"field": "${field:energy_from_start}", "type": "quantitative", "title": "Delta E", "scale": {"type": "symlog"}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative", "title": "Hessian evaluation"},
+              {"field": "${field:energy}", "type": "quantitative", "title": "Energy"},
+              {"field": "${field:energy_from_start}", "type": "quantitative", "title": "Delta E"},
+              {"field": "${field:wall_time_s}", "type": "quantitative", "title": "Wall time (s)"}
+            ]
+          }
+        },
+        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+      ]
+    }
+  ],
+  "resolve": {"scale": {"x": "shared"}},
+  "config": {
+    "background": "transparent",
+    "view": {"stroke": null},
+    "axis": {"gridColor": "#DDDDDD", "gridOpacity": 0.35, "labelFontSize": 11, "titleFontSize": 12},
+    "title": {"fontSize": 13, "fontWeight": 600}
+  }
+}

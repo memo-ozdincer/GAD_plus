@@ -2,6 +2,7 @@
 
 from .intrinsic_gad import (
     IntrinsicGADConfig,
+    IntrinsicGADObservation,
     IntrinsicGADResult,
     IntrinsicGADStep,
     run_intrinsic_gad,
@@ -9,6 +10,7 @@ from .intrinsic_gad import (
 
 __all__ = [
     "IntrinsicGADConfig",
+    "IntrinsicGADObservation",
     "IntrinsicGADResult",
     "IntrinsicGADStep",
     "run_intrinsic_gad",

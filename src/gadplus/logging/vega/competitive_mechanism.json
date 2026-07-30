@@ -1,0 +1,82 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "Competitive pointwise GAD mechanism diagnostics.",
+  "data": {"name": "wandb"},
+  "vconcat": [
+    {
+      "height": 45,
+      "title": {"text": "Mechanism navigator — drag to zoom", "anchor": "start"},
+      "params": [{"name": "mechanism_brush", "select": {"type": "interval", "encodings": ["x"], "clear": "dblclick"}}],
+      "mark": {"type": "area", "color": "#0072B2", "opacity": 0.35},
+      "encoding": {
+        "x": {"field": "${field:evaluation}", "type": "quantitative", "title": null},
+        "y": {"field": "${field:effective_gate}", "type": "quantitative", "scale": {"domain": [0, 1]}, "axis": null}
+      }
+    },
+    {
+      "height": 110,
+      "transform": [{"filter": {"param": "mechanism_brush", "empty": true}}],
+      "title": {"text": "Gate activation", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "line", "color": "#CC79A7", "strokeWidth": 1.3}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:lambda2_gate}", "type": "quantitative", "title": "gate weight", "scale": {"domain": [0, 1]}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:lambda2_gate}", "type": "quantitative", "title": "lambda2 gate"}, {"field": "${field:effective_gate}", "type": "quantitative", "title": "competitive gate"}]}},
+        {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.8}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:effective_gate}", "type": "quantitative", "scale": {"domain": [0, 1]}}}}
+      ]
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "mechanism_brush", "empty": true}}],
+      "title": {"text": "Soft-mode competition", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "area", "color": "#0072B2", "opacity": 0.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:activity_fraction}", "type": "quantitative", "title": "soft / (soft + extra)", "scale": {"domain": [0, 1]}}}},
+        {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.7}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:activity_fraction}", "type": "quantitative", "scale": {"domain": [0, 1]}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:soft_activity}", "type": "quantitative", "title": "soft activity"}, {"field": "${field:extra_negative_activity}", "type": "quantitative", "title": "extra-negative activity"}, {"field": "${field:activity_log10_ratio}", "type": "quantitative", "title": "log10 activity ratio"}]}}
+      ]
+    },
+    {
+      "height": 110,
+      "transform": [{"filter": {"param": "mechanism_brush", "empty": true}}],
+      "title": {"text": "Soft spectral density", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.6}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:p1}", "type": "quantitative", "title": "weight / entropy", "scale": {"domain": [0, 1]}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:p1}", "type": "quantitative"}, {"field": "${field:p2}", "type": "quantitative"}, {"field": "${field:spectral_entropy}", "type": "quantitative"}]}},
+        {"mark": {"type": "line", "color": "#CC79A7", "strokeWidth": 1.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:p2}", "type": "quantitative", "scale": {"domain": [0, 1]}}}},
+        {"mark": {"type": "line", "color": "#009E73", "strokeDash": [4, 3], "strokeWidth": 1.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:spectral_entropy}", "type": "quantitative", "scale": {"domain": [0, 1]}}}}
+      ]
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "mechanism_brush", "empty": true}}],
+      "title": {"text": "Descent/ascent action", "anchor": "start"},
+      "layer": [
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [4, 4]}, "encoding": {"y": {"datum": 0}}},
+        {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.8}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:lowest_reflection}", "type": "quantitative", "title": "1 - 2 w p1", "scale": {"domain": [-1, 1]}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:lowest_reflection}", "type": "quantitative", "title": "softest multiplier"}, {"field": "${field:lambda2_scaled}", "type": "quantitative", "title": "lambda2 / sH"}, {"field": "${field:n_neg}", "type": "quantitative", "title": "Morse index"}]}}
+      ]
+    },
+    {
+      "height": 120,
+      "transform": [{"filter": {"param": "mechanism_brush", "empty": true}}],
+      "title": {"text": "Closed-form regularization", "anchor": "start"},
+      "layer": [
+        {
+          "mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.5},
+          "encoding": {
+            "x": {"field": "${field:evaluation}", "type": "quantitative", "title": "Coherent Hessian evaluation"},
+            "y": {"field": "${field:regularizer_scaled}", "type": "quantitative", "title": "mu / sH", "scale": {"type": "log"}},
+            "tooltip": [
+              {"field": "${field:evaluation}", "type": "quantitative"},
+              {"field": "${field:regularizer_scaled}", "type": "quantitative", "title": "mu / sH"},
+              {"field": "${field:step_over_radius}", "type": "quantitative", "title": "step / R"},
+              {"field": "${field:local_radius}", "type": "quantitative", "title": "local radius"}
+            ]
+          }
+        },
+        {"mark": {"type": "point", "color": "#0072B2", "filled": true, "size": 18}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:regularizer_scaled}", "type": "quantitative", "scale": {"type": "log"}}}}
+      ]
+    }
+  ],
+  "resolve": {"scale": {"x": "shared"}},
+  "config": {
+    "background": "transparent",
+    "view": {"stroke": null},
+    "axis": {"gridColor": "#DDDDDD", "gridOpacity": 0.35, "labelFontSize": 11, "titleFontSize": 12},
+    "title": {"fontSize": 13, "fontWeight": 600}
+  }
+}

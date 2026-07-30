@@ -1,24 +1,35 @@
-"""Trajectory logging, MLflow integration, failure autopsy."""
+"""Trajectory logging with lazy optional integrations."""
 
-from gadplus.logging.schema import TRAJECTORY_SCHEMA, SUMMARY_SCHEMA
-from gadplus.logging.trajectory import TrajectoryLogger
-from gadplus.logging.autopsy import FailureType, classify_failure
+from __future__ import annotations
 
-# MLflow imports are lazy — mlflow may not be installed
-try:
-    from gadplus.logging.mlflow_logger import (
-        setup_mlflow,
-        log_run_params,
-        log_run_metrics,
-        log_artifact,
-    )
-except ImportError:
-    pass
+from importlib import import_module
+
+_EXPORTS = {
+    "FailureType": ("gadplus.logging.autopsy", "FailureType"),
+    "IntrinsicTrajectoryRecorder": (
+        "gadplus.logging.pointwise",
+        "IntrinsicTrajectoryRecorder",
+    ),
+    "SUMMARY_SCHEMA": ("gadplus.logging.schema", "SUMMARY_SCHEMA"),
+    "TRAJECTORY_SCHEMA": ("gadplus.logging.schema", "TRAJECTORY_SCHEMA"),
+    "TrajectoryLogger": ("gadplus.logging.trajectory", "TrajectoryLogger"),
+    "classify_failure": ("gadplus.logging.autopsy", "classify_failure"),
+}
 
 __all__ = [
-    "TRAJECTORY_SCHEMA",
     "SUMMARY_SCHEMA",
-    "TrajectoryLogger",
+    "TRAJECTORY_SCHEMA",
     "FailureType",
+    "IntrinsicTrajectoryRecorder",
+    "TrajectoryLogger",
     "classify_failure",
 ]
+
+
+def __getattr__(name: str):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module_name, attribute = _EXPORTS[name]
+    value = getattr(import_module(module_name), attribute)
+    globals()[name] = value
+    return value
