@@ -21,12 +21,59 @@ from gadplus.search.intrinsic_gad import (
     IntrinsicGADConfig,
     effective_gate_weight,
     pointwise_step_coefficients,
+    relative_soft_subspace_weights,
     run_intrinsic_gad,
     smooth_spectral_policy,
 )
 
 
 class SpectralPolicyTests(unittest.TestCase):
+    def test_relative_soft_subspace_reflects_an_exact_soft_degeneracy(self) -> None:
+        evals = torch.tensor([1.0, 1.0, 4.0], dtype=torch.float64)
+        gradient = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64)
+        policy = smooth_spectral_policy(evals, temperature=0.01)
+        relative = relative_soft_subspace_weights(policy)
+        standard_step, _ = pointwise_step_coefficients(
+            gradient, evals, policy, radius_mw=10.0, gate_variant="competitive"
+        )
+        subspace_step, _ = pointwise_step_coefficients(
+            gradient,
+            evals,
+            policy,
+            radius_mw=10.0,
+            gate_variant="competitive_subspace",
+        )
+
+        torch.testing.assert_close(relative[:2], torch.ones(2, dtype=torch.float64))
+        self.assertLess(float(standard_step[0] * gradient[0]), 1.0e-6)
+        self.assertGreater(float(subspace_step[0] * gradient[0]), 0.0)
+        self.assertGreater(float(subspace_step[1] * gradient[1]), 0.0)
+        self.assertLess(float(subspace_step[2] * gradient[2]), 0.0)
+
+    def test_relative_soft_subspace_keeps_high_index_descent_and_scale_covariance(self) -> None:
+        evals = torch.tensor([-3.0, -1.0, 2.0, 4.0], dtype=torch.float64)
+        gradient = torch.tensor([1.0, 4.0, 1.3, -0.9], dtype=torch.float64)
+        policy = smooth_spectral_policy(evals, temperature=0.01)
+        step, _ = pointwise_step_coefficients(
+            gradient,
+            evals,
+            policy,
+            radius_mw=0.4,
+            gate_variant="competitive_subspace",
+        )
+        self.assertTrue(bool((step * gradient < 0).all().item()))
+
+        factor = 17.0
+        scaled_policy = smooth_spectral_policy(factor * evals, temperature=0.01)
+        scaled_step, _ = pointwise_step_coefficients(
+            factor * gradient,
+            factor * evals,
+            scaled_policy,
+            radius_mw=0.4,
+            gate_variant="competitive_subspace",
+        )
+        torch.testing.assert_close(step, scaled_step)
+
     def test_experimental_gate_variants_are_local_and_selective(self) -> None:
         evals = torch.tensor([-3.0, -1.0, 2.0, 4.0], dtype=torch.float64)
         policy = smooth_spectral_policy(evals, temperature=0.01)
@@ -38,12 +85,8 @@ class SpectralPolicyTests(unittest.TestCase):
         pure_gad = effective_gate_weight(diffuse_negative, policy, "gad")
         aligned = effective_gate_weight(soft_aligned, policy, "alignment")
         diffuse = effective_gate_weight(diffuse_negative, policy, "competitive")
-        alignment_with_stable = effective_gate_weight(
-            stable_contamination, policy, "alignment"
-        )
-        competitive_with_stable = effective_gate_weight(
-            stable_contamination, policy, "competitive"
-        )
+        alignment_with_stable = effective_gate_weight(stable_contamination, policy, "alignment")
+        competitive_with_stable = effective_gate_weight(stable_contamination, policy, "competitive")
         boundary_policy = smooth_spectral_policy(
             torch.tensor([-0.01, -0.005, 2.0], dtype=torch.float64),
             temperature=0.01,
@@ -51,9 +94,7 @@ class SpectralPolicyTests(unittest.TestCase):
         boundary_competitive = effective_gate_weight(
             diffuse_negative[:3], boundary_policy, "competitive"
         )
-        boundary_guard = effective_gate_weight(
-            diffuse_negative[:3], boundary_policy, "guard"
-        )
+        boundary_guard = effective_gate_weight(diffuse_negative[:3], boundary_policy, "guard")
 
         self.assertLess(float(base), 1.0e-6)
         self.assertEqual(float(pure_gad), 1.0)

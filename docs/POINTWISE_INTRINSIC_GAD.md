@@ -93,6 +93,36 @@ budget is a benchmark setting, not state carried by the field.
 The index-boundary `guard` is not a final method: it was tied on the
 development panel and therefore adds complexity without demonstrated benefit.
 
+### Experimental minimum-capture diagnostic: relative soft subspace
+
+The initial g-xTB test-287 competitive run had no projected high-index
+terminals, but 23/281 calculator-valid starts ended at force-converged
+index-zero minima. This is a prevention experiment, not the selected
+production method.
+
+The trace-normalized density satisfies \(\sum_i p_i=1\). Consequently, when several
+positive-curvature modes are comparably soft, the ordinary factor
+`1-2 w p_i` need not fully reverse any one of them. The diagnostic preserves
+the competitive scalar gate but replaces its reflection density by
+
+```math
+\tilde p_i=\frac{p_i}{\max_j p_j}
+=\exp\!\left[-\frac{\lambda_i-\lambda_1}{\tau_s s_H}\right],
+\qquad
+b_i=(1-2w_{\mathrm{g\text{-}xTB}}\tilde p_i)c_i.
+```
+
+There is no new scale or learned parameter. For an isolated lowest mode it is
+exact one-mode GAD when the gate is active; for a degenerate lowest subspace it
+reflects that subspace as a whole. When `lambda_2 << 0`, the competitive gate
+still gives descent. The use of the ordered `lambda_1` is continuous and
+piecewise smooth, no worse than the existing ordered `lambda_2` gate.
+
+At an *exact* stationary minimum, all `c_i=0`, so this or any other
+force-proportional pointwise GAD map has zero step. The goal is therefore to
+avoid capture before that limit, not to claim an impossible deterministic
+escape. The implementation name is `gate_variant="competitive_subspace"`.
+
 ## Common geometry and notation
 
 Let $q\in\mathbb R^{3N}$ be Cartesian coordinates, with energy $E(q)$,

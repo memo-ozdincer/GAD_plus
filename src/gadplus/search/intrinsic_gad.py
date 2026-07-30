@@ -80,9 +80,17 @@ class IntrinsicGADConfig:
             raise ValueError("spectral_temperature must be positive")
         if self.step_fraction <= 0:
             raise ValueError("step_fraction must be positive")
-        if self.gate_variant not in {"lambda2", "alignment", "competitive", "guard", "gad"}:
+        if self.gate_variant not in {
+            "lambda2",
+            "alignment",
+            "competitive",
+            "competitive_subspace",
+            "guard",
+            "gad",
+        }:
             raise ValueError(
-                "gate_variant must be 'lambda2', 'alignment', 'competitive', 'guard', or 'gad'"
+                "gate_variant must be 'lambda2', 'alignment', 'competitive', "
+                "'competitive_subspace', 'guard', or 'gad'"
             )
 
 
@@ -183,6 +191,7 @@ class GateDiagnostics:
     extra_negative_activity: torch.Tensor
     activity_fraction: torch.Tensor
     spectral_entropy: torch.Tensor
+    reflection_weights: torch.Tensor
     lowest_reflection: torch.Tensor
 
 
@@ -279,6 +288,40 @@ def effective_gate_weight(
     return gate_diagnostics(gradient_coefficients, policy, variant).effective_gate
 
 
+def _base_gate_variant(variant: str) -> str:
+    """Return the scalar-gate policy underlying a reflection variant."""
+
+    return "competitive" if variant == "competitive_subspace" else variant
+
+
+def relative_soft_subspace_weights(policy: SpectralPolicy) -> torch.Tensor:
+    r"""Return the parameter-free relative soft-subspace filter.
+
+    With the trace-normalized soft density ``p``, define
+
+    .. math::
+
+        \tilde p_i = p_i / \max_j p_j
+        = \exp[-(\lambda_i-\lambda_1)/(\tau s_H)].
+
+    It gives weight one to every exactly degenerate lowest mode, while an
+    isolated lowest mode is exactly ordinary one-mode GAD.  The use of the
+    ordered minimum is continuous but piecewise smooth at eigenvalue
+    crossings, the same regularity already present in the ``lambda_2`` gate.
+    """
+
+    weights = policy.low_mode_weights
+    return weights / weights.amax().clamp_min(torch.finfo(weights.dtype).tiny)
+
+
+def reflection_weights(policy: SpectralPolicy, variant: str) -> torch.Tensor:
+    """Return the weights used in ``I-2wP`` for a local policy."""
+
+    if variant == "competitive_subspace":
+        return relative_soft_subspace_weights(policy)
+    return policy.low_mode_weights
+
+
 def gate_diagnostics(
     gradient_coefficients: torch.Tensor,
     policy: SpectralPolicy,
@@ -290,8 +333,16 @@ def gate_diagnostics(
     reimplementing a policy with slightly different numerical conventions.
     """
 
-    if variant not in {"lambda2", "alignment", "competitive", "guard", "gad"}:
+    if variant not in {
+        "lambda2",
+        "alignment",
+        "competitive",
+        "competitive_subspace",
+        "guard",
+        "gad",
+    }:
         raise ValueError(f"unknown gate variant: {variant}")
+    base_variant = _base_gate_variant(variant)
     coeffs = gradient_coefficients.to(torch.float64).reshape(-1)
     activity = coeffs.square()
     soft = torch.sum(policy.low_mode_weights * activity)
@@ -304,12 +355,12 @@ def gate_diagnostics(
         torch.zeros_like(competitive_denominator),
     ).clamp(0.0, 1.0)
 
-    if variant == "gad":
+    if base_variant == "gad":
         effective = torch.ones_like(policy.gate)
-    elif variant == "lambda2":
+    elif base_variant == "lambda2":
         effective = policy.gate
     else:
-        if variant == "alignment":
+        if base_variant == "alignment":
             denominator = torch.sum(activity)
             fraction = torch.where(
                 denominator > 0,
@@ -319,7 +370,7 @@ def gate_diagnostics(
         else:
             fraction = competitive_fraction
         competitive = policy.gate + (1.0 - policy.gate) * fraction
-        if variant == "guard":
+        if base_variant == "guard":
             z1 = policy.lowest_normalized_eigenvalue / policy.temperature
             minimum_boundary = torch.sigmoid(z1)
             boundary_guard = 4.0 * minimum_boundary * (1.0 - minimum_boundary)
@@ -334,7 +385,8 @@ def gate_diagnostics(
         ) / math.log(weights.numel())
     else:
         entropy = torch.zeros_like(policy.gate)
-    lowest_reflection = 1.0 - 2.0 * effective * weights[0]
+    policy_reflection_weights = reflection_weights(policy, variant)
+    lowest_reflection = 1.0 - 2.0 * effective * policy_reflection_weights[0]
     return GateDiagnostics(
         lambda2_gate=policy.gate,
         effective_gate=effective,
@@ -342,6 +394,7 @@ def gate_diagnostics(
         extra_negative_activity=extra_negative,
         activity_fraction=competitive_fraction,
         spectral_entropy=entropy,
+        reflection_weights=policy_reflection_weights,
         lowest_reflection=lowest_reflection,
     )
 
@@ -372,7 +425,7 @@ def pointwise_step_coefficients(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""Compute the closed-form gated step in the Hessian eigenbasis.
 
-    With ``b_i = (1 - 2 w p_i) g_i`` and
+    With ``b_i = (1 - 2 w r_i) g_i`` and
     ``mu = ||b|| / R``, the step is
 
     .. math::
@@ -393,7 +446,7 @@ def pointwise_step_coefficients(
         raise ValueError("gradient, eigenvalue, and spectral-weight shapes must agree")
 
     gate = effective_gate_weight(coeffs, policy, gate_variant)
-    reflection = 1.0 - 2.0 * gate * policy.low_mode_weights
+    reflection = 1.0 - 2.0 * gate * reflection_weights(policy, gate_variant)
     modified_gradient = reflection * coeffs
     modified_norm = torch.linalg.vector_norm(modified_gradient)
     if float(modified_norm.item()) == 0.0:

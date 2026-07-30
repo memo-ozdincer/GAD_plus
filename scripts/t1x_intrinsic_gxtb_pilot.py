@@ -57,7 +57,14 @@ def parse_args() -> argparse.Namespace:
     common.add_argument("--spectral-temperature", type=float, default=0.01)
     common.add_argument(
         "--gate-variant",
-        choices=("lambda2", "alignment", "competitive", "guard", "gad"),
+        choices=(
+            "lambda2",
+            "alignment",
+            "competitive",
+            "competitive_subspace",
+            "guard",
+            "gad",
+        ),
         default="competitive",
     )
     common.add_argument("--seed", type=int, default=20260727)
