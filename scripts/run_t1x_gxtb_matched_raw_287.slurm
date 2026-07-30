@@ -27,6 +27,7 @@ case "$FAMILY" in regular_gad|competitive|competitive_subspace|sella) ;; *) echo
 PROJECT_DIR=/scratch/memoozd/GAD/GAD_plus
 export SAMPLE_IDS=$(seq -s, 0 286)
 OUT_ROOT=/scratch/memoozd/gadplus/runs/${RUN_LABEL}-${SLURM_JOB_ID}
+export PROJECT_DIR OUT_ROOT FAMILY NOISE MAX_STEPS RUN_LABEL
 export GADPLUS_SCRATCH=/scratch/memoozd/gadplus
 export GADPLUS_T1X_H5=/scratch/memoozd/GAD/data/transition1x.h5
 export GADPLUS_GXTB_EXE=/scratch/memoozd/GAD/third_party/g-xtb/xtb-6.7.1/bin/xtb
