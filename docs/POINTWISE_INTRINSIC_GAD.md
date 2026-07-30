@@ -123,6 +123,44 @@ force-proportional pointwise GAD map has zero step. The goal is therefore to
 avoid capture before that limit, not to claim an impossible deterministic
 escape. The implementation name is `gate_variant="competitive_subspace"`.
 
+#### Predeclared paired diagnostic (Transition1x / g-xTB, 0.20 Å)
+
+The diagnostic was run on exactly the 23 calculator-valid index-zero terminals
+from the frozen 287-start competitive campaign.  The initial coordinates and
+sample-derived random seeds were regenerated identically; the reflection rule
+above was the only algorithmic change.  At the same 300-update budget:
+
+| policy | calculator-valid | terminal index 0 | terminal index 1 | local index-1, (f_{max}<0.03) eV Å(^{-1}) | strict, (f_{max}<0.01) eV Å(^{-1}) |
+|---|---:|---:|---:|---:|---:|
+| competitive | 23/23 | 23 | 0 | 0 | 0 |
+| competitive subspace | 21/23 | 3 | 17 | 15 | 0 |
+
+Thus the experimental reflection prevented 20/23 matched minimum captures;
+the two missing evaluations were g-xTB SCF failures, not optimizer terminal
+states.  This is compelling evidence that the soft-subspace dilution was a
+real capture mechanism, but it is deliberately not yet called the production
+formulation: the full 287-start and endpoint-topology panels must establish
+whether the improved local index outcome survives calculator robustness and
+IRC-topology scoring.
+
+Separately, the 22 original index-one/high-force terminals were continued
+under the unchanged `competitive` map to 10,000 updates, with two near-
+threshold index-one controls.  Only one of the 22 entered the local gate
+((f_{max}<0.03) eV Å(^{-1})) at update 1,067, and it also passed the
+strict (0.01) eV Å(^{-1}) gate at update 1,072.  At 10,000 updates,
+21/22 remained index one and one was index zero; the median force maximum was
+0.271 eV Å(^{-1}), versus 0.318 eV Å(^{-1}) at update 1,000.  The two
+controls were already locally converged by updates 53 and 58.  Therefore the
+high-force class is mostly a fixed-point/conditioning problem, not a simple
+budget shortage; it should not be obscured by a routine long-run allowance.
+
+The immutable task results and trajectory checkpoints are stored under
+`/scratch/memoozd/gadplus/runs/t1x-gxtb-minimum-prevention-1983160` and
+`/scratch/memoozd/gadplus/runs/t1x-gxtb-force-extension-1983161`, respectively.
+`scripts/analyze_t1x_gxtb_failure_diagnostics.py` regenerates the reported
+paired counts and the 1k/3k/10k continuation checkpoints without calculator
+calls.
+
 ## Common geometry and notation
 
 Let $q\in\mathbb R^{3N}$ be Cartesian coordinates, with energy $E(q)$,
