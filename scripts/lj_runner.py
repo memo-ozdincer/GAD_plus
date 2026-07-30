@@ -81,10 +81,40 @@ def parse_args() -> argparse.Namespace:
         help="Enable torch.compile for LJ force and Hessian kernels on CUDA.",
     )
     parser.add_argument(
+        "--lj-oscillator-mode",
+        choices=["off", "linear", "deadzone", "pair", "switch", "quartic"],
+        default="off",
+        help="Optional LJ tether: off, linear, deadzone, pair, switch, or quartic.",
+    )
+    parser.add_argument(
         "--lj-oscillator",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Add a harmonic tether in the analytical LJ energy (default: off).",
+        help="Legacy alias for --lj-oscillator-mode linear when mode is off.",
+    )
+    parser.add_argument(
+        "--lj-oscillator-scale",
+        type=float,
+        default=1.0,
+        help="Strength of the optional LJ tether term.",
+    )
+    parser.add_argument(
+        "--lj-oscillator-r0",
+        type=float,
+        default=1.0,
+        help="Deadzone/switch threshold in units of r_eq * N^(1/3).",
+    )
+    parser.add_argument(
+        "--lj-oscillator-rcut",
+        type=float,
+        default=1.0,
+        help="Pair spring cutoff in units of r_eq * N^(1/3).",
+    )
+    parser.add_argument(
+        "--lj-oscillator-switch-width",
+        type=float,
+        default=0.3,
+        help="Switch sigmoid width in units of r_eq.",
     )
     parser.add_argument(
         "--atomic-number",
@@ -216,6 +246,24 @@ def lj_dissociation_summary(d_max: float, n_atoms: int, sigma: float) -> dict[st
     }
 
 
+def resolved_lj_oscillator_mode(args: argparse.Namespace) -> str:
+    if args.lj_oscillator_mode != "off":
+        return args.lj_oscillator_mode
+    if args.lj_oscillator:
+        return "linear"
+    return "off"
+
+
+def lj_oscillator_record(args: argparse.Namespace) -> dict[str, float | str]:
+    return {
+        "lj_oscillator_mode": resolved_lj_oscillator_mode(args),
+        "lj_oscillator_scale": args.lj_oscillator_scale,
+        "lj_oscillator_r0": args.lj_oscillator_r0,
+        "lj_oscillator_rcut": args.lj_oscillator_rcut,
+        "lj_oscillator_switch_width": args.lj_oscillator_switch_width,
+    }
+
+
 def method_tag(args: argparse.Namespace) -> str:
     if args.method == "gad":
         tag = (
@@ -302,6 +350,7 @@ def run_regular_gad(args: argparse.Namespace, predict_fn, atomic_nums: torch.Ten
                 "dt": args.dt,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
+                **lj_oscillator_record(args),
                 "noise": args.noise,
                 "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
@@ -506,6 +555,7 @@ def run_hybrid(args: argparse.Namespace, predict_fn, atomic_nums: torch.Tensor) 
                 "switch_force": args.switch_force,
                 "epsilon": args.epsilon,
                 "sigma": args.sigma,
+                **lj_oscillator_record(args),
                 "noise": args.noise,
                 "gaussian_origin_sigma": args.gaussian_origin_sigma,
                 "start_from": args.start_from,
@@ -560,6 +610,9 @@ def main() -> None:
     if args.method != "hybrid_damped_eckart" and args.target_mode_strategy != "fixed":
         sys.exit("--target-mode-strategy only applies to hybrid_damped_eckart")
 
+    if args.lj_oscillator_scale < 0:
+        sys.exit("--lj-oscillator-scale must be non-negative")
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
     params = LennardJonesParams(epsilon=args.epsilon, sigma=args.sigma)
     predict_fn = make_lj_predict_fn(
@@ -568,13 +621,18 @@ def main() -> None:
         compile_forces=args.lj_compile,
         compile_hessian=args.lj_compile,
         oscillator=args.lj_oscillator,
+        oscillator_mode=resolved_lj_oscillator_mode(args),
+        oscillator_scale=args.lj_oscillator_scale,
+        oscillator_r0=args.lj_oscillator_r0,
+        oscillator_rcut=args.lj_oscillator_rcut,
+        oscillator_switch_width=args.lj_oscillator_switch_width,
     )
     atomic_nums = lj_atomic_nums(args.n_atoms, atomic_number=args.atomic_number)
     run_id = uuid.uuid4().hex[:8]
     print(
         f"LJ benchmark | method={args.method} start={args.start_from} "
         f"n_atoms={args.n_atoms} epsilon={args.epsilon:g} sigma={args.sigma:g} "
-        f"samples={args.n_samples} run_id={run_id}",
+        f"osc={resolved_lj_oscillator_mode(args)} samples={args.n_samples} run_id={run_id}",
         flush=True,
     )
 

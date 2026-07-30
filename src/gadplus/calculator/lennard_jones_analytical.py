@@ -11,6 +11,12 @@ import numpy as np
 import torch
 
 from gadplus.calculator.lj_data_utils import subtract_com_vector
+from gadplus.calculator.lj_oscillator import (
+    normalize_oscillator_mode,
+    oscillator_energy,
+    oscillator_forces,
+    oscillator_hessian_blocks,
+)
 
 
 def _resolve_reference_path(path: str) -> Path:
@@ -39,7 +45,11 @@ class LennardJonesEnergy(torch.nn.Module):
         eps: float = 1.0,
         rm: float = 1.0,
         oscillator: bool = True,
+        oscillator_mode: str = "linear",
         oscillator_scale: float = 1.0,
+        oscillator_r0: float = 1.0,
+        oscillator_rcut: float = 1.0,
+        oscillator_switch_width: float = 0.3,
         energy_factor: float = 1.0,
         min_distance: float = 1e-3,
         tau: float = 1.0,
@@ -58,7 +68,13 @@ class LennardJonesEnergy(torch.nn.Module):
         self.eps = eps
         self.rm = rm
         self.oscillator = oscillator
+        self.oscillator_mode = (
+            "off" if not oscillator else normalize_oscillator_mode(oscillator_mode)
+        )
         self.oscillator_scale = oscillator_scale
+        self.oscillator_r0 = oscillator_r0
+        self.oscillator_rcut = oscillator_rcut
+        self.oscillator_switch_width = oscillator_switch_width
         self.energy_factor = energy_factor
         self.min_distance = min_distance
         self.tau = tau
@@ -96,9 +112,18 @@ class LennardJonesEnergy(torch.nn.Module):
 
         energy = lennard_jones_pair_energy(distances, self.eps, self.rm).sum(dim=-1)
         energy = energy * self.energy_factor
-        if self.oscillator:
-            oscillator_energy = samples.pow(2).sum(dim=(-2, -1))
-            energy = energy + self.oscillator_scale * oscillator_energy
+        if self.oscillator_mode != "off":
+            energy = energy + oscillator_energy(
+                samples,
+                torch.linalg.norm(diff, dim=-1),
+                mode=self.oscillator_mode,
+                scale=self.oscillator_scale,
+                rm=self.rm,
+                n_particles=self.n_particles,
+                r0_factor=self.oscillator_r0,
+                rcut_factor=self.oscillator_rcut,
+                switch_width_factor=self.oscillator_switch_width,
+            )
         return energy
 
     def eval_flat(self, samples: torch.Tensor) -> torch.Tensor:
@@ -201,8 +226,20 @@ class LennardJonesEnergy(torch.nn.Module):
         ).sum(dim=2)
 
         forces = pair_forces
-        if self.oscillator:
-            forces = forces - 2.0 * self.oscillator_scale * samples
+        if self.oscillator_mode != "off":
+            forces = forces + oscillator_forces(
+                samples,
+                diff,
+                distances,
+                mode=self.oscillator_mode,
+                scale=self.oscillator_scale,
+                rm=self.rm,
+                n_particles=self.n_particles,
+                r0_factor=self.oscillator_r0,
+                rcut_factor=self.oscillator_rcut,
+                switch_width_factor=self.oscillator_switch_width,
+                min_distance=self.min_distance,
+            )
 
         forces = forces.reshape(n_systems, n_particles, self.n_spatial_dim)
         return forces
@@ -294,20 +331,25 @@ class LennardJonesEnergy(torch.nn.Module):
             off_diagonal_blocks,
         )
 
-        if self.oscillator:
-            projector = torch.eye(
-                n_particles,
-                dtype=positions.dtype,
-                device=positions.device,
+        if self.oscillator_mode != "off":
+            hessian_blocks = hessian_blocks + oscillator_hessian_blocks(
+                subtract_com_vector(
+                    positions,
+                    self.n_particles,
+                    self.n_spatial_dim,
+                ),
+                diff,
+                distances,
+                mode=self.oscillator_mode,
+                scale=self.oscillator_scale,
+                rm=self.rm,
+                n_particles=self.n_particles,
+                spatial_dim=spatial_dim,
+                r0_factor=self.oscillator_r0,
+                rcut_factor=self.oscillator_rcut,
+                switch_width_factor=self.oscillator_switch_width,
+                min_distance=self.min_distance,
             )
-            projector = projector - torch.full_like(projector, 1.0 / n_particles)
-            oscillator_hessian = (
-                2.0
-                * self.oscillator_scale
-                * projector[None, :, :, None, None]
-                * eye_spatial[None, None, None, :, :]
-            )
-            hessian_blocks = hessian_blocks + oscillator_hessian
 
         hessian = hessian_blocks.permute(0, 1, 3, 2, 4).reshape(
             n_systems,

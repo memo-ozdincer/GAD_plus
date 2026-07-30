@@ -95,6 +95,11 @@ class LennardJonesAnalyticalPredictor(PredictFn):
         compile_forces: bool = False,
         compile_hessian: bool = False,
         oscillator: bool = False,
+        oscillator_mode: str = "off",
+        oscillator_scale: float = 1.0,
+        oscillator_r0: float = 1.0,
+        oscillator_rcut: float = 1.0,
+        oscillator_switch_width: float = 0.3,
     ):
         if n_atoms < 2:
             raise ValueError("Lennard-Jones clusters require at least two atoms.")
@@ -102,11 +107,19 @@ class LennardJonesAnalyticalPredictor(PredictFn):
         p = params or LennardJonesParams()
         self.n_atoms = n_atoms
         self.params = p
+        mode = oscillator_mode
+        if oscillator and mode == "off":
+            mode = "linear"
         self._model = LennardJonesEnergy(
             n_particles=n_atoms,
             eps=p.epsilon,
             rm=params_to_analytical_rm(p.sigma),
-            oscillator=oscillator,
+            oscillator=mode != "off",
+            oscillator_mode=mode,
+            oscillator_scale=oscillator_scale,
+            oscillator_r0=oscillator_r0,
+            oscillator_rcut=oscillator_rcut,
+            oscillator_switch_width=oscillator_switch_width,
             compile_forces=compile_forces,
             compile_hessian=compile_hessian,
         )
@@ -198,6 +211,11 @@ def make_lj_predict_fn(
     compile_forces: bool = False,
     compile_hessian: bool = False,
     oscillator: bool = False,
+    oscillator_mode: str = "off",
+    oscillator_scale: float = 1.0,
+    oscillator_r0: float = 1.0,
+    oscillator_rcut: float = 1.0,
+    oscillator_switch_width: float = 0.3,
 ) -> PredictFn:
     """Create an analytical PredictFn for the Lennard-Jones cluster potential.
 
@@ -206,7 +224,13 @@ def make_lj_predict_fn(
         n_atoms: Cluster size.
         compile_forces: Enable ``torch.compile`` for analytical forces on CUDA.
         compile_hessian: Enable ``torch.compile`` for analytical Hessians on CUDA.
-        oscillator: Add a harmonic tether restoring each atom toward the origin.
+        oscillator: Legacy boolean; when True and mode is ``off``, uses ``linear``.
+        oscillator_mode: One of ``off``, ``linear``, ``deadzone``, ``pair``,
+            ``switch``, or ``quartic``.
+        oscillator_scale: Strength of the tether term.
+        oscillator_r0: Deadzone / switch threshold in units of ``r_eq N^(1/3)``.
+        oscillator_rcut: Pair spring cutoff in units of ``r_eq N^(1/3)``.
+        oscillator_switch_width: Switch sigmoid width in units of ``r_eq``.
     """
 
     return LennardJonesAnalyticalPredictor(
@@ -215,6 +239,11 @@ def make_lj_predict_fn(
         compile_forces=compile_forces,
         compile_hessian=compile_hessian,
         oscillator=oscillator,
+        oscillator_mode=oscillator_mode,
+        oscillator_scale=oscillator_scale,
+        oscillator_r0=oscillator_r0,
+        oscillator_rcut=oscillator_rcut,
+        oscillator_switch_width=oscillator_switch_width,
     )
 
 
