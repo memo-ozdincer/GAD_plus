@@ -140,6 +140,83 @@ def _markdown(rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _wilson(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
+    """Two-sided Wilson interval, robust even for zero observed successes."""
+
+    if trials <= 0:
+        return math.nan, math.nan
+    p = successes / trials
+    denom = 1.0 + z * z / trials
+    centre = (p + z * z / (2.0 * trials)) / denom
+    half = z * math.sqrt(p * (1.0 - p) / trials + z * z / (4.0 * trials * trials)) / denom
+    return centre - half, centre + half
+
+
+def _analysis(rows: list[dict[str, Any]]) -> str:
+    """Write a compact interpretation without hiding rates or denominators."""
+
+    lines = [
+        "# Matched Transition1x / g-xTB grid interpretation",
+        "",
+        "Every cell has 287 paired Cartesian-noise starts. `local index 1` means "
+        "projected index one and $f_{\\max}<0.03$ eV Å$^{-1}$; `native topology` "
+        "additionally requires the two independently relaxed downhill branches to "
+        "match the labelled Transition1x endpoint pair. Thus topology/start is the "
+        "primary robustness measure, while topology/local is candidate selectivity.",
+        "",
+        "Wilson 95% intervals below quantify only finite-start sampling uncertainty; "
+        "they do not include calculator, data-set, or hyperparameter uncertainty.",
+        "",
+    ]
+    for noise in sorted({row["noise_angstrom"] for row in rows}):
+        panel = sorted(
+            (row for row in rows if row["noise_angstrom"] == noise),
+            key=lambda row: (-float(row["native_topology_per_start"] or 0.0), row["method"]),
+        )
+        lines.extend([
+            f"## Noise $\\sigma={noise:.2f}$ Å",
+            "",
+            "| method | local / starts | native topology / starts (95% Wilson) | native topology / local | calculator errors | terminal index 0 | terminal index >1 |",
+            "|---|---:|---:|---:|---:|---:|---:|",
+        ])
+        for row in panel:
+            lo, hi = _wilson(row["native_topology"], row["starts"])
+            selectivity = (
+                f"{row['native_topology']}/{row['local_index1']} "
+                f"({100 * row['native_topology_per_local']:.1f}%)"
+                if row["local_index1"] else "0/0 (—)"
+            )
+            lines.append(
+                f"| {row['method']} | {row['local_index1']}/{row['starts']} "
+                f"({100 * row['local_index1'] / row['starts']:.1f}%) | "
+                f"{row['native_topology']}/{row['starts']} "
+                f"({100 * row['native_topology_per_start']:.1f}%; "
+                f"{100 * lo:.1f}–{100 * hi:.1f}%) | "
+                f"{selectivity} | "
+                f"{row['calculator_error']} | {row['terminal_index0']} | "
+                f"{row['terminal_index_gt1']} |"
+            )
+        winner = panel[0]
+        lines.extend([
+            "",
+            f"The highest observed native-topology recovery in this panel is "
+            f"`{winner['method']}`: {winner['native_topology']}/{winner['starts']} "
+            f"({100 * winner['native_topology_per_start']:.1f}%).",
+            "",
+        ])
+    lines.extend([
+        "## Reading the failure columns",
+        "",
+        "`terminal index 0` denotes capture in a minimum-like basin at the budget; "
+        "`terminal index >1` denotes remaining higher-order curvature; and the omitted "
+        "valid starts are index-one but force-limited. These categories are terminal "
+        "outcomes, not post hoc exclusions. Compare them against `local / starts` before "
+        "attributing a topology difference to endpoint selectivity.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="JSON list of campaign specifications")
@@ -154,6 +231,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "summary.json").write_text(json.dumps(rows, indent=2) + "\n")
     (args.output_dir / "SUMMARY.md").write_text(_markdown(rows))
+    (args.output_dir / "ANALYSIS.md").write_text(_analysis(rows))
     print(_markdown(rows), end="")
 
 
