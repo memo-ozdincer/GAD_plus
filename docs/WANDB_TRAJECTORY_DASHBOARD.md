@@ -57,8 +57,8 @@ method-specific controls. Historical LJ7 progression data have aggregate
 records but no saved stepwise traces, so the explorer reports that limitation
 instead of fabricating plots.
 
-On Trillium the server binds only to loopback. Start it from the scratch-root
-checkout and open an SSH tunnel from the workstation:
+For a private local session on Trillium, start it from the scratch-root checkout
+and open an SSH tunnel from the workstation:
 
 ```bash
 ssh -N -L 8767:127.0.0.1:8767 <trillium-host>
@@ -66,6 +66,27 @@ ssh -N -L 8767:127.0.0.1:8767 <trillium-host>
 
 Then open `http://localhost:8767`. The local DuckDB index and trace cache are
 observational and never enter an optimizer update.
+
+### Git-connected public explorer
+
+The public Cloud Run service is deployed from `main` by
+`.github/workflows/deploy-trajectory-explorer.yml`.  It uses GitHub-to-Google
+Cloud workload identity federation rather than a stored cloud key: a qualifying
+source change builds a container from that exact commit and replaces the
+revision behind the stable service URL.
+
+The indexed trajectory artifacts deliberately remain outside Git.  They are
+immutable, private Cloud Storage data mounted read-only by Cloud Run; publish a
+completed campaign explicitly with:
+
+```bash
+scripts/publish_trajectory_explorer_data_gcs.sh \
+  gs://gadplus-explorer-811442049155-us-central1
+```
+
+This separates a small, reviewable Git deployment from potentially large raw
+trajectory data.  A source push updates the viewer; a data publish updates its
+indexed campaign records.  Neither operation changes optimizer dynamics.
 
 ### Current matched g-xTB grid record
 

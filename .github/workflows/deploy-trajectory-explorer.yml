@@ -1,0 +1,49 @@
+name: Deploy trajectory explorer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/gadplus/**'
+      - 'scripts/serve_t1x_trajectory_explorer.py'
+      - 'deploy/cloudrun/**'
+      - '.github/workflows/deploy-trajectory-explorer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: project-6c9e3a32-ae7d-4c0a-b62
+  PROJECT_NUMBER: '811442049155'
+  REGION: us-central1
+  REPOSITORY: gadplus-explorer
+  SERVICE: gadplus-trajectory-explorer
+  DATA_BUCKET: gadplus-explorer-811442049155-us-central1
+  SERVICE_ACCOUNT: gadplus-github-deployer@project-6c9e3a32-ae7d-4c0a-b62.iam.gserviceaccount.com
+  RUNTIME_SERVICE_ACCOUNT: gadplus-explorer-runtime@project-6c9e3a32-ae7d-4c0a-b62.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gadplus-github/providers/github
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build image from this commit
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/explorer:${GITHUB_SHA}"
+          gcloud builds submit --project "$PROJECT_ID" --config deploy/cloudrun/cloudbuild.yaml --substitutions="_IMAGE=${IMAGE}" .
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+      - name: Roll the stable URL to this revision
+        run: |
+          gcloud run deploy "$SERVICE" --project "$PROJECT_ID" --region "$REGION" \
+            --image "$IMAGE" --allow-unauthenticated --port 8080 --cpu 1 --memory 1Gi \
+            --min-instances 0 --max-instances 3 --timeout 300 \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --add-volume="name=explorer-data,type=cloud-storage,bucket=${DATA_BUCKET},readonly=true,mount-path=/mnt/gadplus" \
+            --set-env-vars="GADPLUS_DATABASE=/mnt/gadplus/index.duckdb,GADPLUS_TRACE_ROOT=/mnt/gadplus/runs"

@@ -6,6 +6,7 @@ import argparse
 from functools import lru_cache
 import json
 import math
+import os
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +115,10 @@ def regular_trace(path: str) -> dict[str, Any]:
 
 
 def load_trace(kind: str, path: str) -> dict[str, Any]:
+    source_root = "/scratch/memoozd/gadplus/runs"
+    mounted_root = os.environ.get("GADPLUS_TRACE_ROOT")
+    if mounted_root and path.startswith(source_root + "/"):
+        path = mounted_root + path.removeprefix(source_root)
     if not path: return {}
     return {"bundle":bundle_trace, "sella_npz":sella_trace, "regular_parquet":regular_trace}[kind](path)
 
@@ -271,9 +276,12 @@ def create_app(database: Path) -> Flask:
 
 
 def main() -> None:
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--manifest",type=Path,default=Path("experiments/t1x_gxtb_matched_noise_grid_manifest.json"));parser.add_argument("--lj-results",type=Path,default=Path("/scratch/memoozd/gadplus/runs/lj-method-progression-1946071/all_results.json"));parser.add_argument("--database",type=Path,default=Path("/scratch/memoozd/gadplus/analysis/trajectory-explorer/index.duckdb"));parser.add_argument("--port",type=int,default=8767);parser.add_argument("--rebuild",action="store_true");args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--manifest",type=Path,default=Path("experiments/t1x_gxtb_matched_noise_grid_manifest.json"));parser.add_argument("--lj-results",type=Path,default=Path("/scratch/memoozd/gadplus/runs/lj-method-progression-1946071/all_results.json"));parser.add_argument("--database",type=Path,default=Path(os.environ.get("GADPLUS_DATABASE", "/scratch/memoozd/gadplus/analysis/trajectory-explorer/index.duckdb")));parser.add_argument("--port",type=int,default=int(os.environ.get("PORT", "8767")));parser.add_argument("--rebuild",action="store_true");args=parser.parse_args()
     if args.rebuild or not args.database.exists(): build_index(args.manifest,args.lj_results,args.database)
-    create_app(args.database).run(host="127.0.0.1",port=args.port,debug=False,threaded=True)
+    # Cloud Run (and the local tunnel) need the process reachable outside its
+    # loopback namespace.  The service is still public only through Cloud Run
+    # IAM; this does not alter the local data/API contract.
+    create_app(args.database).run(host="0.0.0.0",port=args.port,debug=False,threaded=True)
 
 
 if __name__=="__main__": main()
