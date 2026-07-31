@@ -1,23 +1,24 @@
 # A five-minute toy for the GADplus evolution
 
-Run this single file after installing NumPy and Matplotlib:
+Open the self-contained notebook after installing NumPy and Matplotlib:
 
 ```bash
-python examples/gad_evolution_toy.py --output gad_evolution_toy.png
+jupyter notebook examples/gad_evolution_four_wells.ipynb
 ```
 
-It produces one figure with four trajectories on the same analytic surface
-and one small spectral inset. The code has no calculator, optimizer state,
+It produces the four-well landscape, a controlled competitive-gate contrast,
+and a small spectral inset. The code has no calculator, optimizer state,
 dataset, or molecular machinery.
 
 ## The surface
 
 ```math
-E(x,y)=(x^2-1)^2+(y^2-1)^2.
+E(x,y)=(x^2-1)^2+0.9(y^2-1)^2.
 ```
 
 It has four minima \((\pm1,\pm1)\), four index-one edge saddles, and an
-index-two centre at \((0,0)\). Therefore it contains the exact failure that
+index-two centre at \((0,0)\). The slight anisotropy only breaks an otherwise
+pathological exact symmetry. Therefore it contains the exact failure that
 ordinary one-mode GAD does not address: far from an index-one saddle, more
 than one direction can have negative curvature.
 
