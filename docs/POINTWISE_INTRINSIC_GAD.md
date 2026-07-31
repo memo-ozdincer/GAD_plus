@@ -1,4 +1,6 @@
-# From ordinary GAD to pointwise intrinsic smooth-index GAD
+# Soft-Spectral Gentlest Ascent Dynamics (SS-GAD)
+
+## From ordinary GAD to Competitive Soft-Spectral GAD (CS²-GAD)
 
 This document explains the sequence of ideas that led from ordinary
 one-mode Gentlest Ascent Dynamics (GAD) to the current pointwise intrinsic
@@ -929,11 +931,14 @@ LJ noise-study results are in
 
 The full matched 287-start g-xTB grid changes the provisional selection made
 in the earlier development discussion above.  The selected molecular
-formulation is now **competitive-subspace GAD**,
+formulation is now **Competitive Soft-Spectral GAD (CS²-GAD)**,
 `gate_variant="competitive_subspace"`.  It retains the LJ-derived intrinsic
 geometry, the smooth \(\lambda_2\) descent-to-GAD transition, and the
 competitive activity gate, but removes soft-density dilution when the lowest
-curvature is nearly degenerate.
+curvature is nearly degenerate. “Soft-spectral” refers to the
+finite-temperature spectral density used below. The exact, isolated-mode,
+fully active ordinary-GAD limit is a Householder reflection; the
+finite-temperature operator is generally not.
 
 Let \(c_i\) be the current mass-weighted vibrational gradient coefficients,
 \(s_H=(m^{-1}\sum_i\lambda_i^2)^{1/2}\), and

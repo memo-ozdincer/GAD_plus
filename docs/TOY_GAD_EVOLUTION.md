@@ -1,4 +1,4 @@
-# A five-minute toy for the GADplus evolution
+# Soft-Spectral Gentlest Ascent Dynamics: a five-minute toy
 
 Run this single file after installing NumPy and Matplotlib:
 
@@ -50,7 +50,7 @@ intrinsic pair-distance scale described in `POINTWISE_INTRINSIC_GAD.md`.
 3. **Competitive gate** uses the current gradient activity to turn ascent on
    earlier only when the soft direction is active relative to the *other
    negative* directions. It is the g-xTB minimum-capture fix.
-4. **Competitive-subspace GAD** keeps that scalar gate but replaces the
+4. **Competitive Soft-Spectral GAD (CS²-GAD)** keeps that scalar gate but replaces the
    normalized soft density \(p_i\) in the reflection with
    \(\widetilde p_i=p_i/\max_jp_j\). The inset shows why: near a degenerate
    soft spectrum, \(p_1<1\), so the rank-one multiplier
