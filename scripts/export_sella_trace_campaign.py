@@ -11,6 +11,8 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
+from gadplus.logging.wandb_export import event_preserving_indices, kabsch_rmsd, log_trajectory_table
+
 
 def _run_id(parts: tuple[object, ...]) -> str:
     text = "\x1f".join(map(str, parts)).encode()
@@ -26,6 +28,15 @@ def main() -> None:
     parser.add_argument("--mode", choices=("online", "offline"), default="online")
     parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive summary index")
     parser.add_argument("--stop-index", type=int, help="0-based exclusive summary index")
+    parser.add_argument("--max-view-rows", type=int, default=600)
+    parser.add_argument(
+        "--cockpit-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
+    )
+    parser.add_argument(
+        "--mechanism-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-sella-mechanism-v2",
+    )
     args = parser.parse_args()
     import wandb
 
@@ -43,6 +54,7 @@ def main() -> None:
             continue
         with np.load(trace_path) as trace:
             fields = {key: trace[key] for key in trace.files if key != "coordinates"}
+            coordinates = trace["coordinates"].copy()
             count = len(fields["evaluation"])
         config = {
             "dataset": "Transition1x",
@@ -69,6 +81,12 @@ def main() -> None:
         )
         run.define_metric("trajectory/evaluation")
         run.define_metric("trajectory/*", step_metric="trajectory/evaluation")
+        coordinates = np.asarray(coordinates, dtype=float)
+        terminal = coordinates[-1]
+        terminal_distance = np.asarray([kabsch_rmsd(xyz, terminal) for xyz in coordinates])
+        terminal_d0 = float(terminal_distance[0])
+        start_energy = float(fields["energy"][0])
+        view_rows: list[dict[str, object]] = []
         for position in range(count):
             payload = {"trajectory/evaluation": int(fields["evaluation"][position])}
             for key, values in fields.items():
@@ -76,7 +94,49 @@ def main() -> None:
                 if isinstance(value, float) and not np.isfinite(value):
                     continue
                 payload[f"trajectory/{key}"] = value
+            lambdas = [float(fields[name][position]) for name in ("lambda1", "lambda2", "lambda3")]
+            scale = max(float(np.sqrt(np.mean(np.square(lambdas)))), 1.0e-15)
+            normalized = {
+                "evaluation": int(fields["evaluation"][position]),
+                "force_max": float(fields["force_max"][position]),
+                "force_ratio_display": max(float(fields["force_max"][position]) / 0.01, 1.0e-15),
+                "n_neg": int(fields["n_neg"][position]),
+                "lambda1": lambdas[0], "lambda2": lambdas[1], "lambda3": lambdas[2],
+                "lambda1_scaled": lambdas[0] / scale,
+                "lambda2_scaled": lambdas[1] / scale,
+                "lambda3_scaled": lambdas[2] / scale,
+                "spectral_scale": scale,
+                "terminal": position == count - 1,
+                "distance_to_terminal": float(terminal_distance[position]),
+                "distance_to_terminal_display": max(float(terminal_distance[position]), 1.0e-15),
+                "terminal_progress_raw": 1.0 - float(terminal_distance[position]) / terminal_d0 if terminal_d0 else float(position == count - 1),
+                "distance_to_labelled_ts": None,
+                "distance_to_labelled_ts_display": None,
+                "step_mw_rms": None, "max_atom_displacement": None,
+                "step_over_radius": None, "step_over_radius_display": None,
+                "step_over_length": None, "step_over_length_display": None,
+                "energy": float(fields["energy"][position]),
+                "energy_from_start": float(fields["energy"][position]) - start_energy,
+                "wall_time_s": float(fields["wall_time_s"][position]),
+                "force_rms": float(fields["force_rms"][position]),
+            }
+            view_rows.append(normalized)
+            for key, value in normalized.items():
+                if key != "evaluation" and value is not None and np.isscalar(value) and np.isfinite(float(value)):
+                    payload[f"trajectory/{key}"] = value
             run.log(payload)
+        view_rows = [view_rows[item] for item in event_preserving_indices(view_rows, max_rows=args.max_view_rows)]
+        log_trajectory_table(
+            run,
+            view_rows,
+            cockpit_chart_id=args.cockpit_chart_id,
+            mechanism_chart_id=args.mechanism_chart_id,
+            mechanism_key="sella_mechanism",
+            mechanism_fields=(
+                "evaluation", "force_max", "force_rms", "energy_from_start",
+                "wall_time_s", "lambda1_scaled", "lambda2_scaled", "lambda3_scaled", "n_neg",
+            ),
+        )
         run.summary.update(
             {
                 "calculator_valid": not bool(row.get("final_eval_error")),

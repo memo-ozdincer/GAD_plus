@@ -164,7 +164,7 @@ def enrich_rows(
 def event_preserving_indices(
     rows: Sequence[Mapping[str, Any]],
     *,
-    max_rows: int = 2500,
+    max_rows: int = 600,
 ) -> list[int]:
     """Select a compact view while retaining scientific transition events."""
 
@@ -232,6 +232,53 @@ def load_bundle(bundle_dir: str | Path) -> tuple[list[dict[str, Any]], np.ndarra
     return rows, coordinates, metadata
 
 
+def log_trajectory_table(
+    run: Any,
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    cockpit_chart_id: str | None = None,
+    mechanism_chart_id: str | None = None,
+    mechanism_key: str = "competitive_mechanism",
+    mechanism_fields: Sequence[str] = COMPETITIVE_FIELDS,
+) -> None:
+    """Attach one exact, queryable trajectory table and optional Vega panels.
+
+    This deliberately runs *after* history logging.  The table is a compact
+    visualization view of an already recorded trajectory, never an input to
+    the search.  Keeping all common cockpit columns (including null columns)
+    makes the same chart honest across GAD and Sella: a panel is absent where
+    the corresponding optimizer did not record or define that quantity.
+    """
+
+    import wandb
+
+    columns = sorted({key for row in rows for key in row} | set(COCKPIT_FIELDS))
+
+    def table_value(value: Any) -> Any:
+        if isinstance(value, (float, np.floating)) and not math.isfinite(float(value)):
+            return None
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
+    data = [[table_value(row.get(column)) for column in columns] for row in rows]
+    table = wandb.Table(columns=columns, data=data)
+    payload: dict[str, Any] = {"trajectory_view": table}
+    if cockpit_chart_id:
+        payload["trajectory_cockpit"] = wandb.plot_table(
+            vega_spec_name=cockpit_chart_id,
+            data_table=table,
+            fields={field: field for field in COCKPIT_FIELDS},
+        )
+    if mechanism_chart_id:
+        payload[mechanism_key] = wandb.plot_table(
+            vega_spec_name=mechanism_chart_id,
+            data_table=table,
+            fields={field: field for field in mechanism_fields},
+        )
+    run.log(payload)
+
+
 def export_bundle(
     bundle_dir: str | Path,
     *,
@@ -242,7 +289,7 @@ def export_bundle(
     tags: Sequence[str] = (),
     mode: str = "offline",
     labelled_ts: np.ndarray | None = None,
-    max_view_rows: int = 2500,
+    max_view_rows: int = 600,
     cockpit_chart_id: str | None = None,
     mechanism_chart_id: str | None = None,
 ) -> str:
@@ -304,29 +351,12 @@ def export_bundle(
                     payload[f"trajectory/{key}"] = numeric
         run.log(payload)
 
-    table_columns = sorted({key for row in view for key in row})
-
-    def table_value(value: Any) -> Any:
-        if isinstance(value, float) and not math.isfinite(value):
-            return None
-        return value
-
-    table_data = [[table_value(row.get(column)) for column in table_columns] for row in view]
-    trajectory_table = wandb.Table(columns=table_columns, data=table_data)
-    table_payload: dict[str, Any] = {"trajectory_view": trajectory_table}
-    if cockpit_chart_id:
-        table_payload["trajectory_cockpit"] = wandb.plot_table(
-            vega_spec_name=cockpit_chart_id,
-            data_table=trajectory_table,
-            fields={field: field for field in COCKPIT_FIELDS},
-        )
-    if mechanism_chart_id:
-        table_payload["competitive_mechanism"] = wandb.plot_table(
-            vega_spec_name=mechanism_chart_id,
-            data_table=trajectory_table,
-            fields={field: field for field in COMPETITIVE_FIELDS},
-        )
-    run.log(table_payload)
+    log_trajectory_table(
+        run,
+        view,
+        cockpit_chart_id=cockpit_chart_id,
+        mechanism_chart_id=mechanism_chart_id,
+    )
     run.summary.update(metadata.get("summary", {}))
     run.summary["view_rows"] = len(view)
     run.summary["exact_rows"] = len(enriched)
@@ -348,4 +378,5 @@ __all__ = [
     "export_bundle",
     "kabsch_rmsd",
     "load_bundle",
+    "log_trajectory_table",
 ]

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "Sella local convergence diagnostics recorded without replaying the calculator.",
+  "data": {"name": "wandb"},
+  "vconcat": [
+    {"height": 45, "title": {"text": "Sella evaluation navigator — drag to zoom", "anchor": "start"}, "params": [{"name": "brush", "select": {"type": "interval", "encodings": ["x"], "clear": "dblclick"}}], "mark": {"type": "line", "color": "#0072B2"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "title": null}, "y": {"field": "${field:force_ratio_display}", "type": "quantitative", "scale": {"type": "log"}, "axis": null}}},
+    {"height": 140, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Sella stationarity and energy", "anchor": "start"}, "layer": [
+      {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.6}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:force_ratio_display}", "type": "quantitative", "title": "fmax / tolerance", "scale": {"type": "log"}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:force_max}", "type": "quantitative"}, {"field": "${field:force_rms}", "type": "quantitative"}, {"field": "${field:energy_from_start}", "type": "quantitative"}] }},
+      {"mark": {"type": "line", "color": "#E69F00", "strokeWidth": 1.3}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:energy_from_start}", "type": "quantitative", "title": "Delta E"}}}
+    ], "resolve": {"scale": {"y": "independent"}}},
+    {"height": 135, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Sella spectrum and index", "anchor": "start"}, "layer": [
+      {"mark": {"type": "rule", "color": "#222222", "strokeDash": [4,4]}, "encoding": {"y": {"datum": 0}}},
+      {"mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:lambda1_scaled}", "type": "quantitative", "title": "lambda / local scale"}}},
+      {"mark": {"type": "line", "color": "#CC79A7"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda2_scaled}", "type": "quantitative"}}},
+      {"mark": {"type": "line", "color": "#009E73"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda3_scaled}", "type": "quantitative"}}}
+    ]},
+    {"height": 100, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Evaluation wall time", "anchor": "start"}, "mark": {"type": "line", "color": "#555555"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "title": "Sella evaluation"}, "y": {"field": "${field:wall_time_s}", "type": "quantitative", "title": "elapsed wall time (s)"}}}
+  ],
+  "resolve": {"scale": {"x": "shared"}},
+  "config": {"background": "transparent", "view": {"stroke": null}, "axis": {"gridColor": "#DDDDDD", "gridOpacity": 0.35}}
+}

@@ -2,18 +2,6 @@
   "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
   "description": "GADplus trajectory cockpit with navigator-filtered y domains.",
   "data": {"name": "wandb"},
-  "params": [
-    {
-      "name": "hover",
-      "select": {
-        "type": "point",
-        "fields": ["${field:evaluation}"],
-        "nearest": true,
-        "on": "pointerover",
-        "clear": "pointerout"
-      }
-    }
-  ],
   "vconcat": [
     {
       "height": 45,
@@ -59,8 +47,7 @@
             ]
           }
         },
-        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}},
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}}
       ]
     },
     {
@@ -84,8 +71,7 @@
           }
         },
         {"mark": {"type": "line", "color": "#CC79A7", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda2_scaled}", "type": "quantitative", "scale": {"type": "symlog", "constant": 0.01}}}},
-        {"mark": {"type": "line", "color": "#009E73", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda3_scaled}", "type": "quantitative", "scale": {"type": "symlog", "constant": 0.01}}}},
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        {"mark": {"type": "line", "color": "#009E73", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda3_scaled}", "type": "quantitative", "scale": {"type": "symlog", "constant": 0.01}}}}
       ]
     },
     {
@@ -106,8 +92,7 @@
             ]
           }
         },
-        {"mark": {"type": "rule", "color": "#777777", "strokeDash": [3, 3]}, "encoding": {"y": {"datum": 1}}},
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        {"mark": {"type": "rule", "color": "#777777", "strokeDash": [3, 3]}, "encoding": {"y": {"datum": 1}}}
       ]
     },
     {
@@ -128,8 +113,7 @@
             ]
           }
         },
-        {"mark": {"type": "line", "color": "#E69F00", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:distance_to_labelled_ts_display}", "type": "quantitative", "scale": {"type": "log"}}}},
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        {"mark": {"type": "line", "color": "#E69F00", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:distance_to_labelled_ts_display}", "type": "quantitative", "scale": {"type": "log"}}}}
       ]
     },
     {
@@ -152,8 +136,7 @@
           }
         },
         {"mark": {"type": "line", "color": "#009E73", "strokeWidth": 1.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:step_over_length_display}", "type": "quantitative", "scale": {"type": "log"}}}},
-        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}},
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        {"mark": {"type": "rule", "color": "#222222", "strokeDash": [5, 4]}, "encoding": {"y": {"datum": 1}}}
       ]
     },
     {
@@ -174,8 +157,7 @@
               {"field": "${field:wall_time_s}", "type": "quantitative", "title": "Wall time (s)"}
             ]
           }
-        },
-        {"transform": [{"filter": {"param": "hover", "empty": false}}], "mark": {"type": "rule", "color": "#666666"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}}}
+        }
       ]
     }
   ],

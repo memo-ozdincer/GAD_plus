@@ -15,12 +15,25 @@ def main() -> None:
     parser.add_argument("--project", default="gadplus-ts-mechanisms")
     parser.add_argument("--name", default="GADplus TS mechanisms v1")
     parser.add_argument(
+        "--trajectory-only",
+        action="store_true",
+        help="Create a one-run inspector instead of an aggregate comparison workspace.",
+    )
+    parser.add_argument(
         "--cockpit-chart-id",
-        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v1",
+        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
     )
     parser.add_argument(
         "--mechanism-chart-id",
-        default="memo-ozdincer-university-of-toronto/gadplus-competitive-mechanism-v1",
+        default="memo-ozdincer-university-of-toronto/gadplus-competitive-mechanism-v2",
+    )
+    parser.add_argument(
+        "--regular-gad-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-regular-gad-mechanism-v2",
+    )
+    parser.add_argument(
+        "--sella-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-sella-mechanism-v2",
     )
     args = parser.parse_args()
 
@@ -56,15 +69,38 @@ def main() -> None:
         )
 
     cockpit = wr.CustomChart(
-        query={"summaryTable": {"tableKey": "trajectory_cockpit_table"}},
+        query={"summaryTable": {"tableKey": "trajectory_view"}},
         chart_name=args.cockpit_chart_id,
         chart_fields={field: field for field in COCKPIT_FIELDS},
         layout=wr.Layout(x=0, y=0, w=24, h=34),
     )
     mechanism = wr.CustomChart(
-        query={"summaryTable": {"tableKey": "competitive_mechanism_table"}},
+        query={"summaryTable": {"tableKey": "trajectory_view"}},
         chart_name=args.mechanism_chart_id,
         chart_fields={field: field for field in COMPETITIVE_FIELDS},
+        layout=wr.Layout(x=0, y=0, w=24, h=26),
+    )
+    regular_mechanism = wr.CustomChart(
+        query={"summaryTable": {"tableKey": "trajectory_view"}},
+        chart_name=args.regular_gad_chart_id,
+        chart_fields={
+            field: field for field in (
+                "evaluation", "dt_eff", "disp_from_last", "mode_overlap",
+                "eigvec_continuity", "grad_v0_overlap", "grad_v1_overlap",
+                "lambda1", "lambda2", "n_neg",
+            )
+        },
+        layout=wr.Layout(x=0, y=0, w=24, h=26),
+    )
+    sella_mechanism = wr.CustomChart(
+        query={"summaryTable": {"tableKey": "trajectory_view"}},
+        chart_name=args.sella_chart_id,
+        chart_fields={
+            field: field for field in (
+                "evaluation", "force_max", "force_rms", "energy_from_start",
+                "wall_time_s", "lambda1_scaled", "lambda2_scaled", "lambda3_scaled", "n_neg",
+            )
+        },
         layout=wr.Layout(x=0, y=0, w=24, h=26),
     )
     common_diagnostics = (
@@ -122,6 +158,31 @@ def main() -> None:
         ),
     )
 
+    trajectory_sections = [
+        ws.Section(name="Trajectory cockpit — select one run", panels=[cockpit], is_open=True, pinned=True),
+        ws.Section(name="Competitive GAD mechanism", panels=[mechanism], is_open=True, pinned=True),
+        ws.Section(name="Ordinary GAD mechanism", panels=[regular_mechanism], is_open=True, pinned=True),
+        ws.Section(name="Sella mechanism", panels=[sella_mechanism], is_open=True, pinned=True),
+        ws.Section(
+            name="Exact trajectory record",
+            panels=[wr.WeavePanelSummaryTable(table_name="trajectory_view", layout=wr.Layout(x=0, y=0, w=24, h=18))],
+            is_open=False,
+        ),
+    ]
+    full_sections = [
+        ws.Section(name="Campaign outcomes", panels=outcome_panels, is_open=True),
+        ws.Section(name="Trajectory cockpit", panels=[cockpit], is_open=True, pinned=True),
+        ws.Section(name="Competitive GAD mechanism", panels=[mechanism], is_open=True, pinned=True),
+        ws.Section(name="Ordinary GAD mechanism", panels=[regular_mechanism], is_open=True, pinned=True),
+        ws.Section(name="Sella mechanism", panels=[sella_mechanism], is_open=True, pinned=True),
+        ws.Section(name="Native full-fidelity diagnostics", panels=list(common_diagnostics), is_open=False),
+        ws.Section(
+            name="Exact trajectory records",
+            panels=[wr.WeavePanelSummaryTable(table_name="trajectory_view", layout=wr.Layout(x=0, y=0, w=24, h=18))],
+            is_open=False,
+        ),
+    ]
+
     workspace = ws.Workspace(
         entity=entity,
         project=args.project,
@@ -134,34 +195,10 @@ def main() -> None:
             ignore_outliers=False,
             sort_panels_alphabetically=False,
             tooltip_number_of_runs="single",
-            max_runs=10,
+            max_runs=1 if args.trajectory_only else 10,
             point_visualization_method="bucketing",
         ),
-        sections=[
-            ws.Section(name="Campaign outcomes", panels=outcome_panels, is_open=True),
-            ws.Section(name="Trajectory cockpit", panels=[cockpit], is_open=True, pinned=True),
-            ws.Section(
-                name="Competitive GAD mechanism",
-                panels=[mechanism],
-                is_open=True,
-                pinned=True,
-            ),
-            ws.Section(
-                name="Native full-fidelity diagnostics",
-                panels=list(common_diagnostics),
-                is_open=False,
-            ),
-            ws.Section(
-                name="Exact trajectory records",
-                panels=[
-                    wr.WeavePanelSummaryTable(
-                        table_name="trajectory_view",
-                        layout=wr.Layout(x=0, y=0, w=24, h=18),
-                    )
-                ],
-                is_open=False,
-            ),
-        ],
+        sections=trajectory_sections if args.trajectory_only else full_sections,
     )
     workspace.save()
     print(workspace.url)

@@ -7,14 +7,16 @@
 # Usage (Trillium — secondary):
 #   CLUSTER=trillium bash scripts/setup_env.sh
 #
-# After setup, activate with:
-#   source .venv/bin/activate
+# Set GADPLUS_WITH_CUDA=0 to skip loading the CUDA module for a g-xTB-only
+# runtime (the project dependency set may still include CUDA-enabled Torch).
+# After setup, activate with: source .venv/bin/activate
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VENV_DIR="$PROJECT_DIR/.venv"
+VENV_DIR="${GADPLUS_ENV:-$PROJECT_DIR/.venv}"
 CLUSTER="${CLUSTER:-narval}"
+WITH_CUDA="${GADPLUS_WITH_CUDA:-1}"
 
 echo "=== GAD_plus Environment Setup ==="
 echo "Cluster: $CLUSTER"
@@ -27,7 +29,7 @@ if [ "$CLUSTER" = "narval" ]; then
     SCRATCH="/lustre07/scratch/memoozd"
     PYTHON_MOD="python/3.11"
 elif [ "$CLUSTER" = "trillium" ]; then
-    PARENT="/project/rrg-aspuru/memoozd"
+    PARENT="/scratch/memoozd/GAD"
     SCRATCH="/scratch/memoozd"
     PYTHON_MOD="python/3.11.5"
 else
@@ -46,7 +48,9 @@ echo "Scratch: $SCRATCH"
 module purge
 module load StdEnv/2023
 module load "$PYTHON_MOD"
-module load cuda/12.6
+if [ "$WITH_CUDA" = "1" ]; then
+    module load cuda/12.6
+fi
 
 # ---- Create venv ----
 if [ ! -d "$VENV_DIR" ]; then
@@ -62,12 +66,16 @@ pip install uv 2>/dev/null || echo "uv already installed or unavailable, using p
 # ---- Install GAD_plus ----
 echo "Installing GAD_plus..."
 if command -v uv &>/dev/null; then
-    uv pip install -e "$PROJECT_DIR"
     uv pip install -e "$PROJECT_DIR[analysis]"
 else
     pip install -e "$PROJECT_DIR"
     pip install -e "$PROJECT_DIR[analysis]"
 fi
+
+echo ""
+echo "Optional g-xTB setup:"
+echo "  export GADPLUS_GXTB_EXE=/path/to/xtb"
+echo "  export GADPLUS_T1X_H5=$PARENT/data/transition1x.h5"
 
 # ---- Install local dependencies ----
 INSTALLER="pip install -e"

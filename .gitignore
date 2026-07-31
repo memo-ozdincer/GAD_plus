@@ -6,3 +6,11 @@ __pycache__/
 *.log
 *.out
 *.toc
+*.parquet
+mlruns/
+runs/
+outputs/
+.pytest_cache/
+.ruff_cache/
+# Runtime clone/binary; select its installed path with GADPLUS_GXTB_EXE.
+g-xtb/

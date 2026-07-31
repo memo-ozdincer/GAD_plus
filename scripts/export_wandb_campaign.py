@@ -21,12 +21,16 @@ def main() -> None:
     parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive bundle index")
     parser.add_argument("--stop-index", type=int, help="0-based exclusive bundle index")
     parser.add_argument(
+        "--max-view-rows", type=int, default=600,
+        help="Maximum event-preserving points in each interactive trajectory table.",
+    )
+    parser.add_argument(
         "--cockpit-chart-id",
-        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v1",
+        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
     )
     parser.add_argument(
         "--mechanism-chart-id",
-        default="memo-ozdincer-university-of-toronto/gadplus-competitive-mechanism-v1",
+        default="memo-ozdincer-university-of-toronto/gadplus-competitive-mechanism-v2",
     )
     args = parser.parse_args()
 
@@ -51,6 +55,7 @@ def main() -> None:
                 mode=args.mode,
                 cockpit_chart_id=args.cockpit_chart_id,
                 mechanism_chart_id=args.mechanism_chart_id,
+                max_view_rows=args.max_view_rows,
             )
             print(f"[{index}/{len(bundles)}] {bundle.name} -> {run_id}")
         except Exception as error:  # noqa: BLE001 - continue an independent export batch.

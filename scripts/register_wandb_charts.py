@@ -35,18 +35,35 @@ def main() -> None:
             "GADplus competitive mechanism",
             "competitive_mechanism.json",
         ),
+        (
+            "gadplus-regular-gad-mechanism",
+            "GADplus ordinary GAD mechanism",
+            "regular_gad_mechanism.json",
+        ),
+        (
+            "gadplus-sella-mechanism",
+            "GADplus Sella mechanism",
+            "sella_mechanism.json",
+        ),
     )
     for base_name, display_name, filename in definitions:
         with chart_root.joinpath(filename).open(encoding="utf-8") as handle:
             specification = json.load(handle)
-        chart_id = api.create_custom_chart(
-            entity=entity,
-            name=f"{base_name}-{args.version}",
-            display_name=f"{display_name} ({args.version})",
-            spec_type="vega2",
-            access=args.access,
-            spec=specification,
-        )
+        try:
+            chart_id = api.create_custom_chart(
+                entity=entity,
+                name=f"{base_name}-{args.version}",
+                display_name=f"{display_name} ({args.version})",
+                spec_type="vega2",
+                access=args.access,
+                spec=specification,
+            )
+        except Exception as error:
+            # Registration is idempotent in practice: W&B rejects a repeated
+            # chart slug. Continue so a pre-existing common chart cannot hide
+            # a newly added method-specific chart.
+            print(f"already exists or rejected: {base_name}-{args.version}: {error}")
+            continue
         print(chart_id)
 
 

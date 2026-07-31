@@ -4,13 +4,14 @@ This directory preserves superseded reports, historical experiment notes,
 and the previous manuscript package. These files are retained for provenance;
 they are not the current scientific source of truth.
 
-Current entry points are in the repository root:
+Current scientific summaries are in `docs/research/`; maintained operational
+entry points are described in `docs/`.
 
-- [Results-heavy working manuscript](../WORKING_DRAFT_ALL_RESULTS_2026_07_20.md)
-- [Scientific synthesis](../HIP_GAD_SELLA_SYNTHESIS_2026_07_17.md)
-- [Theory and implementation audit](../HIP_GAD_SELLA_THEORY_AUDIT_2026_07_17.md)
-- [Cross-benchmark result ledger](../BENCHMARK_RESULTS_2026_07_16.md)
-- [Research plan](../RESEARCH_PLAN_GAD_VS_SELLA.md)
+- [Results-heavy working manuscript](../docs/research/WORKING_DRAFT_ALL_RESULTS_2026_07_20.md)
+- [Scientific synthesis](../docs/research/HIP_GAD_SELLA_SYNTHESIS_2026_07_17.md)
+- [Theory and implementation audit](../docs/research/HIP_GAD_SELLA_THEORY_AUDIT_2026_07_17.md)
+- [Cross-benchmark result ledger](../docs/research/BENCHMARK_RESULTS_2026_07_16.md)
+- [Research plan](../docs/research/RESEARCH_PLAN_GAD_VS_SELLA.md)
 
 Archive layout:
 

@@ -17,6 +17,8 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
+from gadplus.logging.wandb_export import event_preserving_indices, kabsch_rmsd, log_trajectory_table
+
 
 def _run_id(parts: tuple[object, ...]) -> str:
     return hashlib.sha256("\x1f".join(map(str, parts)).encode()).hexdigest()[:20]
@@ -33,6 +35,10 @@ def _finite(value: object) -> bool:
         return False
 
 
+def _number_or_none(value: object) -> float | None:
+    return float(value) if _finite(value) else None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("campaign_root", type=Path)
@@ -44,6 +50,15 @@ def main() -> None:
     parser.add_argument("--mode", choices=("online", "offline"), default="online")
     parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive summary index")
     parser.add_argument("--stop-index", type=int, help="0-based exclusive summary index")
+    parser.add_argument("--max-view-rows", type=int, default=600)
+    parser.add_argument(
+        "--cockpit-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
+    )
+    parser.add_argument(
+        "--mechanism-chart-id",
+        default="memo-ozdincer-university-of-toronto/gadplus-regular-gad-mechanism-v2",
+    )
     args = parser.parse_args()
 
     import wandb
@@ -84,7 +99,54 @@ def main() -> None:
         )
         run.define_metric("trajectory/step")
         run.define_metric("trajectory/*", step_metric="trajectory/step")
-        for row in trace:
+        coordinates = np.asarray([entry["coords_flat"] for entry in trace], dtype=float)
+        coordinates = coordinates.reshape(len(trace), -1, 3)
+        terminal = coordinates[-1]
+        terminal_distance = np.asarray([kabsch_rmsd(xyz, terminal) for xyz in coordinates])
+        terminal_d0 = float(terminal_distance[0])
+        start_energy = float(trace[0]["energy"])
+        view_rows: list[dict[str, object]] = []
+        for position, row in enumerate(trace):
+            spectrum = list(row.get("bottom_spectrum") or [])
+            low = [float(value) for value in spectrum[:3] if _finite(value)]
+            scale = float(np.sqrt(np.mean(np.square(low)))) if low else 1.0
+            scale = max(scale, 1.0e-15)
+            known_distance = row.get("dist_to_known_ts")
+            normalized = {
+                "evaluation": int(row["step"]),
+                "force_max": float(row["force_max"]),
+                "force_ratio_display": max(float(row["force_max"]) / 0.01, 1.0e-15),
+                "n_neg": int(row["n_neg"]),
+                "lambda1": float(spectrum[0]) if len(spectrum) > 0 else None,
+                "lambda2": float(spectrum[1]) if len(spectrum) > 1 else None,
+                "lambda3": float(spectrum[2]) if len(spectrum) > 2 else None,
+                "lambda1_scaled": float(spectrum[0]) / scale if len(spectrum) > 0 else None,
+                "lambda2_scaled": float(spectrum[1]) / scale if len(spectrum) > 1 else None,
+                "lambda3_scaled": float(spectrum[2]) / scale if len(spectrum) > 2 else None,
+                "spectral_scale": scale,
+                "terminal": position == len(trace) - 1,
+                "distance_to_terminal": float(terminal_distance[position]),
+                "distance_to_terminal_display": max(float(terminal_distance[position]), 1.0e-15),
+                "terminal_progress_raw": 1.0 - float(terminal_distance[position]) / terminal_d0 if terminal_d0 else float(position == len(trace) - 1),
+                "distance_to_labelled_ts": float(known_distance) if _finite(known_distance) else None,
+                "distance_to_labelled_ts_display": max(float(known_distance), 1.0e-15) if _finite(known_distance) else None,
+                "step_mw_rms": None,
+                "max_atom_displacement": None,
+                "step_over_radius": None,
+                "step_over_radius_display": None,
+                "step_over_length": None,
+                "step_over_length_display": None,
+                "energy": float(row["energy"]),
+                "energy_from_start": float(row["energy"]) - start_energy,
+                "wall_time_s": float(row["wall_time_s"]),
+                "dt_eff": _number_or_none(row.get("dt_eff")),
+                "mode_overlap": _number_or_none(row.get("mode_overlap")),
+                "eigvec_continuity": _number_or_none(row.get("eigvec_continuity")),
+                "grad_v0_overlap": _number_or_none(row.get("grad_v0_overlap")),
+                "grad_v1_overlap": _number_or_none(row.get("grad_v1_overlap")),
+                "disp_from_last": _number_or_none(row.get("disp_from_last")),
+            }
+            view_rows.append(normalized)
             payload: dict[str, object] = {"trajectory/step": int(row["step"])}
             for key, value in row.items():
                 if key in {"step", "coords_flat", "bottom_spectrum", "run_id", "sample_id", "rxn", "formula", "start_method", "search_method"}:
@@ -96,7 +158,23 @@ def main() -> None:
                 if mode >= 6 or not _finite(value):
                     continue
                 payload[f"trajectory/lambda_{mode + 1}"] = value
+            for key, value in normalized.items():
+                if key != "evaluation" and _finite(value):
+                    payload[f"trajectory/{key}"] = value
             run.log(payload)
+        view_rows = [view_rows[item] for item in event_preserving_indices(view_rows, max_rows=args.max_view_rows)]
+        log_trajectory_table(
+            run,
+            view_rows,
+            cockpit_chart_id=args.cockpit_chart_id,
+            mechanism_chart_id=args.mechanism_chart_id,
+            mechanism_key="regular_gad_mechanism",
+            mechanism_fields=(
+                "evaluation", "dt_eff", "disp_from_last", "mode_overlap",
+                "eigvec_continuity", "grad_v0_overlap", "grad_v1_overlap",
+                "lambda1", "lambda2", "n_neg",
+            ),
+        )
         run.summary.update({
             "calculator_valid": not bool(summary.get("final_eval_error")),
             "local_ts": bool(summary.get("converged")),

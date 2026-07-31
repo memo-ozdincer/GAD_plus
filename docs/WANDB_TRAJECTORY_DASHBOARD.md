@@ -39,6 +39,33 @@ and endpoint-topology labels. This separation has four advantages:
 - the same raw record can be re-exported when a chart definition changes;
 - hindsight diagnostics cannot accidentally influence the dynamics.
 
+### Current matched g-xTB grid record
+
+The completed `0.10`, `0.20`, and `1.00` A cells already have the exact local
+records needed for this design; they are not reconstructed by rerunning g-xTB:
+
+- competitive and competitive-subspace GAD: `trajectory.parquet`,
+  `coordinates.npz`, and `metadata.json` for each recorded trajectory;
+- regular GAD: one rich `traj_*.parquet` per recorded trajectory, including
+  Cartesian coordinates, the bottom spectrum, effective step size, mode and
+  gradient overlaps, displacement, and known-TS distance;
+- Sella: one `sella_trace_*.npz` per recorded trajectory, including accepted
+  coordinates, energy, force, projected index, and the lowest three
+  curvatures.
+
+`scripts/replay_t1x_gxtb_wandb_trajectory_grid.sh` uploads those immutable
+records serially with deterministic W&B run IDs. Serial replay is deliberate:
+W&B starts a helper service per exporter, and parallel helper processes can
+exhaust a Trillium login-node process quota. Interrupted replay resumes the
+same W&B runs.
+
+The common cockpit leaves a field null when the historical record did not
+contain it. In particular, the present Sella adapter does **not** invent a
+trust radius, predicted/actual ratio, trial acceptance, or labelled-TS distance
+that the installed Sella trace did not record. The regular-GAD panel likewise
+does not label its Cartesian displacement as mass-weighted. These omissions are
+visible rather than silently imputed.
+
 On Trillium, compute jobs use `WANDB_MODE=offline` and write W&B spool files
 under `/scratch/memoozd/gadplus/wandb`. Synchronization is a separate login-node
 operation after the packed CPU job completes. API credentials are supplied only
@@ -77,6 +104,17 @@ export can resume without creating a duplicate. Use:
 - group: the matched comparison campaign;
 - job type: `competitive-gad`, `sella`, or `regular-gad`;
 - tags: surface, calculator, noise tier, terminal outcome, and code version.
+
+### Per-run trajectory inspection
+
+The high-resolution cockpit is deliberately **per run**, not an overlaid
+population plot. Each recorded trajectory gets one W&B run and owns one exact
+`trajectory_view` table, its cockpit, and its method-specific panel. Use the
+`GADplus trajectory inspector v3` workspace, select a single run by optimizer,
+noise, and sample ID, then inspect that run's plots (or open the same panels on
+the run page). Its one-run limit prevents unrelated trajectories from being
+drawn into the same axes. Aggregate rates and outcome distributions belong in
+the separate campaign workspace.
 
 ### Immutable run configuration
 
@@ -217,10 +255,10 @@ inside the selected interval and a very large early repulsive force does not
 flatten the late convergence dynamics. Probability panels retain their fixed
 $[0,1]$ domains. Dragging the navigator brush zooms all strips; dragging its
 center pans the window; double-clicking clears the brush and restores the full
-trajectory. A vertical hover rule shared by the detail strips snaps to the
-nearest evaluation and reports raw eigenvalues with units, index, force, gate
-state, displacement, distance, and event labels. Avoid dual y-axes. The report
-also provides a full-screen link.
+trajectory. Each strip uses ordinary W&B/Vega tooltips for its exact local
+values. A previous cross-strip hover signal was removed because the hosted W&B
+renderer can duplicate selection signals when a chart is embedded in a
+workspace. Avoid dual y-axes. The report also provides a full-screen link.
 
 Recommended strip heights are 120 pixels for force, 165 for the spectrum, 75
 for projected index, 130 for distance, 120 for step mechanics, and 120 for

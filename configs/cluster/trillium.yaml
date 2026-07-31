@@ -16,6 +16,8 @@ modules:
   - StdEnv/2023
   - python/3.11.5
   - cuda/12.6
+python_module: python/3.11.5
+cuda_module: cuda/12.6
 
 project_dir: /project/rrg-aspuru/memoozd
 scratch_dir: /scratch/memoozd

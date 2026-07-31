@@ -1,0 +1,25 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "Ordinary GAD recorded action diagnostics.",
+  "data": {"name": "wandb"},
+  "vconcat": [
+    {"height": 45, "title": {"text": "Ordinary GAD navigator — drag to zoom", "anchor": "start"}, "params": [{"name": "brush", "select": {"type": "interval", "encodings": ["x"], "clear": "dblclick"}}], "mark": {"type": "line", "color": "#0072B2"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "title": null}, "y": {"field": "${field:disp_from_last}", "type": "quantitative", "axis": null}}},
+    {"height": 130, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Fixed-step action", "anchor": "start"}, "layer": [
+      {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.6}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:disp_from_last}", "type": "quantitative", "title": "Cartesian displacement (A)"}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:dt_eff}", "type": "quantitative", "title": "effective dt"}, {"field": "${field:disp_from_last}", "type": "quantitative", "title": "displacement"}] }},
+      {"mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.2}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:dt_eff}", "type": "quantitative", "title": "effective dt"}}}
+    ], "resolve": {"scale": {"y": "independent"}}},
+    {"height": 140, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Mode selection and continuity", "anchor": "start"}, "layer": [
+      {"mark": {"type": "line", "color": "#0072B2", "strokeWidth": 1.6}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "axis": {"labels": false, "ticks": false, "title": null}}, "y": {"field": "${field:mode_overlap}", "type": "quantitative", "title": "overlap", "scale": {"domain": [-1, 1]}}, "tooltip": [{"field": "${field:evaluation}", "type": "quantitative"}, {"field": "${field:mode_overlap}", "type": "quantitative"}, {"field": "${field:eigvec_continuity}", "type": "quantitative"}, {"field": "${field:grad_v0_overlap}", "type": "quantitative"}, {"field": "${field:grad_v1_overlap}", "type": "quantitative"}] }},
+      {"mark": {"type": "line", "color": "#CC79A7"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:eigvec_continuity}", "type": "quantitative", "scale": {"domain": [-1, 1]}}}},
+      {"mark": {"type": "line", "color": "#009E73"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:grad_v0_overlap}", "type": "quantitative", "scale": {"domain": [-1, 1]}}}},
+      {"mark": {"type": "line", "color": "#E69F00"}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:grad_v1_overlap}", "type": "quantitative", "scale": {"domain": [-1, 1]}}}}
+    ]},
+    {"height": 125, "transform": [{"filter": {"param": "brush", "empty": true}}], "title": {"text": "Lowest two curvatures and index", "anchor": "start"}, "layer": [
+      {"mark": {"type": "rule", "color": "#222222", "strokeDash": [4, 4]}, "encoding": {"y": {"datum": 0}}},
+      {"mark": {"type": "line", "color": "#D55E00", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative", "title": "GAD step"}, "y": {"field": "${field:lambda1}", "type": "quantitative", "title": "curvature"}}},
+      {"mark": {"type": "line", "color": "#CC79A7", "strokeWidth": 1.5}, "encoding": {"x": {"field": "${field:evaluation}", "type": "quantitative"}, "y": {"field": "${field:lambda2}", "type": "quantitative"}}}
+    ]}
+  ],
+  "resolve": {"scale": {"x": "shared"}},
+  "config": {"background": "transparent", "view": {"stroke": null}, "axis": {"gridColor": "#DDDDDD", "gridOpacity": 0.35}}
+}

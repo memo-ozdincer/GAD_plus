@@ -20,9 +20,6 @@ import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import pyarrow as pa
-import pyarrow.parquet as pq
-
 # Make src/ importable without installing.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -52,6 +49,14 @@ def _build_predict_fn(backend: str, method: str):
         from gadplus.calculator.horm import load_horm_leftnet_calculator, make_horm_predict_fn
         calc = load_horm_leftnet_calculator(device="cuda")
         predict_fn = make_horm_predict_fn(calc)
+    elif backend == "gxtb":
+        from gadplus.calculator.gxtb import load_gxtb_calculator, make_gxtb_predict_fn
+        calc = load_gxtb_calculator(**{k: v for k, v in {
+            "executable": os.environ.get("GADPLUS_GXTB_EXE", "g-xtb/xtb-6.7.1/bin/xtb"),
+            "n_threads": 1,
+            "parallel": int(os.environ.get("GADPLUS_GXTB_PARALLEL", "1")),
+        }.items() if v is not None})
+        predict_fn = make_gxtb_predict_fn(calc)
     else:
         raise ValueError(f"Unknown backend: {backend!r}")
     _PREDICT_FN_CACHE[key] = predict_fn
@@ -63,7 +68,7 @@ def _run_one_sample(args_tuple):
     only loads the dependencies it needs.
     """
     (
-        sample_idx, h5_path, split, backend, method, noise_ang, seed,
+        sample_idx, h5_path, split, backend, method, noise_ang, start_geometry, seed,
         n_steps, dt, use_projection, force_threshold, force_criterion,
         use_adaptive_dt, dt_min, dt_max, max_atom_disp,
         use_preconditioning, eig_floor,
@@ -83,24 +88,44 @@ def _run_one_sample(args_tuple):
     from gadplus.logging.autopsy import classify_failure
     from gadplus.search.gad_search import GADSearchConfig, run_gad_search
 
-    if backend in {"mace", "horm"}:
-        from gadplus.data.direct_t1x import load_t1x_record
-
-        sample = load_t1x_record(h5_path, split, sample_idx)
+    if backend in {"mace", "horm", "gxtb"}:
+        if backend == "gxtb":
+            from gadplus.data.direct_t1x import load_t1x_records_direct
+            sample = load_t1x_records_direct(h5_path, split, [sample_idx])[sample_idx]
+        else:
+            from gadplus.data.direct_t1x import load_t1x_record
+            sample = load_t1x_record(h5_path, split, sample_idx)
         formula = sample.formula or f"sample_{sample_idx}"
         rxn = sample.rxn
         known_ts_cpu = torch.as_tensor(sample.transition_state, dtype=torch.float32)
-        generator = torch.Generator(device="cpu").manual_seed(seed)
-        coords_cpu = known_ts_cpu + noise_ang * torch.randn(
-            known_ts_cpu.shape, generator=generator, dtype=known_ts_cpu.dtype,
-        )
-        # Keep both the optimizer state and the calculator outputs on CUDA.
-        # Returning a Hessian to CPU on every iteration dominates these small
-        # molecular HORM/MACE evaluations and defeats GPU acceleration.
-        device = torch.device("cuda")
-        coords = coords_cpu.to(device)
-        known_ts = known_ts_cpu.to(device)
-        z = torch.as_tensor(sample.atomic_nums, dtype=torch.long, device=device)
+        if start_geometry == "labelled_ts":
+            coords_cpu = known_ts_cpu.clone()
+            start_label = "labelled_ts"
+        elif start_geometry == "reactant":
+            coords_cpu = torch.as_tensor(sample.reactant, dtype=torch.float32)
+            start_label = "labelled_reactant"
+        elif start_geometry == "product":
+            if sample.product is None:
+                raise ValueError(f"sample {sample_idx} has no compatible labelled product geometry")
+            coords_cpu = torch.as_tensor(sample.product, dtype=torch.float32)
+            start_label = "labelled_product"
+        else:
+            generator = torch.Generator(device="cpu").manual_seed(seed)
+            coords_cpu = known_ts_cpu + noise_ang * torch.randn(
+                known_ts_cpu.shape, generator=generator, dtype=known_ts_cpu.dtype,
+            )
+            start_label = f"noised_ts_noise{noise_ang:.2f}A"
+        if backend in {"mace", "horm"}:
+            # Keep neural-model state and outputs on CUDA. g-xTB is an
+            # external CPU executable and stays on CPU.
+            device = torch.device("cuda")
+            coords = coords_cpu.to(device)
+            known_ts = known_ts_cpu.to(device)
+            z = torch.as_tensor(sample.atomic_nums, dtype=torch.long, device=device)
+        else:
+            coords = coords_cpu
+            known_ts = known_ts_cpu
+            z = torch.as_tensor(sample.atomic_nums, dtype=torch.long)
     else:
         from gadplus.data.transition1x import Transition1xDataset, UsePos
         from gadplus.geometry.starting import make_starting_coords
@@ -132,7 +157,6 @@ def _run_one_sample(args_tuple):
         purify_hessian=False,
     )
 
-    start_label = f"noised_ts_noise{noise_ang:.2f}A"
     logger = TrajectoryLogger(
         output_dir=output_dir, run_id=run_id, sample_id=sample_idx,
         start_method=start_label,
@@ -162,6 +186,7 @@ def _run_one_sample(args_tuple):
         "final_force_max": float(result.final_force_max),
         "final_energy": float(result.final_energy),
         "final_eig0": float(result.final_eig0),
+        "final_coords_flat": result.final_coords.reshape(-1).tolist(),
         "wall_time_s": float(wall),
         "failure_type": failure_type or "",
     }
@@ -169,11 +194,16 @@ def _run_one_sample(args_tuple):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--backend", required=True, choices=["scine", "xtb", "mace", "horm"])
+    p.add_argument("--backend", required=True, choices=["scine", "xtb", "gxtb", "mace", "horm"])
     p.add_argument("--method", default="DFTB0",
                    help="SCINE functional, xTB method, or MACE-OFF23 model size/path")
     p.add_argument("--noise", type=float, default=1.0,
-                   help="Gaussian RMS noise on TS, in Angstrom. 1.0 A = 100 pm.")
+                   help="Per-Cartesian-component Gaussian sigma on the labelled TS, in Angstrom (not per-atom RMS).")
+    p.add_argument(
+        "--start-geometry", default="noised_ts",
+        choices=("noised_ts", "labelled_ts", "reactant", "product"),
+        help="Initial T1x geometry; noise is used only for noised_ts.",
+    )
     p.add_argument("--n-samples", type=int, default=5)
     p.add_argument("--sample-indices", type=str, default=None,
                    help="Comma-separated 0-indexed sample IDs. Overrides --n-samples.")
@@ -199,7 +229,10 @@ def main():
     )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--split", default="test")
-    p.add_argument("--h5", default="/lustre06/project/6033559/memoozd/data/transition1x.h5")
+    p.add_argument(
+        "--h5", default=os.environ.get("GADPLUS_T1X_H5", "data/transition1x.h5"),
+        help="Transition1x HDF5 path (or set GADPLUS_T1X_H5).",
+    )
     p.add_argument("--n-workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "4")))
     p.add_argument("--output-dir", required=True)
     args = p.parse_args()
@@ -208,7 +241,7 @@ def main():
     run_id = str(uuid.uuid4())[:8]
 
     print(f"Backend: {args.backend} | Method: {args.method}")
-    print(f"Noise: {args.noise} A | Use Eckart: {args.use_projection}")
+    print(f"Start: {args.start_geometry} | Noise: {args.noise} A | Use Eckart: {args.use_projection}")
     print(f"Workers: {args.n_workers}")
     print(f"Output: {args.output_dir}")
 
@@ -222,7 +255,7 @@ def main():
     )
     task_args = [
         (
-            i, args.h5, args.split, args.backend, args.method, args.noise,
+            i, args.h5, args.split, args.backend, args.method, args.noise, args.start_geometry,
             args.seed + 1000 * i, args.n_steps, args.dt, args.use_projection,
             args.force_threshold, args.force_criterion,
             args.use_adaptive_dt, args.dt_min, args.dt_max, args.max_atom_disp,
@@ -235,12 +268,19 @@ def main():
 
     results = []
     t_overall = time.time()
-    with ProcessPoolExecutor(max_workers=args.n_workers) as exe:
+    # A single local run should not fork a second Python interpreter.  Besides
+    # adding no throughput, that makes large shared filesystems a startup
+    # bottleneck and obscures the calculator subprocess in the Slurm log.
+    if args.n_workers == 1:
+        completed = ((ta[0], _run_one_sample, ta) for ta in task_args)
+    else:
+        exe = ProcessPoolExecutor(max_workers=args.n_workers)
         future_to_idx = {exe.submit(_run_one_sample, ta): ta[0] for ta in task_args}
-        for fut in as_completed(future_to_idx):
-            idx = future_to_idx[fut]
+        completed = ((future_to_idx[fut], fut.result, None) for fut in as_completed(future_to_idx))
+    try:
+        for idx, run, task in completed:
             try:
-                r = fut.result()
+                r = run(task) if task is not None else run()
             except Exception as exc:
                 print(f"  [{idx}] FAILED: {exc}")
                 results.append({
@@ -258,10 +298,17 @@ def main():
                   f"n_neg={r['final_n_neg']} fmax={r['final_force_max']:.3e} "
                   f"wall={r['wall_time_s']:.1f}s")
             results.append(r)
+    finally:
+        if args.n_workers != 1:
+            exe.shutdown()
 
     total_wall = time.time() - t_overall
 
     summary_path = os.path.join(args.output_dir, f"summary_{run_id}.parquet")
+    # pyarrow's large shared objects can take minutes to page in from Lustre;
+    # it is only needed after the electronic-structure work has finished.
+    import pyarrow as pa
+    import pyarrow.parquet as pq
     pq.write_table(pa.Table.from_pylist(results), summary_path)
 
     n_total = len(results)

@@ -2,6 +2,6 @@
 # scratch; the adapter derives conservative forces and a full autograd Hessian.
 name: neuralneb
 device: cuda
-checkpoint: /lustre07/scratch/memoozd/gadplus/models/neuralneb-t1x-8d9598b/models/painn0.sd
+checkpoint: ${cluster.scratch_dir}/gadplus/models/neuralneb-t1x-8d9598b/models/painn0.sd
 cutoff: 5.0
-h5_path: /lustre06/project/6033559/memoozd/data/transition1x.h5
+h5_path: ${cluster.project_dir}/data/transition1x.h5
