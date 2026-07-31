@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
+#SBATCH --mem=0
 #SBATCH --time=00:15:00
 #SBATCH --output=/scratch/memoozd/gadplus/logs/t1x_grid_aggregate_%j.out
 #SBATCH --error=/scratch/memoozd/gadplus/logs/t1x_grid_aggregate_%j.err
