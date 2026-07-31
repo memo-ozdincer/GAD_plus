@@ -37,7 +37,9 @@ jobs:
       - name: Build image from this commit
         run: |
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/explorer:${GITHUB_SHA}"
-          gcloud builds submit --project "$PROJECT_ID" --config deploy/cloudrun/cloudbuild.yaml --substitutions="_IMAGE=${IMAGE}" .
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build --file deploy/cloudrun/Dockerfile.git --tag "$IMAGE" .
+          docker push "$IMAGE"
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
       - name: Roll the stable URL to this revision
         run: |
