@@ -18,6 +18,8 @@ def main() -> None:
     parser.add_argument("--group", required=True)
     parser.add_argument("--job-type", default="competitive-gad")
     parser.add_argument("--mode", choices=("offline", "online"), default="online")
+    parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive bundle index")
+    parser.add_argument("--stop-index", type=int, help="0-based exclusive bundle index")
     parser.add_argument(
         "--cockpit-chart-id",
         default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v1",
@@ -33,8 +35,11 @@ def main() -> None:
     )
     if not bundles:
         raise SystemExit(f"no trajectory bundles found under {args.campaign_root}")
+    stop = len(bundles) if args.stop_index is None else args.stop_index
+    if not 0 <= args.start_index <= stop <= len(bundles):
+        raise SystemExit("invalid --start-index/--stop-index range")
     failures = []
-    for index, bundle in enumerate(bundles, start=1):
+    for index, bundle in enumerate(bundles[args.start_index:stop], start=args.start_index + 1):
         try:
             run_id = export_bundle(
                 bundle,

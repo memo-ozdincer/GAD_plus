@@ -24,13 +24,18 @@ def main() -> None:
     parser.add_argument("--entity", default=os.environ.get("WANDB_ENTITY"))
     parser.add_argument("--group", required=True)
     parser.add_argument("--mode", choices=("online", "offline"), default="online")
+    parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive summary index")
+    parser.add_argument("--stop-index", type=int, help="0-based exclusive summary index")
     args = parser.parse_args()
     import wandb
 
     summaries = sorted(args.campaign_root.glob("task_*/summary_*.parquet"))
     if len(summaries) != 287:
         raise SystemExit(f"expected 287 task summaries, found {len(summaries)}")
-    for index, summary_path in enumerate(summaries, start=1):
+    stop = len(summaries) if args.stop_index is None else args.stop_index
+    if not 0 <= args.start_index <= stop <= len(summaries):
+        raise SystemExit("invalid --start-index/--stop-index range")
+    for index, summary_path in enumerate(summaries[args.start_index:stop], start=args.start_index + 1):
         row = pq.read_table(summary_path).to_pylist()[0]
         trace_path = Path(str(row.get("sella_trace_path", "")))
         if not trace_path.is_file():
