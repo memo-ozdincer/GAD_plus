@@ -61,7 +61,7 @@ That is the scale-normalized, soft-low-mode version of the original
 implemented LJ profile is `gate_variant="lambda2"`,
 `spectral_temperature=0.01`, and the default `step_fraction=0.05`.
 
-### Final g-xTB formulation: the competitive gate
+### g-xTB scalar competitive gate (a component of the final formulation)
 
 For the g-xTB Transition1x campaign, use the same step with
 
@@ -86,19 +86,20 @@ The extra term counts only activity in *additional negative* directions; it
 does not penalize ordinary stable-mode relaxation.  Hence it reduces to
 \(w_2\) when the \(\lambda_2\) gate is active, but restores one-mode ascent
 when the current force is concentrated in the softest mode inside a
-high-index region.  The g-xTB profile is `gate_variant="competitive"`,
+high-index region.  The original g-xTB profile was `gate_variant="competitive"`,
 `spectral_temperature=0.01`, and `step_fraction=0.01`; the 2,000-update
 budget is a benchmark setting, not state carried by the field.
 
 The index-boundary `guard` is not a final method: it was tied on the
 development panel and therefore adds complexity without demonstrated benefit.
 
-### Experimental minimum-capture diagnostic: relative soft subspace
+### Relative soft-subspace reflection: final g-xTB refinement
 
 The initial g-xTB test-287 competitive run had no projected high-index
 terminals, but 23/281 calculator-valid starts ended at force-converged
-index-zero minima. This is a prevention experiment, not the selected
-production method.
+index-zero minima. The full paired 287-start grid subsequently selected this
+refinement as the g-xTB production formulation; see
+[Final formulation update: Transition1x / g-xTB](#7-final-formulation-update-transition1x--g-xtb).
 
 The trace-normalized density satisfies \(\sum_i p_i=1\). Consequently, when several
 positive-curvature modes are comparably soft, the ordinary factor
@@ -602,8 +603,10 @@ index-one selection.
 The simple \(\lambda_2\) gate is the maintained analytic-LJ baseline. The
 Transition1x g-xTB campaign additionally tested two strictly pointwise,
 scale-invariant gates for the observed high-index-to-minimum failure mode.
-The competitive gate is the selected g-xTB formulation and is stated in full
-in [Recommended surface-specific formulations](#recommended-surface-specific-formulations).
+The original scalar competitive gate is stated in full in
+[Recommended surface-specific formulations](#recommended-surface-specific-formulations).
+The completed paired grid selects its relative-soft-subspace refinement as the
+current g-xTB formulation; see Section 7.
 
 For completeness, the rejected boundary guard used
 
@@ -921,3 +924,82 @@ The implementation is in `src/gadplus/search/intrinsic_gad.py`. Mathematical
 and LJ regression tests are in `tests/test_intrinsic_gad.py`, and the complete
 LJ noise-study results are in
 `docs/research/LJ_INTRINSIC_GAD_NOISE_2026_07_26.md`.
+
+## 7. Final formulation update: Transition1x / g-xTB
+
+The full matched 287-start g-xTB grid changes the provisional selection made
+in the earlier development discussion above.  The selected molecular
+formulation is now **competitive-subspace GAD**,
+`gate_variant="competitive_subspace"`.  It retains the LJ-derived intrinsic
+geometry, the smooth \(\lambda_2\) descent-to-GAD transition, and the
+competitive activity gate, but removes soft-density dilution when the lowest
+curvature is nearly degenerate.
+
+Let \(c_i\) be the current mass-weighted vibrational gradient coefficients,
+\(s_H=(m^{-1}\sum_i\lambda_i^2)^{1/2}\), and
+
+```math
+p_i=
+\frac{\exp[-\lambda_i/(\tau_s s_H)]}
+     {\sum_j\exp[-\lambda_j/(\tau_s s_H)]},
+\qquad
+n_i=\sigma\!\left(-\frac{\lambda_i}{\tau_s s_H}\right),
+\qquad
+w_2=\sigma\!\left(\frac{\lambda_2}{\tau_s s_H}\right).
+```
+
+Define the soft and additional-negative activity, respectively, by
+
+```math
+A_{\rm soft}=\sum_i p_i c_i^2,
+\qquad
+A_{\rm extra}=\sum_i n_i(1-p_i)^2c_i^2,
+\qquad
+\chi=
+\begin{cases}
+ A_{\rm soft}/(A_{\rm soft}+A_{\rm extra}),&A_{\rm soft}+A_{\rm extra}>0,\\
+ 0,&\text{otherwise}.
+\end{cases}
+```
+
+The local scalar gate and relative soft-subspace reflection density are
+
+```math
+w=w_2+(1-w_2)\chi,
+\qquad
+\widetilde p_i=\frac{p_i}{\max_jp_j}
+=\exp\!\left[-\frac{\lambda_i-\lambda_1}{\tau_s s_H}\right],
+\qquad
+b_i=(1-2w\widetilde p_i)c_i.
+```
+
+Finally, use the same pointwise intrinsic radius and closed-form coefficients
+from Sections 4.5--4.6:
+
+```math
+\mu=\frac{\lVert b\rVert_2}{R(q)},
+\qquad
+a_i=-\frac{b_i}{\sqrt{\lambda_i^2+\mu^2}},
+\qquad
+q^+=q+M^{-1/2}QVa.
+```
+
+This is a deterministic \(q^+=\Psi(q,g(q),H(q))\) map.  The iteration budget
+is an external stopping rule, not optimizer state.  There is no minimum
+rescue, mode history, trial-point acceptance, or hidden displacement clip.
+
+The distinction from the LJ profile is narrow but important.  LJ7 uses
+\(b_i=(1-2w_2p_i)c_i\).  On g-xTB, finite-temperature weights can distribute
+the nominal reflection over several nearly soft modes, leaving no mode fully
+reversed just before capture by a minimum.  Replacing \(p_i\) only in the
+reflection by \(\widetilde p_i\) gives unit weight to every exactly degenerate
+lowest mode and exact one-mode GAD for an isolated lowest mode.  The scalar
+competition \(\chi\) still suppresses ascent when substantial activity lies
+in *other* negative directions.  Thus it does not make a high-index saddle
+attracting by flipping all negative modes.
+
+The full outcomes, including the distinction between local saddle recovery,
+the two-branch endpoint screen, and labelled recovery, are recorded in
+`docs/research/BENCHMARK_RESULTS_2026_07_16.md`.  The endpoint screen is not
+a discretized IRC; true IRC validation remains the appropriate higher-cost
+follow-up for accepted candidates.

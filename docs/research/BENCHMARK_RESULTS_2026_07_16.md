@@ -161,6 +161,56 @@ needed independent positive result for a broad GAD-over-Sella claim.
 
 Source: `/lustre07/scratch/memoozd/gadplus/runs/horm_formula_starts_zero_20260711/`.
 
+## Transition1x / g-xTB matched noise grid
+
+This is a separate, current 287-start test-split campaign on the g-xTB PES.
+Each method received the same Cartesian-noise realization for each labelled
+Transition1x TS.  `local index 1` means projected \(n_{\rm neg}=1\) and
+\(f_{\max}<0.03\) eV A\(^{-1}\). `native topology` additionally requires
+two downhill, minimized branches to match the labelled Transition1x endpoint
+pair. It is an inexpensive two-branch endpoint screen, **not a full IRC**.
+
+| noise (A) | method | updates | valid / 287 | local index-1 / 287 | native topology / 287 | topology / local |
+|---:|---|---:|---:|---:|---:|---:|
+| 0.10 | regular GAD | 300 | 287 | 35 (12.2%) | 33 (11.5%) | 94.3% |
+| 0.10 | competitive GAD | 300 | 287 | 264 (92.0%) | 222 (77.4%) | 84.1% |
+| 0.10 | **competitive-subspace GAD** | 300 | 286 | **282 (98.3%)** | **231 (80.5%)** | 81.9% |
+| 0.10 | Sella | 300 | 286 | 275 (95.8%) | 210 (73.2%) | 76.4% |
+| 0.20 | regular GAD | 300 | 287 | 2 (0.7%) | 2 (0.7%) | 100.0% |
+| 0.20 | competitive GAD | 300 | 281 | 236 (82.2%) | 123 (42.9%) | 52.1% |
+| 0.20 | **competitive-subspace GAD** | 300 | 276 | **262 (91.3%)** | **124 (43.2%)** | 47.3% |
+| 0.20 | Sella | 300 | 276 | 261 (90.9%) | 107 (37.3%) | 41.0% |
+| 1.00 | regular GAD | 2000 | 95 | 3 (1.0%) | 0 (0.0%) | 0.0% |
+| 1.00 | competitive GAD | 2000 | 117 | 105 (36.6%) | 0 (0.0%) | 0.0% |
+| 1.00 | competitive-subspace GAD | 2000 | 94 | 90 (31.4%) | 0 (0.0%) | 0.0% |
+| 1.00 | Sella | 2000 | 101 | 87 (30.3%) | 0 (0.0%) | 0.0% |
+
+### Interpretation
+
+At 0.10 and 0.20 A, competitive-subspace GAD has the highest observed
+labelled endpoint recovery: 80.5% and 43.2%, respectively. Its advantage over
+the rank-one competitive reflection is small at 0.20 A (124 versus 123
+starts), so this is a selection based on the complete paired evidence and the
+minimum-capture mechanism, not a broad claim of a large effect. It is clearly
+stronger than regular one-mode GAD on these starts, and it exceeds Sella on
+the labelled two-branch screen at both moderate noise levels.
+
+At 1.00 A, g-xTB calculator failures dominate (170--193 failures depending on
+method), and no method recovers the labelled endpoint pair. This does **not**
+mean no local saddles exist: competitive GAD, competitive-subspace GAD, and
+Sella still reached 105, 90, and 87 local index-one candidates, respectively.
+It means that the labelled-event recovery metric is outside its useful regime
+at this perturbation under the present PES and endpoint labels.
+
+The selected g-xTB method is therefore competitive-subspace GAD for the
+state-based local search. Accepted candidates still require the normal
+physical filters: force/index, a clear spectral gap where relevant,
+fragmentation screening, and—when chemical connectivity matters—a proper IRC
+or equivalently justified endpoint validation. The raw manifests and
+reproducible aggregate are
+`experiments/t1x_gxtb_matched_noise_grid_manifest.json` and
+`/scratch/memoozd/gadplus/analysis/t1x-gxtb-matched-noise-grid/`.
+
 ## MACE-OFF23
 
 MACE work is exploratory only. The compatibility screen found that all
