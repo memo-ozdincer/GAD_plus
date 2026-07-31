@@ -17,6 +17,7 @@ module purge
 module load StdEnv/2023 python/3.11.5
 PROJECT_DIR=/scratch/memoozd/GAD/GAD_plus
 export GADPLUS_ENV="$PROJECT_DIR/.venv"
+export GADPLUS_T1X_H5=/scratch/memoozd/GAD/data/transition1x.h5
 source "$PROJECT_DIR/scripts/lib/gxtb_runtime.sh"
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 OUT_ROOT=/scratch/memoozd/gadplus/analysis/t1x-gxtb-matched-noise-grid

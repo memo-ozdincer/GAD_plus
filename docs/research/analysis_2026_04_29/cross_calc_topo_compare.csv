@@ -1,0 +1,13 @@
+method,noise_pm,n_hip_topo,n_scine_topo,n_both,n_hip_only,n_scine_only,P_scine_topo_given_hip_topo,P_hip_topo_given_scine_topo
+GAD,10,255,37,34,221,3,0.13333333333333333,0.918918918918919
+GAD,30,256,2,2,254,0,0.0078125,1.0
+GAD,50,255,1,1,254,0,0.00392156862745098,1.0
+GAD,100,224,0,0,224,0,0.0,nan
+GAD,150,177,0,0,177,0,0.0,nan
+GAD,200,128,0,0,128,0,0.0,nan
+Sella,10,256,0,0,256,0,0.0,nan
+Sella,30,256,0,0,256,0,0.0,nan
+Sella,50,251,0,0,251,0,0.0,nan
+Sella,100,208,0,0,208,0,0.0,nan
+Sella,150,143,0,0,143,0,0.0,nan
+Sella,200,67,0,0,67,0,0.0,nan

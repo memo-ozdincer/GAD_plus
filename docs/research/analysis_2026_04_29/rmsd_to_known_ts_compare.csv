@@ -1,0 +1,19 @@
+family,noise_pm,n_conv,n_total,rmsd_med,rmsd_p95,rmsd_mean
+Sella libdef,10,276,287,0.008,0.073,0.019
+Sella libdef,30,276,287,0.009,0.071,0.021
+Sella libdef,50,264,287,0.009,0.072,0.023
+Sella libdef,100,217,287,0.009,0.201,0.039
+Sella libdef,150,164,287,0.013,0.617,0.093
+Sella libdef,200,90,287,0.017,0.838,0.192
+hybrid Eckart damped tr=0.05,10,245,287,0.007,0.047,0.016
+hybrid Eckart damped tr=0.05,30,244,287,0.007,0.047,0.016
+hybrid Eckart damped tr=0.05,50,234,287,0.007,0.049,0.016
+hybrid Eckart damped tr=0.05,100,192,287,0.008,0.055,0.018
+hybrid Eckart damped tr=0.05,150,146,287,0.007,0.062,0.022
+hybrid Eckart damped tr=0.05,200,95,287,0.008,0.109,0.038
+plain GAD dt=0.005,10,256,287,0.005,0.018,0.008
+plain GAD dt=0.005,30,254,287,0.008,0.021,0.012
+plain GAD dt=0.005,50,246,287,0.011,0.028,0.015
+plain GAD dt=0.005,100,206,287,0.014,0.044,0.022
+plain GAD dt=0.005,150,164,287,0.016,0.088,0.042
+plain GAD dt=0.005,200,124,287,0.014,0.456,0.08

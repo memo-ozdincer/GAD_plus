@@ -1,0 +1,5 @@
+label,method_tag,noise_pm,n_partitions,n_samples,n_converged,n_topo,n_intended,per_conv_topo_pct,full_n_topo_pct,full_n_intended_pct,raw_conv_pct,recovery_pp
+Sella d=3 @ 200pm,Sella cartesian Eckart untuned Hess.Freq.=3,200,4,287,79,63,30,79.74683544303798,21.951219512195124,10.452961672473867,23.3,-1.348780487804877
+Sella internal d=1 @ 200pm,Sella internal tuned Hess.Freq.=1,200,4,287,50,46,23,92.0,16.027874564459932,8.013937282229966,13.9,2.1278745644599315
+Sella libdef midpoint @ 0pm,Sella libdef (midpoint @ 0pm),0,4,287,148,134,85,90.54054054054055,46.68989547038328,29.61672473867596,46.7,-0.0101045296167257
+Sella internal d=1 @ 150pm,Sella internal tuned Hess.Freq.=1,150,4,287,94,95,43,101.06382978723404,33.10104529616725,14.982578397212544,41.7,-8.598954703832753
