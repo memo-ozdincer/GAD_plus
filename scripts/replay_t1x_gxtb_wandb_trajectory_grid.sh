@@ -11,27 +11,29 @@ set -a
 source /scratch/memoozd/GAD/secrets/wandb.env
 set +a
 export WANDB_SILENT=true OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONPATH=src
+MAX_RUNS_PER_CELL=${MAX_RUNS_PER_CELL:-10}
+TRAJECTORY_GROUP=${TRAJECTORY_GROUP:-t1x-gxtb-trajectory-examples}
 
 replay_regular() {
   local noise=$1 budget=$2 job_id=$3
   local noise_value=${noise/p/.}
   .venv/bin/python scripts/export_regular_gad_trace_campaign.py \
     "/scratch/memoozd/gadplus/runs/t1x-gxtb-grid-regular_gad-${noise}-${job_id}" \
-    --noise "$noise_value" --budget "$budget" --group t1x-gxtb-matched-noise-grid --mode online
+    --noise "$noise_value" --budget "$budget" --group "$TRAJECTORY_GROUP" --mode online --max-runs "$MAX_RUNS_PER_CELL"
 }
 
 replay_sella() {
   local noise=$1 job_id=$2
   .venv/bin/python scripts/export_sella_trace_campaign.py \
     "/scratch/memoozd/gadplus/runs/t1x-gxtb-grid-sella-${noise}-${job_id}" \
-    --group t1x-gxtb-matched-noise-grid --mode online
+    --group "$TRAJECTORY_GROUP" --mode online --max-runs "$MAX_RUNS_PER_CELL"
 }
 
 replay_competitive() {
   local family=$1 noise=$2 job_id=$3 job_type=$4
   .venv/bin/python scripts/export_wandb_campaign.py \
     "/scratch/memoozd/gadplus/runs/t1x-gxtb-grid-${family}-${noise}-${job_id}" \
-    --group t1x-gxtb-matched-noise-grid --job-type "$job_type" --mode online
+    --group "$TRAJECTORY_GROUP" --job-type "$job_type" --mode online --max-runs "$MAX_RUNS_PER_CELL"
 }
 
 replay_regular 0p10 300 1984934 || echo "regular 0p10 replay reported failures"

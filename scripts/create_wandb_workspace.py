@@ -169,19 +169,10 @@ def main() -> None:
             is_open=False,
         ),
     ]
-    full_sections = [
-        ws.Section(name="Campaign outcomes", panels=outcome_panels, is_open=True),
-        ws.Section(name="Trajectory cockpit", panels=[cockpit], is_open=True, pinned=True),
-        ws.Section(name="Competitive GAD mechanism", panels=[mechanism], is_open=True, pinned=True),
-        ws.Section(name="Ordinary GAD mechanism", panels=[regular_mechanism], is_open=True, pinned=True),
-        ws.Section(name="Sella mechanism", panels=[sella_mechanism], is_open=True, pinned=True),
-        ws.Section(name="Native full-fidelity diagnostics", panels=list(common_diagnostics), is_open=False),
-        ws.Section(
-            name="Exact trajectory records",
-            panels=[wr.WeavePanelSummaryTable(table_name="trajectory_view", layout=wr.Layout(x=0, y=0, w=24, h=18))],
-            is_open=False,
-        ),
-    ]
+    # The overview must remain fast: it contains only scalar population
+    # summaries. High-resolution charts and tables are deliberately loaded
+    # only from the one-run inspector (or directly from a run page).
+    full_sections = [ws.Section(name="Campaign outcomes", panels=outcome_panels, is_open=True)]
 
     workspace = ws.Workspace(
         entity=entity,

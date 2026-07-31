@@ -51,6 +51,7 @@ def main() -> None:
     parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive summary index")
     parser.add_argument("--stop-index", type=int, help="0-based exclusive summary index")
     parser.add_argument("--max-view-rows", type=int, default=600)
+    parser.add_argument("--max-runs", type=int, help="Evenly select at most this many trajectories from the requested range.")
     parser.add_argument(
         "--cockpit-chart-id",
         default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
@@ -69,7 +70,14 @@ def main() -> None:
     stop = len(summaries) if args.stop_index is None else args.stop_index
     if not 0 <= args.start_index <= stop <= len(summaries):
         raise SystemExit("invalid --start-index/--stop-index range")
-    for index, summary_path in enumerate(summaries[args.start_index:stop], start=args.start_index + 1):
+    positions = list(range(args.start_index, stop))
+    if args.max_runs is not None and len(positions) > args.max_runs:
+        if args.max_runs < 1:
+            raise SystemExit("--max-runs must be positive")
+        positions = sorted({round(item * (len(positions) - 1) / (args.max_runs - 1)) for item in range(args.max_runs)}) if args.max_runs > 1 else [0]
+        positions = [args.start_index + item for item in positions]
+    for summary_index in positions:
+        index, summary_path = summary_index + 1, summaries[summary_index]
         summary = pq.read_table(summary_path).to_pylist()[0]
         trace_matches = sorted(summary_path.parent.glob("traj_*.parquet"))
         if len(trace_matches) != 1:
@@ -145,6 +153,7 @@ def main() -> None:
                 "grad_v0_overlap": _number_or_none(row.get("grad_v0_overlap")),
                 "grad_v1_overlap": _number_or_none(row.get("grad_v1_overlap")),
                 "disp_from_last": _number_or_none(row.get("disp_from_last")),
+                "step_cart_rms": _number_or_none(row.get("disp_from_last")),
             }
             view_rows.append(normalized)
             payload: dict[str, object] = {"trajectory/step": int(row["step"])}

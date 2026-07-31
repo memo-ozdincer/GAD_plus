@@ -29,6 +29,7 @@ def main() -> None:
     parser.add_argument("--start-index", type=int, default=0, help="0-based inclusive summary index")
     parser.add_argument("--stop-index", type=int, help="0-based exclusive summary index")
     parser.add_argument("--max-view-rows", type=int, default=600)
+    parser.add_argument("--max-runs", type=int, help="Evenly select at most this many trajectories from the requested range.")
     parser.add_argument(
         "--cockpit-chart-id",
         default="memo-ozdincer-university-of-toronto/gadplus-trajectory-cockpit-v3",
@@ -46,7 +47,14 @@ def main() -> None:
     stop = len(summaries) if args.stop_index is None else args.stop_index
     if not 0 <= args.start_index <= stop <= len(summaries):
         raise SystemExit("invalid --start-index/--stop-index range")
-    for index, summary_path in enumerate(summaries[args.start_index:stop], start=args.start_index + 1):
+    positions = list(range(args.start_index, stop))
+    if args.max_runs is not None and len(positions) > args.max_runs:
+        if args.max_runs < 1:
+            raise SystemExit("--max-runs must be positive")
+        positions = sorted({round(item * (len(positions) - 1) / (args.max_runs - 1)) for item in range(args.max_runs)}) if args.max_runs > 1 else [0]
+        positions = [args.start_index + item for item in positions]
+    for summary_index in positions:
+        index, summary_path = summary_index + 1, summaries[summary_index]
         row = pq.read_table(summary_path).to_pylist()[0]
         trace_path = Path(str(row.get("sella_trace_path", "")))
         if not trace_path.is_file():
@@ -86,6 +94,10 @@ def main() -> None:
         terminal_distance = np.asarray([kabsch_rmsd(xyz, terminal) for xyz in coordinates])
         terminal_d0 = float(terminal_distance[0])
         start_energy = float(fields["energy"][0])
+        step_cart_rms = np.zeros(count, dtype=float)
+        if count > 1:
+            displacement = coordinates[1:] - coordinates[:-1]
+            step_cart_rms[1:] = np.sqrt(np.mean(np.sum(displacement * displacement, axis=2), axis=1))
         view_rows: list[dict[str, object]] = []
         for position in range(count):
             payload = {"trajectory/evaluation": int(fields["evaluation"][position])}
@@ -113,6 +125,7 @@ def main() -> None:
                 "distance_to_labelled_ts": None,
                 "distance_to_labelled_ts_display": None,
                 "step_mw_rms": None, "max_atom_displacement": None,
+                "step_cart_rms": float(step_cart_rms[position]),
                 "step_over_radius": None, "step_over_radius_display": None,
                 "step_over_length": None, "step_over_length_display": None,
                 "energy": float(fields["energy"][position]),

@@ -39,12 +39,40 @@ and endpoint-topology labels. This separation has four advantages:
 - the same raw record can be re-exported when a chart definition changes;
 - hindsight diagnostics cannot accidentally influence the dynamics.
 
+### Fast local trajectory explorer
+
+For interactive diagnosis without W&B latency, run
+`scripts/serve_t1x_trajectory_explorer.py`. Its landing view is deliberately
+aggregate-first: separate `g-xTB` and `LJ7` tabs show the complete method-by-noise
+table before any trajectory is decoded. Below that table, each g-xTB method has
+one declared success and one declared failure example for A/B comparison.
+Failures appear only in this curated diagnostic section; the secondary raw-run
+browser contains successful runs with saved traces only.
+
+Trace data are loaded only after selection, reduced to at most 600
+event-preserving samples, and cached in the server process. The plot stack uses
+one full-width row per diagnostic: force, signed and absolute low spectrum,
+projected index, step displacement, hindsight distance, energy, and available
+method-specific controls. Historical LJ7 progression data have aggregate
+records but no saved stepwise traces, so the explorer reports that limitation
+instead of fabricating plots.
+
+On Trillium the server binds only to loopback. Start it from the scratch-root
+checkout and open an SSH tunnel from the workstation:
+
+```bash
+ssh -N -L 8767:127.0.0.1:8767 <trillium-host>
+```
+
+Then open `http://localhost:8767`. The local DuckDB index and trace cache are
+observational and never enter an optimizer update.
+
 ### Current matched g-xTB grid record
 
 The completed `0.10`, `0.20`, and `1.00` A cells already have the exact local
 records needed for this design; they are not reconstructed by rerunning g-xTB:
 
-- competitive and competitive-subspace GAD: `trajectory.parquet`,
+- competitive GAD and CS²-GAD (`competitive_subspace` internally): `trajectory.parquet`,
   `coordinates.npz`, and `metadata.json` for each recorded trajectory;
 - regular GAD: one rich `traj_*.parquet` per recorded trajectory, including
   Cartesian coordinates, the bottom spectrum, effective step size, mode and

@@ -278,6 +278,82 @@ def log_trajectory_table(
         )
     run.log(payload)
 
+    # Plain W&B line charts are intentionally duplicated from the richer Vega
+    # cockpit. They are a robust, immediately visible per-run fallback when a
+    # custom chart is unavailable in a particular workspace/browser.
+    def line_data(field: str, *, absolute: bool = False) -> tuple[list[float], list[float]]:
+        xs: list[float] = []
+        ys: list[float] = []
+        for row in rows:
+            x, value = row.get("evaluation"), row.get(field)
+            if x is None or value is None:
+                continue
+            try:
+                x_float, y_float = float(x), float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(x_float) and math.isfinite(y_float):
+                xs.append(x_float)
+                ys.append(abs(y_float) if absolute else y_float)
+        return xs, ys
+
+    force_x, force_y = line_data("force_ratio_display")
+    force_y = [math.log10(value) for value in force_y]
+    if force_x:
+        run.log({
+            "trajectory_force_graph": wandb.plot.line_series(
+                force_x, [force_y], keys=("log10(fmax / tolerance)",),
+                title="Stationarity (per-run; 0 is the force tolerance)",
+                xname="Hessian evaluation",
+            )
+        })
+    spectra = [line_data(field, absolute=True) for field in ("lambda1", "lambda2", "lambda3")]
+    present = [(x, y, label) for (x, y), label in zip(spectra, ("|lambda1|", "|lambda2|", "|lambda3|")) if x]
+    if present:
+        run.log({
+            "trajectory_curvature_graph": wandb.plot.line_series(
+                [item[0] for item in present], [item[1] for item in present],
+                keys=[item[2] for item in present],
+                title="Lowest vibrational-curvature magnitudes (per run)",
+                xname="Hessian evaluation",
+            )
+        })
+    distance_series = [
+        (*line_data(field), label)
+        for field, label in (
+            ("distance_to_terminal_display", "RMSD to terminal candidate"),
+            ("distance_to_labelled_ts_display", "RMSD to labelled TS"),
+        )
+    ]
+    present_distance = [(x, y, label) for x, y, label in distance_series if x]
+    if present_distance:
+        run.log({
+            "trajectory_hindsight_distance_graph": wandb.plot.line_series(
+                [item[0] for item in present_distance], [item[1] for item in present_distance],
+                keys=[item[2] for item in present_distance],
+                title="Hindsight closeness to TS/candidate (not used by optimizer)",
+                xname="Hessian evaluation",
+            )
+        })
+    step_series = [
+        (*line_data(field), label)
+        for field, label in (
+            ("step_cart_rms", "Cartesian RMS step"),
+            ("disp_from_last", "Cartesian displacement"),
+            ("max_atom_displacement", "maximum atom displacement"),
+        )
+    ]
+    present_step = [(x, y, label) for x, y, label in step_series if x]
+    if present_step:
+        run.log({
+            "trajectory_step_graph": wandb.plot.line_series(
+                [item[0] for item in present_step], [item[1] for item in present_step],
+                keys=[item[2] for item in present_step],
+                title="Per-step displacement (per run)",
+                xname="Hessian evaluation",
+            )
+        })
+
 
 def export_bundle(
     bundle_dir: str | Path,
