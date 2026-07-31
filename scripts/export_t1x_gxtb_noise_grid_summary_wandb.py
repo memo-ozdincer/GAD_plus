@@ -61,8 +61,10 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     json_path = args.output_dir / "summary.json"
     markdown_path = args.output_dir / "SUMMARY.md"
+    analysis_path = args.output_dir / "ANALYSIS.md"
     json_path.write_text(json.dumps(rows, indent=2) + "\n")
     markdown_path.write_text(aggregate._markdown(rows))
+    analysis_path.write_text(aggregate._analysis(rows))
 
     import wandb
 
@@ -97,6 +99,7 @@ def main() -> None:
     artifact.add_file(str(args.manifest))
     artifact.add_file(str(json_path))
     artifact.add_file(str(markdown_path))
+    artifact.add_file(str(analysis_path))
     run.log_artifact(artifact)
     run.summary.update({"cells": len(rows), "complete": True})
     run.finish()
