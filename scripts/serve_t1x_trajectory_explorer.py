@@ -118,10 +118,23 @@ def load_trace(kind: str, path: str) -> dict[str, Any]:
     return {"bundle":bundle_trace, "sella_npz":sella_trace, "regular_parquet":regular_trace}[kind](path)
 
 
+def json_safe(value: Any) -> Any:
+    """Recursively replace non-finite diagnostics with standards-compliant nulls."""
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 @lru_cache(maxsize=64)
 def cached_trace(kind: str, path: str) -> dict[str, Any]:
     """Cache decoded/decimated traces; files are immutable campaign artifacts."""
-    return load_trace(kind, path)
+    return json_safe(load_trace(kind, path))
 
 
 PAGE = r'''<!doctype html>
