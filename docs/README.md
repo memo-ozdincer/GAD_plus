@@ -12,6 +12,9 @@
   historical provenance.
 - [Experiment organisation](EXPERIMENT_ORGANIZATION.md): output and scratch
   conventions.
+- [Five-minute toy](TOY_GAD_EVOLUTION.md): a self-contained four-well visual
+  explanation of the GAD-to-competitive-subspace progression. The executable
+  notebook is [`examples/gad_evolution_four_wells.ipynb`](../examples/gad_evolution_four_wells.ipynb).
 
 ## Research archive
 
