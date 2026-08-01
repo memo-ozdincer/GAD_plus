@@ -32,11 +32,18 @@ from pathlib import Path
 from typing import Any
 
 import torch
+from ase import Atoms
+from sella import Sella
 
 from gadplus.calculator.lennard_jones import (
     lj_atomic_nums,
     make_lj_predict_fn,
     pair_distances,
+)
+from gadplus.calculator.sella import (
+    FullHessianASECalculator,
+    full_hessian_function,
+    refresh_hessian_after_kicks,
 )
 from gadplus.core.adaptive_dt import cap_displacement
 from gadplus.core.convergence import force_max, is_ts_converged
@@ -52,7 +59,7 @@ from lj_intrinsic_noise_sweep import (
 )
 
 
-METHODS = ("ordinary_gad", "hard_gate", "historical_lambda2", "intrinsic")
+METHODS = ("ordinary_gad", "hard_gate", "historical_lambda2", "intrinsic", "sella")
 EULER_METHODS = frozenset(METHODS[:3])
 DEFAULT_NOISES = "0.10,0.20,0.40"
 FIELDNAMES = (
@@ -241,6 +248,9 @@ def _run_method(
             max_atom_disp=args.max_atom_disp,
         )
 
+    if method == "sella":
+        return _run_sella(predictor, atomic_nums, start, args)
+
     result = run_intrinsic_gad(
         predictor,
         start,
@@ -260,6 +270,45 @@ def _run_method(
         "total_steps": result.total_steps,
         "n_evaluations": result.n_evaluations,
         "wall_time_s": result.wall_time_s,
+    }
+
+
+def _run_sella(
+    predictor,
+    atomic_nums: torch.Tensor,
+    start: torch.Tensor,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Cartesian Sella with an exact, Eckart-cleaned Hessian after each kick."""
+    coords = start.detach().clone().to(torch.float64).reshape(-1, 3)
+    atoms = Atoms(numbers=atomic_nums.detach().cpu().numpy(), positions=coords.cpu().numpy())
+    calculator = FullHessianASECalculator(predictor, atomic_nums, "cpu")
+    atoms.calc = calculator
+    began = time.monotonic()
+    try:
+        optimizer = Sella(
+            atoms=atoms, order=1, internal=False, logfile=None,
+            delta0=0.1, gamma=0.4, diag_every_n=1,
+            hessian_function=full_hessian_function(calculator, eckart_project=True),
+            rho_inc=1.035, rho_dec=5.0, sigma_inc=1.15, sigma_dec=0.65,
+        )
+        refresh_hessian_after_kicks(optimizer.pes)
+        optimizer.run(fmax=0.01, steps=args.euler_max_steps)
+        steps = int(optimizer.nsteps)
+    except Exception:
+        steps = args.euler_max_steps
+    final_coords = torch.as_tensor(atoms.positions, dtype=torch.float64)
+    out, evals, _ = _evaluate_spectrum(predictor, atomic_nums, final_coords)
+    forces = out["forces"].reshape_as(final_coords)
+    n_neg = int((evals < -1.0e-4).sum().item())
+    fmax = force_max(forces)
+    return {
+        "coords": final_coords, "energy": float(out["energy"].item()),
+        "n_neg": n_neg, "force_max": fmax,
+        "lambda1": float(evals[0].item()), "lambda2": float(evals[1].item()),
+        "evals": evals, "converged": is_ts_converged(n_neg, fmax, 0.01, criterion="fmax"),
+        "total_steps": steps, "n_evaluations": calculator.n_evaluations + 1,
+        "wall_time_s": time.monotonic() - began,
     }
 
 
