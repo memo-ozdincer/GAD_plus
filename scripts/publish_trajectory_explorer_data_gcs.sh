@@ -21,14 +21,14 @@ for root in \
     "$DATA/runs/t1x-gxtb-grid-regular_gad-1p00-1984943" \
     "$DATA/runs/t1x-gxtb-grid-competitive-1p00-1984944" \
     "$DATA/runs/t1x-gxtb-grid-competitive_subspace-1p00-1984945" \
-    "$DATA/runs/t1x-gxtb-grid-sella-1p00-1984946"
-    "$DATA/runs/t1x-gxtb-grid-regular_gad-0p50-1990765"
-    "$DATA/runs/t1x-gxtb-grid-competitive-0p50-1990767"
-    "$DATA/runs/t1x-gxtb-grid-competitive_subspace-0p50-1990769"
-    "$DATA/runs/t1x-gxtb-grid-sella-0p50-1990771"
-    "$DATA/runs/t1x-gxtb-grid-regular_gad-2p00-1990773"
-    "$DATA/runs/t1x-gxtb-grid-competitive-2p00-1990775"
-    "$DATA/runs/t1x-gxtb-grid-competitive_subspace-2p00-1990777"
+    "$DATA/runs/t1x-gxtb-grid-sella-1p00-1984946" \
+    "$DATA/runs/t1x-gxtb-grid-regular_gad-0p50-1990765" \
+    "$DATA/runs/t1x-gxtb-grid-competitive-0p50-1990767" \
+    "$DATA/runs/t1x-gxtb-grid-competitive_subspace-0p50-1990769" \
+    "$DATA/runs/t1x-gxtb-grid-sella-0p50-1990771" \
+    "$DATA/runs/t1x-gxtb-grid-regular_gad-2p00-1990773" \
+    "$DATA/runs/t1x-gxtb-grid-competitive-2p00-1990775" \
+    "$DATA/runs/t1x-gxtb-grid-competitive_subspace-2p00-1990777" \
     "$DATA/runs/t1x-gxtb-grid-sella-2p00-1990779"
 do
     env -u PYTHONPATH "$GCLOUD" storage rsync --recursive --verbosity=error \
