@@ -20,6 +20,7 @@ PROJECT_DIR=/scratch/memoozd/GAD/GAD_plus
 OUT_ROOT=/scratch/memoozd/gadplus/runs/lj7-sella-progression-${SLURM_JOB_ID}
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONPATH="$PROJECT_DIR/src"
 PYTHON="$PROJECT_DIR/.venv/bin/python"
+export PROJECT_DIR OUT_ROOT PYTHON
 mkdir -p "$OUT_ROOT"
 
 "$PYTHON" "$PROJECT_DIR/scripts/lj_method_progression_sweep.py" prepare --output-root "$OUT_ROOT"
