@@ -7,7 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src
 
 WORKDIR /app
-RUN pip install --no-cache-dir Flask duckdb numpy pyarrow plotly
+# Plotly 6.x currently ships plotly.js 3.x, whose browser bundle has caused
+# blank dashboard panels in this otherwise plain-JS viewer.  Keep the proven
+# 5.x / plotly.js 2.x renderer pinned until the 3.x interaction regression is
+# resolved upstream.
+RUN pip install --no-cache-dir Flask duckdb numpy pyarrow 'plotly==5.24.1'
 COPY src /app/src
 COPY scripts/serve_t1x_trajectory_explorer.py /app/serve_t1x_trajectory_explorer.py
 
