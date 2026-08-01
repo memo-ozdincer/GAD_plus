@@ -50,7 +50,7 @@ def topology_rows(root: Path) -> dict[int, dict[str, Any]]:
     return result
 
 
-def build_index(manifest: Path, lj_results: Path, database: Path) -> None:
+def build_index(manifest: Path, lj_results: Path, database: Path, lj_sella_results: Path | None = None) -> None:
     database.parent.mkdir(parents=True, exist_ok=True)
     records: list[tuple[Any, ...]] = []
     for spec in json.loads(manifest.read_text()):
@@ -82,7 +82,11 @@ def build_index(manifest: Path, lj_results: Path, database: Path) -> None:
             "historical_lambda2": {"gate": "sigmoid(50 lambda2)", "dt": .005, "cap": .005, "budget": 8000},
             "intrinsic": {"spectral_temperature": .01, "step_fraction": .05, "budget": 200},
         }
-        for row in json.loads(lj_results.read_text()):
+        all_lj_rows = json.loads(lj_results.read_text())
+        if lj_sella_results and lj_sella_results.is_file():
+            all_lj_rows.extend(json.loads(lj_sella_results.read_text()))
+        lj_params["sella"] = {"coordinates": "Cartesian", "projection": "Eckart", "budget": 8000}
+        for row in all_lj_rows:
             method, sid = row["method"], int(row["sample_id"]); params = lj_params[method]
             fmax, nneg = finite(row.get("final_force_max")), int(row.get("final_n_neg", -1))
             records.append((f"lj7:{method}:{row['noise']}:{row['panel']}:{sid}", "analytic reduced LJ7", method, row["panel"], float(row["noise"]), "σ", sid, row.get("seed"), "LJ7", row["panel"], row.get("initial_n_neg"), nneg, fmax, finite(row.get("final_lambda1")), finite(row.get("final_lambda2")), int(row.get("n_evaluations", 0)), finite(row.get("wall_time_s")), int(params["budget"]), bool(row.get("converged")), bool(row.get("converged")), bool(row.get("downhill_valid")), bool(row.get("correct_event")), str(row.get("failure_type", "") or row.get("error", "")), False, "none", "", json.dumps(params, sort_keys=True)))
@@ -338,8 +342,8 @@ def create_app(database: Path) -> Flask:
 
 
 def main() -> None:
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--manifest",type=Path,default=Path("experiments/t1x_gxtb_matched_noise_grid_manifest.json"));parser.add_argument("--lj-results",type=Path,default=Path("/scratch/memoozd/gadplus/runs/lj-method-progression-1946071/all_results.json"));parser.add_argument("--database",type=Path,default=Path(os.environ.get("GADPLUS_DATABASE", "/scratch/memoozd/gadplus/analysis/trajectory-explorer/index.duckdb")));parser.add_argument("--port",type=int,default=int(os.environ.get("PORT", "8767")));parser.add_argument("--rebuild",action="store_true");args=parser.parse_args()
-    if args.rebuild or not args.database.exists(): build_index(args.manifest,args.lj_results,args.database)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--manifest",type=Path,default=Path("experiments/t1x_gxtb_matched_noise_grid_manifest.json"));parser.add_argument("--lj-results",type=Path,default=Path("/scratch/memoozd/gadplus/runs/lj-method-progression-1946071/all_results.json"));parser.add_argument("--lj-sella-results",type=Path,default=Path("/scratch/memoozd/gadplus/runs/lj7-sella-progression-1994169/all_results.json"));parser.add_argument("--database",type=Path,default=Path(os.environ.get("GADPLUS_DATABASE", "/scratch/memoozd/gadplus/analysis/trajectory-explorer/index.duckdb")));parser.add_argument("--port",type=int,default=int(os.environ.get("PORT", "8767")));parser.add_argument("--rebuild",action="store_true");args=parser.parse_args()
+    if args.rebuild or not args.database.exists(): build_index(args.manifest,args.lj_results,args.database,args.lj_sella_results)
     # Cloud Run (and the local tunnel) need the process reachable outside its
     # loopback namespace.  The service is still public only through Cloud Run
     # IAM; this does not alter the local data/API contract.

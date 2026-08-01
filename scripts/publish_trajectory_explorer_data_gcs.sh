@@ -29,7 +29,8 @@ for root in \
     "$DATA/runs/t1x-gxtb-grid-regular_gad-2p00-1990773" \
     "$DATA/runs/t1x-gxtb-grid-competitive-2p00-1990775" \
     "$DATA/runs/t1x-gxtb-grid-competitive_subspace-2p00-1990777" \
-    "$DATA/runs/t1x-gxtb-grid-sella-2p00-1990779"
+    "$DATA/runs/t1x-gxtb-grid-sella-2p00-1990779" \
+    "$DATA/runs/lj7-sella-progression-1994169"
 do
     env -u PYTHONPATH "$GCLOUD" storage rsync --recursive --verbosity=error \
         "$root" "$BUCKET_URI/runs/${root##*/}"
