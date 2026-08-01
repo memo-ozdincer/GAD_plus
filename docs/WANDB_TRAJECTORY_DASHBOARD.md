@@ -57,6 +57,15 @@ method-specific controls. Historical LJ7 progression data have aggregate
 records but no saved stepwise traces, so the explorer reports that limitation
 instead of fabricating plots.
 
+The hosted explorer defaults to compact, left-aligned diagnostic cards; each
+card has a fullscreen control (or `Escape` to return) so long trajectories are
+easy to scroll without losing a detailed inspection mode.  Its projected
+recorded-update map is a PCA display of the saved trajectory coordinates: line
+segments show the actual accepted update between displayed evaluations.  It is
+not presented as a global molecular vector field, which would require a
+specified 2-D slice and new energy/gradient/Hessian evaluations away from the
+recorded path.
+
 For a private local session on Trillium, start it from the scratch-root checkout
 and open an SSH tunnel from the workstation:
 
