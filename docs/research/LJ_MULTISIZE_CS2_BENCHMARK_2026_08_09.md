@@ -213,6 +213,41 @@ generally had the lower cost tail.
   prejudge the HIP benchmark, where unequal masses, learned curvature, and
   labelled chemistry change the problem.
 
+## Higher-noise extension: 0.30/0.40 sigma
+
+The prospectively matched higher-noise extension completed on 2026-08-14.
+It retained all methods, basins, start families, replicate counts, optimizer
+parameters, budgets, and convergence gates from the frozen benchmark, changing
+only the two displacement levels from `0.10/0.20` to `0.30/0.40 sigma`.
+Job `2117204` ran on one packed 192-core `def-aspuru` node, completed in
+`01:35:32`, and produced 1,344/1,344 calculator-valid records with no errors.
+
+| Method | Strict local TS | Two minima | Median evaluations among strict successes |
+|---|---:|---:|---:|
+| intrinsic `lambda2` | 316/448 (70.5%) | 167/448 (37.3%) | 40 |
+| CS²-GAD | 357/448 (79.7%) | 163/448 (36.4%) | 73 |
+| Sella | **407/448 (90.8%)** | 176/448 (39.3%) | **37** |
+| Intrinsic-or-CS² union (two searches) | 405/448 (90.4%) | **240/448 (53.6%)** | not a single-search cost |
+
+No single GAD method beats Sella in this higher-noise pool. Sella exceeds
+CS² by 50 paired strict outcomes (`407` versus `357`; exact two-sided McNemar
+`p=1.25e-6`) and exceeds it by 13 two-minimum outcomes, although that endpoint
+difference is not significant (`p=0.326`). The two-search GAD portfolio is
+locally indistinguishable from Sella (`405` versus `407`; paired
+`p=0.906`) and has substantially more validated two-minimum outcomes (`240`
+versus `176`; paired `p=1.83e-6`). Thus higher noise strengthens the case for
+Sella as the strongest *single* local optimizer, while the complementary GAD
+portfolio remains the stronger validated catchall when two searches are
+acceptable.
+
+Immutable artifacts are under
+`/scratch/memoozd/gadplus/runs/lj-multisize-high-noise-20260814/`.
+The first allocation, job `2117182`, exposed Trillium's inherited `--mem=0`
+step serialization and was stopped after preserving 26 valid atomic rows.
+The launcher was corrected to give each exclusive trajectory step 3 GiB;
+job `2117204` resumed the same run root, packed all 192 cores, and supplied
+the final scientific result.
+
 ## GAD-only route toward a catchall
 
 Running intrinsic `lambda2` and CS² on the same start and accepting either

@@ -57,6 +57,7 @@ for ((task_id=0; task_id<N_TASKS; task_id++)); do
     fi
     export TASK_ID="$task_id"
     srun --exclusive --exact --nodes=1 --ntasks=1 --cpus-per-task=1 --cpu-bind=cores \
+        --mem=3G \
         bash -c 'export XDG_CACHE_HOME="/scratch/memoozd/gadplus/cache/lj_multisize_${SLURM_JOB_ID}/task_${TASK_ID}"; \
           python scripts/lj_multisize_cs2_benchmark.py worker \
           --output-root "$RUN_ROOT" --task-id "$TASK_ID" \

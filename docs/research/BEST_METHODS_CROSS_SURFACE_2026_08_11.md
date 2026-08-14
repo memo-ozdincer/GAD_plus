@@ -148,6 +148,12 @@ paired strict union of 442/448 (98.7%). A later explicitly post-hoc rescue
 grid finds at least one strict and one two-minimum profile for all six misses,
 but its exploratory 448/448 union is not a replacement population estimate.
 
+The matched `0.30/0.40 sigma` extension gives strict/two-minimum counts of
+316/167 intrinsic, 357/163 CS², and 407/176 Sella, each over 448 starts. No
+single GAD method beats Sella there. The intrinsic-or-CS² union is 405 strict
+and 240 two-minimum outcomes: essentially tied with Sella locally and much
+stronger after the validated endpoint gate, at the cost of two searches.
+
 The earlier matched LJ7 formulation progression covers the methods that
 preceded the multisize decision grid:
 
