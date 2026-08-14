@@ -154,9 +154,10 @@ preceded the multisize decision grid:
 | LJ7 method | Strict TS | Two valid endpoints | Median strict evaluations |
 |---|---:|---:|---:|
 | Ordinary GAD | 115/288 (39.9%) | 115/288 | 494 |
+| Sella comparator | 169/288 (58.7%) | 167/288 | **13** |
 | Hard descent-to-GAD gate | 283/288 (98.3%) | 283/288 | 240 |
 | Historical smooth `lambda2` gate | 283/288 (98.3%) | 283/288 | 240 |
-| Pointwise intrinsic `lambda2` GAD | **288/288 (100%)** | **288/288** | **17** |
+| Pointwise intrinsic `lambda2` GAD | **288/288 (100%)** | **288/288** | 17 |
 
 ### g-xTB matched Transition1x benchmark
 
