@@ -1,0 +1,25 @@
+surface,method,noise,progress
+HIP,Hybrid damped,0.01,6.0
+HIP,Hybrid damped,0.03,12.0
+HIP,Hybrid damped,0.05,19.0
+HIP,Hybrid damped,0.1,36.5
+HIP,Hybrid damped,0.15,61.0
+HIP,Hybrid damped,0.2,95.0
+HIP,Hybrid undamped,0.01,6.0
+HIP,Hybrid undamped,0.03,14.0
+HIP,Hybrid undamped,0.05,21.0
+HIP,Hybrid undamped,0.1,39.5
+HIP,Hybrid undamped,0.15,65.0
+HIP,Hybrid undamped,0.2,95.0
+HIP,Plain GAD dt=.005,0.01,99.5
+HIP,Plain GAD dt=.005,0.03,203.5
+HIP,Plain GAD dt=.005,0.05,278.0
+HIP,Plain GAD dt=.005,0.1,458.0
+HIP,Plain GAD dt=.005,0.15,613.5
+HIP,Plain GAD dt=.005,0.2,738.0
+HIP,Sella + Eckart d=3,0.01,5.0
+HIP,Sella + Eckart d=3,0.03,8.0
+HIP,Sella + Eckart d=3,0.05,9.0
+HIP,Sella + Eckart d=3,0.1,11.0
+HIP,Sella + Eckart d=3,0.15,14.0
+HIP,Sella + Eckart d=3,0.2,

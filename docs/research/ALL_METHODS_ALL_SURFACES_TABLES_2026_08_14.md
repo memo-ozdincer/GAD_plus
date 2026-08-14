@@ -1,8 +1,8 @@
 # Every method on every surface
 
-**Bold is best within each benchmark.** Local means the registered convergence gate; validated means two minima for LJ, native endpoints for g-xTB, and intended IRC topology for HIP.
+**Bold is best within each benchmark.**
 
-| Benchmark | Method | Local convergence | Validated outcome | Median successful steps/evaluations |
+| Benchmark | Method | nneg=1 / fmax | IRC | Median successful steps/evaluations |
 |---|---|---:|---:|---:|
 | **LJ7** (288 starts) | Ordinary GAD | 39.9% | 39.9% | 494 |
 | | Sella | 58.7% | 58.0% | **13** |
@@ -31,3 +31,26 @@
 | | Sella, internal coordinates | 13.9% | 16.0% | — |
 | | GAD + damped Newton refinement | 33.1% | 38.7% | 95 |
 | | GAD + undamped Newton refinement | 31.0% | 38.7% | 95 |
+
+## Visual companion
+
+![Local transition-state convergence over noise](figures/all_methods_all_surfaces/convergence_rate_over_noise.png)
+
+The histograms use a log progress axis and are normalized within each method's
+successful runs, so their shapes compare speed without hiding the convergence
+rates above. Dotted lines in the HIP figure are medians where the historical
+campaign retained aggregate progress but not its run-level distribution.
+
+![LJ7 successful-progress histograms](figures/all_methods_all_surfaces/steps_histogram_lj7.png)
+
+![LJ13–75 successful-progress histograms](figures/all_methods_all_surfaces/steps_histogram_lj13_75.png)
+
+![g-xTB successful-progress histograms](figures/all_methods_all_surfaces/steps_histogram_g-xtb.png)
+
+![HIP successful-progress histograms](figures/all_methods_all_surfaces/steps_histogram_hip.png)
+
+Reproducible inputs: [rates](data/all_methods_all_surfaces/convergence_rates.csv),
+[successful-run progress](data/all_methods_all_surfaces/successful_progress.csv),
+and [aggregate-only medians](data/all_methods_all_surfaces/median_only_progress.csv).
+The extraction and plotting code is
+[`scripts/plot_main_table_companion.py`](../../scripts/plot_main_table_companion.py).
