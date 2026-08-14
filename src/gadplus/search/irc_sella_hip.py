@@ -171,6 +171,7 @@ def run_irc_sella_hip(
     eta: float = 1e-4,
     gamma: float = 0.4,
     fmax: float = 0.01,
+    logfile: Optional[str] = "-",
 ) -> IRCResult:
     """Sella IRC identical to the baseline, with HIP MW+Eckart Hessian
     injected into pes.H after every inner kick.
@@ -199,6 +200,7 @@ def run_irc_sella_hip(
                 eta=eta,
                 gamma=gamma,
                 hessian_function=hess_fn,
+                logfile=logfile,
             )
             _force_hessian_every_kick(irc.pes)
             _force_first_kick(irc)

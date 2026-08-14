@@ -275,8 +275,13 @@ part of the proposed paper claim.
 
 ## The HIP Crossover
 
-The fixed test set contains 287 noised Transition1x structures. Under the
-strict criterion `n_neg = 1` and `fmax < 0.01`:
+The fixed test set contains 287 noised Transition1x structures. The current
+CS² follow-up explicitly loads the HDF5 `test` partition and exact filtered
+IDs `0..286`; this is separate from the checkpoint metadata's training LMDB
+`ts1x_hess_train_big.lmdb` and validation LMDB `ts1x-val.lmdb`. Its g-xTB-
+selected `eta=0.01` and `tau_s=0.01` were frozen before HIP evaluation, so
+the HIP test outcomes are not used for per-noise tuning. Under the strict
+criterion `n_neg = 1` and `fmax < 0.01`:
 
 | Historical noise label | Plain GAD | Best completed Sella | GAD minus Sella |
 |---:|---:|---:|---:|
@@ -286,6 +291,15 @@ strict criterion `n_neg = 1` and `fmax < 0.01`:
 | 100 pm | 72.8% | 72.8% | 0.0 pp |
 | 150 pm | 58.2% | 54.0% | +4.2 pp |
 | 200 pm | 44.6% | 27.2% | +17.4 pp |
+
+The completed held-out CS²-GAD cells give `202/287`, `157/287`, and `111/287`
+strict successes at `0.10/0.15/0.20 A`, versus plain GAD's `209/287`,
+`167/287`, and `128/287`. Intended all-endpoint IRC_TOPO is `218/287`,
+`166/287`, and `117/287`, versus plain GAD's `225/287`, `177/287`, and
+`128/287`. CS² therefore does not improve HIP local capture or intended
+mechanism recovery at any hard-noise cell. See
+`HIP_CS2_H100_HANDOFF_2026_08_09.md` for immutable start hashes and the final
+failure ledger.
 
 The labels above are historically wrong by a factor of ten: the scripts use
 coordinate standard deviations of `0.01` through `0.20 A` but label them

@@ -904,6 +904,33 @@ The historical gate supplied the essential dynamical idea. The current method
 makes that idea dimensionless, degeneracy-safe, algebraically bounded, and
 strictly pointwise.
 
+### Multi-size LJ qualification
+
+The 2026-08-09 matched benchmark on LJ13, LJ31, LJ38, LJ55, and LJ75 prevents
+the LJ7 result from being generalized into a universal optimizer claim. Over
+448 matched starts per method, strict index-one recovery was 395 for the
+intrinsic `lambda2` profile, 399 for CS²-GAD, and 422 for Sella. CS² improved
+on intrinsic for LJ38 and LJ55 but lost on LJ31 and, substantially, LJ75.
+Its 23 multi-negative LJ75 endpoints, versus none for intrinsic, identify a
+real high-index failure mode even though CS² recovered more distinct saddle
+families.
+
+Accordingly, CS² is a complementary LJ search channel rather than the LJ
+catchall by itself. Retain intrinsic `lambda2` as the default LJ GAD profile
+and prefer it over CS² for LJ75 under this protocol. Sella is a comparator,
+not an available downstream optimizer. Running both GAD profiles gives a
+442/448 strict union (98.7%), including 100% on LJ13 and LJ31; the six
+budget-limited misses define a separate recovery experiment toward 100%.
+That post-hoc 192-profile experiment recovered all six misses, so its
+exploratory union is 448/448, but only 89/192 rescue profiles were strict and
+36/192 passed the two-minimum endpoint screen. Intrinsic `lambda2` was the
+stronger rescue branch (50/96 strict, 24 endpoints) than CS² (39/96 strict,
+12 endpoints), and 5,000 updates added only one strict result over the matched
+2,000-update grid. This does not replace the frozen 442/448 estimate; it shows
+that a small profile portfolio can recover its selected failures efficiently.
+Full protocol and results are in
+`docs/research/LJ_MULTISIZE_CS2_BENCHMARK_2026_08_09.md`.
+
 ## 6. Scope and next validation
 
 The LJ7 result establishes optimizer mechanics on an exact many-particle

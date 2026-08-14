@@ -28,6 +28,7 @@ full-Hessian RS-P-RFO, not as a quasi-Newton baseline.
 | HIP / Transition1x | Sella leads at low noise; plain GAD ties around 100 pm and leads at 150--200 pm. | The original high-noise GAD advantage, on HIP, is real. |
 | SCINE DFTB0 | GAD has a small 10 pm lead; Sella wins at every higher noise value. | Not a robustness win for GAD. |
 | LJ7 | Sella strongly beats **pure** GAD at high noise. A high-index gate makes GAD nearly perfect, but is not pure GAD and has no endpoint validation yet. | Pure GAD has a stiff/high-index globalization failure; the gated extension is promising. |
+| LJ13/31/38/55/75 | CS²-GAD is mixed against intrinsic `lambda2` (399/448 vs 395/448 strict); their paired union is 442/448. Sella's 422/448 is comparator-only. | CS² is not a universal LJ catchall alone, but it is a strong complementary GAD channel; intrinsic is safer on LJ75. |
 | HORM LEFTNet | Stabilized GAD 0/4; Sella 1/4. | Negative independent-MLIP screen. |
 | MACE-OFF23 | Exploratory probes only; no completed matched pool. | Do not use as comparative evidence. |
 
@@ -50,6 +51,18 @@ For intended-saddle validation, the best completed plain-GAD IRC topology
 rates at 100/150/200 are 78.4%/61.7%/44.6%, versus Sella's
 72.5%/49.8%/23.3% for the matched Cartesian-Eckart baseline. This is the
 strongest positive comparison currently in the repository.
+
+The frozen CS²-GAD follow-up uses the held-out HDF5 `test` partition, exact
+filtered IDs `0..286`, rather than the checkpoint's recorded training LMDB
+`ts1x_hess_train_big.lmdb` or validation LMDB `ts1x-val.lmdb`. Its optimizer
+parameters were inherited from g-xTB and were not selected on these HIP test
+outcomes. Completed strict counts are `202/287`, `157/287`, and `111/287` at
+`0.10/0.15/0.20 A`, below plain GAD's `209/287`, `167/287`, and `128/287`.
+Intended all-endpoint IRC_TOPO is `218/287`, `166/287`, and `117/287`, versus
+plain GAD's `225/287`, `177/287`, and `128/287`. The completed held-out
+evidence therefore rejects CS² as HIP's catchall. Operational details,
+start-table hashes, and retained calculator failures are recorded in
+`HIP_CS2_H100_HANDOFF_2026_08_09.md`.
 
 Source: `analysis_2026_04_29/master_2026_05_16.csv`.
 
@@ -138,6 +151,45 @@ also changes the saddle distribution: at 0.20, only 33/104 pure-GAD successes
 ended at the same energy (within `1e-4`) as their gated counterparts.  An
 LJ-specific endpoint/IRC-like classifier is required before treating gated
 LJ success as intended-saddle recovery.
+
+### Hard multi-size LJ validation (2026-08-09)
+
+A later frozen benchmark tested intrinsic `lambda2`, CS²-GAD, and Sella on
+LJ13, LJ31, the two LJ38 funnels, LJ55, and the two LJ75 funnels. It used
+1,344 trajectories with exact matched starts, and all records were
+calculator-valid. Strict successes pooled over the 448 unique starts per
+method were 395 intrinsic, 399 CS², and 422 Sella.
+
+The pooled near-tie between the two GAD profiles conceals strong size
+dependence. CS²-minus-intrinsic matched strict counts were `+3`, `-3`, `+7`,
+`+9`, and `-12` for LJ13, LJ31, LJ38, LJ55, and LJ75. CS² ended at a
+multi-negative structure 40 times, including 23/128 LJ75 starts; intrinsic
+had no multi-negative terminal cases. Conversely, CS² recovered more
+fingerprint families than intrinsic at every size. The operational conclusion
+is therefore to retain intrinsic `lambda2` as the LJ GAD default and add CS²
+as a complementary LJ38/LJ55 or diversity channel. Sella is only a comparator
+for this downstream use case, not an optimizer option.
+
+The GAD-only paired union reaches 442/448 strict outcomes: 64/64 LJ13, 64/64
+LJ31, 127/128 LJ38, 63/64 LJ55, and 124/128 LJ75. The six misses all exhaust
+the 500-update budget, providing a fixed target for a separately documented
+continuation/restart experiment toward 100% rather than a reason to retune
+the completed benchmark post hoc.
+
+That fixed post-hoc rescue experiment subsequently completed 192/192 valid
+profiles with zero errors. All six misses were rescued by at least one strict
+GAD-family profile, giving an explicitly exploratory 448/448 union, and all
+six had at least one two-minimum profile. The sweep produced 89/192 strict and
+36/192 endpoint-valid rows; intrinsic `lambda2` contributed 50/96 strict and
+24/96 endpoints versus CS²'s 39/96 and 12/96. Increasing the matched budget
+from 2,000 to 5,000 updates added only one strict result and no endpoints.
+This failure-selected sweep supports a profile-diverse rescue strategy but
+does not revise the frozen 442/448 population estimate.
+
+Protocol, per-size strict and endpoint results, paired tests, cost tails, and
+limitations are in `LJ_MULTISIZE_CS2_BENCHMARK_2026_08_09.md`; immutable run
+artifacts are under
+`/scratch/memoozd/gadplus/runs/lj-multisize-cs2-2076554/`.
 
 ## HORM LEFTNet
 

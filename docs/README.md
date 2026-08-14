@@ -15,6 +15,15 @@
 - [Five-minute toy](TOY_GAD_EVOLUTION.md): a self-contained four-well visual
   explanation of the GAD-to-competitive-subspace progression. The executable
   notebook is [`examples/gad_evolution_four_wells.ipynb`](../examples/gad_evolution_four_wells.ipynb).
+- [Multi-size LJ CS² benchmark](research/LJ_MULTISIZE_CS2_BENCHMARK_2026_08_09.md):
+  paired LJ13/LJ31/LJ38/LJ55/LJ75 protocol and run ledger.
+- [HIP CS² H100 handoff](research/HIP_CS2_H100_HANDOFF_2026_08_09.md): frozen
+  matched-noise GPU protocol and aggregation instructions.
+- [Best methods and cross-surface performance](research/BEST_METHODS_CROSS_SURFACE_2026_08_11.md):
+  minimal LJ, g-xTB, and HIP reference implementations plus the complete
+  evaluated-method matrix.
+- [Every method on every surface](research/ALL_METHODS_ALL_SURFACES_TABLES_2026_08_14.md):
+  tables-only comparison across local, strict, endpoint, IRC, and force gates.
 
 ## Research archive
 

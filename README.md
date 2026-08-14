@@ -5,6 +5,15 @@ Transition1x.  It implements gentlest-ascent dynamics (GAD), Sella workflows,
 Eckart-projected vibrational Hessian analysis, and IRC/topology validation on
 neural and semiempirical potential-energy surfaces.
 
+## Results gallery
+
+The consolidated [LJ, g-xTB, and HIP results gallery](docs/research/BEST_METHODS_CROSS_SURFACE_2026_08_11.md)
+contains the selected non-Sella implementations, every matched decision-grid
+method, explicit Sella deltas, steps-to-convergence comparisons, and
+convergence-criterion sensitivity tables. The corresponding minimal readable
+methods are in [`examples/best_methods/`](examples/best_methods/).
+For a tables-only view, use [every method on every surface](docs/research/ALL_METHODS_ALL_SURFACES_TABLES_2026_08_14.md).
+
 ## Current maintained workflow
 
 The active g-xTB workflow is:
