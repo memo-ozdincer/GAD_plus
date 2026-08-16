@@ -57,6 +57,11 @@ method-specific controls. Historical LJ7 progression data have aggregate
 records but no saved stepwise traces, so the explorer reports that limitation
 instead of fabricating plots.
 
+The converged-run effort chart uses equal-width bins on a logarithmic progress
+axis and an in-chart noise selector. Each method is normalized by its own
+successful-run count at that noise, while the recovery plot above retains the
+full planned denominator.
+
 The hosted explorer defaults to compact, left-aligned diagnostic cards; each
 card has a fullscreen control (or `Escape` to return) so long trajectories are
 easy to scroll without losing a detailed inspection mode.  Its projected
