@@ -7,15 +7,14 @@
 | **LJ7** (288 starts) | Ordinary GAD | 39.9% | 39.9% | 494 |
 | | Sella | 58.7% | 58.0% | **13** |
 | | Hard descent gate | 98.3% | 98.3% | 240 |
-| | Smooth `lambda2` gate | 98.3% | 98.3% | 240 |
-| | Intrinsic `lambda2` GAD | **100%** | **100%** | 17 |
-| **LJ13–75, 0.10/0.20 noise** (448 starts) | Intrinsic `lambda2` GAD | 88.2% | 44.6% | 25 |
+| | λ2 GAD | **100%** | **100%** | 17 |
+| **LJ13–75, 0.10/0.20 noise** (448 starts) | λ2 GAD | 88.2% | 44.6% | 25 |
 | | CS²-GAD | 89.1% | 46.2% | 32 |
-| | Intrinsic or CS² (two searches) | **98.7%** | **64.1%** | — |
+| | λ2 or CS² (two searches) | **98.7%** | **64.1%** | — |
 | | Sella | 94.2% | 45.1% | **20.5** |
-| **LJ13–75, 0.30/0.40 noise** (448 starts) | Intrinsic `lambda2` GAD | 70.5% | 37.3% | 40 |
+| **LJ13–75, 0.30/0.40 noise** (448 starts) | λ2 GAD | 70.5% | 37.3% | 40 |
 | | CS²-GAD | 79.7% | 36.4% | 73 |
-| | Intrinsic or CS² (two searches) | 90.4% | **53.6%** | — |
+| | λ2 or CS² (two searches) | 90.4% | **53.6%** | — |
 | | Sella | **90.8%** | 39.3% | **37** |
 | **g-xTB, 0.20 A** (287 starts) | Regular GAD | 0.7% | 0.7% | 282.5 |
 | | Competitive GAD | 82.2% | 42.9% | 28 |

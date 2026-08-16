@@ -19,7 +19,7 @@ DATA = REPO / "docs/research/data/all_methods_all_surfaces"
 
 COLORS = {
     "Ordinary GAD": "#7f8c8d", "Hard gate": "#9467bd",
-    "Smooth λ2": "#17becf", "Intrinsic λ2": "#8c2d04",
+    "λ2 GAD": "#8c2d04",
     "Regular GAD": "#7f8c8d", "Competitive GAD": "#1f77b4",
     "CS²-GAD": "#d62728", "Sella": "#e69f00",
     "Plain GAD dt=.003": "#9ecae1", "Plain GAD dt=.005": "#4292c6",
@@ -45,13 +45,15 @@ def _add_rate(rates, surface, method, noise, success, total, median=None):
 def collect_lj(rates, steps):
     method_labels = {
         "ordinary_gad": "Ordinary GAD", "hard_gate": "Hard gate",
-        "historical_lambda2": "Smooth λ2", "intrinsic": "Intrinsic λ2",
+        "intrinsic": "λ2 GAD",
         "sella": "Sella",
     }
     rows = json.loads((RUNS / "lj-method-progression-1946071/all_results.json").read_text())
     rows += json.loads((RUNS / "lj7-sella-progression-1994169/all_results.json").read_text())
     groups = defaultdict(list)
     for row in rows:
+        if row["method"] not in method_labels:
+            continue
         groups[(method_labels[row["method"]], float(row["noise"]))].append(row)
     for (method, noise), group in sorted(groups.items()):
         successful = [row for row in group if row["converged"]]
@@ -60,7 +62,7 @@ def collect_lj(rates, steps):
         steps.extend({"surface": "LJ7", "method": method, "noise": noise, "progress": x}
                      for x in values)
 
-    labels = {"intrinsic_lambda2": "Intrinsic λ2", "cs2": "CS²-GAD", "sella": "Sella"}
+    labels = {"intrinsic_lambda2": "λ2 GAD", "cs2": "CS²-GAD", "sella": "Sella"}
     rows = []
     for root in ("lj-multisize-cs2-2076554", "lj-multisize-high-noise-20260814"):
         rows += json.loads((RUNS / root / "all_results.json").read_text())
@@ -188,7 +190,7 @@ def collect_hip(rates, steps, medians_only):
 def write_csv(path: Path, rows: list[dict], fields: list[str]):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
